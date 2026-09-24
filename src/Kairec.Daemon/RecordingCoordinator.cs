@@ -231,7 +231,7 @@ public sealed class RecordingCoordinator : IAsyncDisposable
             var clip = a.Profile.EventWantsClip(ev.Type, kills);
             _log.LogInformation("event {type} '{label}' at {where}{clip}", ev.Type, ev.Label ?? "", where, clip ? " (clip)" : "");
             _events.Write("mark", $"{ev.Type}{(ev.Label is null ? "" : " " + ev.Label)} at {where}" + (clip ? $", clip in {a.Profile.MarkAfterSeconds}s" : ""), a.Profile.Name, a.Session.Info.Id, seconds: m.TVideo);
-            if (clip) { _sound.Play("mark"); await ScheduleMarkClipAsync(a, m, tMono, ct); }
+            if (clip) await ScheduleMarkClipAsync(a, m, tMono, ct);   // automated: no sound, the log has it
         }
         finally { _lock.Release(); }
     }
@@ -301,7 +301,7 @@ public sealed class RecordingCoordinator : IAsyncDisposable
         }
         var target = ClipNaming.NewPath(_cfg.ClipsDir, a.Profile.Name, label);
         var r = await ClipExporter.ExportAsync(a.Session.Dir, a.Segments, start, end, target, exact: false, _log, ct);
-        if (!r.Ok) { _sound.Play("error"); return Fail($"{source} failed: " + r.Error); }
+        if (!r.Ok) { if (source != "mark") _sound.Play("error"); return Fail($"{source} failed: " + r.Error); }
 
         var actualStart = end - (r.Duration ?? (end - start));   // stream copy may begin up to a keyframe early
         var info = new ClipInfo
@@ -338,7 +338,7 @@ public sealed class RecordingCoordinator : IAsyncDisposable
         secs = Math.Min(secs, a.Profile.BufferMinutes * 60);
         var saveMono = MonotonicClock.NowMicros();
         var reply = await a.Recorder.SaveReplayAsync(secs, ct);
-        if (!reply.Ok || reply.Data is null) { _sound.Play("error"); return Fail("save failed: " + reply.Data); }
+        if (!reply.Ok || reply.Data is null) { if (source != "mark") _sound.Play("error"); return Fail("save failed: " + reply.Data); }
 
         var target = ClipNaming.Place(_cfg.ClipsDir, reply.Data, a.Profile.Name, label);
         var duration = await VideoProbe.DurationSecondsAsync(target, ct) ?? secs;
@@ -387,7 +387,7 @@ public sealed class RecordingCoordinator : IAsyncDisposable
             var first = a.Session.ToVideoTime(job.FirstMarkMonoUs) ?? end;
             r = await ExportFromTimelineAsync(a, Math.Max(0, first - p.MarkBeforeSeconds), end, label, "mark", job, now, ct);
         }
-        if (r.Ok) _sound.Play("save");
+        // Clip written in the background: silent. You already heard the mark itself if you pressed it.
     }
 
     private long _lastPurgeMono;
