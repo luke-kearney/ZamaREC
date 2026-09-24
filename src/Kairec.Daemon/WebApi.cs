@@ -89,6 +89,28 @@ public static class WebApi
             });
         });
 
+        // Running processes, for the profile picker in Settings. Read from /proc on demand only.
+        api.MapGet("/processes", () =>
+        {
+            var self = Environment.ProcessId;
+            var list = new List<object>();
+            foreach (var dir in Directory.EnumerateDirectories("/proc"))
+            {
+                if (!int.TryParse(Path.GetFileName(dir), out var pid) || pid == self) continue;
+                try
+                {
+                    var comm = File.ReadAllText(Path.Combine(dir, "comm")).TrimEnd('\n');
+                    var cmd = File.ReadAllText(Path.Combine(dir, "cmdline")).Replace('\0', ' ').Trim();
+                    if (cmd.Length == 0) continue;   // kernel threads
+                    var uid = File.ReadLines(Path.Combine(dir, "status")).FirstOrDefault(l => l.StartsWith("Uid:"))?.Split('\t', StringSplitOptions.RemoveEmptyEntries)[1];
+                    if (uid != Environment.GetEnvironmentVariable("UID") && uid != GetUid()) continue;   // only my own processes
+                    list.Add(new { Pid = pid, Comm = comm, Cmdline = cmd.Length > 160 ? cmd[..160] + "…" : cmd });
+                }
+                catch { }
+            }
+            return Results.Ok(list.OrderBy(x => ((dynamic)x).Comm).ToList());
+        });
+
         // ------------------------------------------------------------ config
 
         api.MapGet("/config", async (ConfigService cs, KairecConfig cfg, RecordingCoordinator rec, CancellationToken ct) => Results.Ok(new
@@ -277,6 +299,14 @@ public static class WebApi
             rec.RecordExport(profile, src.SessionId, target, r.Duration);
             return Results.Ok(new { r.Ok, Path = target, File = Path.GetFileName(target), r.Duration });
         });
+    }
+
+    private static string? _uid;
+    private static string GetUid()
+    {
+        if (_uid is not null) return _uid;
+        try { _uid = File.ReadLines("/proc/self/status").First(l => l.StartsWith("Uid:")).Split('\t', StringSplitOptions.RemoveEmptyEntries)[1]; } catch { _uid = ""; }
+        return _uid;
     }
 
     private static long FreeBytes(string path)

@@ -59,12 +59,15 @@
     c.profiles.forEach((p, i) => {
       const P = `profiles.${i}.`;
       const ov = (o, k) => (o && o[k] != null) ? o[k] : '';
-      h += `<div class="card profile"><h3><span class="name">${p.name || 'new profile'}</span><span class="badge">${p.mode}</span><span class="spacer"></span><button class="btn small danger" data-del="${i}">Delete</button></h3>
-        <div class="fields">
+      const open = openProfiles.has(p.name || `#${i}`) || !p.name;
+      const st = p.mode === 'buffer' ? (ov(p.buffer, 'storage') || c.buffer.storage) : (ov(p.timeline, 'storage') || c.timeline.storage);
+      const len = p.mode === 'buffer' ? `${ov(p.buffer, 'minutes') || c.buffer.minutes} min buffer` : `${ov(p.timeline, 'windowMinutes') === '' ? c.timeline.windowMinutes : ov(p.timeline, 'windowMinutes')} min window`;
+      h += `<div class="card profile ${open ? 'open' : 'closed'}" data-profile="${i}"><h3 class="ph" data-toggle="${p.name || `#${i}`}"><span class="chev">${open ? '▾' : '▸'}</span><span class="name">${p.name || 'new profile'}</span><span class="badge">${p.mode}</span><span class="badge">${st}</span><span class="muted sum">${len} · ${p.events === 'none' ? 'manual markers' : p.events} · ${p.match || p.matchCmdline || 'no match yet'}</span><span class="spacer"></span><button class="btn small danger" data-del="${i}">Delete</button></h3>
+        <div class="body"><div class="fields">
           ${field('name', inp(P + 'name', p.name))}
           ${field('mode', sel(P + 'mode', p.mode, [{ v: 'timeline', l: 'timeline (rolling window on disk)' }, { v: 'buffer', l: 'buffer (RAM ring buffer)' }]))}
           ${field('events', sel(P + 'events', p.events, [{ v: 'none', l: 'none (manual markers only)' }, { v: 'cs2-gsi', l: 'cs2-gsi (CS2 game state)' }]))}
-          ${field('process name regex (comm, max 15 chars)', inp(P + 'match', p.match, 'text', 'placeholder="^cs2$"'))}
+          <label class="field"><span>process name regex (comm, max 15 chars) <button class="tiny" data-pick="${i}" title="pick from running processes">pick…</button></span>${inp(P + 'match', p.match, 'text', 'placeholder="^cs2$"')}</label>
           ${field('command line regex (for Java games etc.)', inp(P + 'matchCmdline', p.matchCmdline, 'text', 'placeholder="net\\\\.minecraft|prismlauncher"'))}
           ${field('fps override', inp(P + 'fps', p.fps, 'number'))}
         </div>
@@ -83,12 +86,19 @@
           ${field('clip around each mark', sel(P + 'clips.markSaves', ov(p.clips, 'markSaves') === '' ? '' : String(ov(p.clips, 'markSaves')), [{ v: '', l: '(default)' }, { v: 'true', l: 'on' }, { v: 'false', l: 'off' }]))}
           ${field('retention max GB', inp(P + 'retention.maxGb', ov(p.retention, 'maxGb'), 'number'))}
           ${field('retention max days', inp(P + 'retention.maxDays', ov(p.retention, 'maxDays'), 'number'))}
-        </div></div></div>`;
+        </div></div></div></div>`;
     });
     $('cfgForm').innerHTML = h;
     $('cfgForm').addEventListener('input', updateFootprints);
     updateFootprints();
-    $('addProfile').onclick = () => { collect(); cfg.profiles.push({ name: '', match: '', matchCmdline: null, mode: 'timeline', events: 'none', fps: null, timeline: null, buffer: null, clips: null, retention: null }); render(); };
+    document.querySelectorAll('[data-toggle]').forEach(hd => hd.onclick = e => {
+      if (e.target.closest('button')) return;
+      const key = hd.dataset.toggle; openProfiles.has(key) ? openProfiles.delete(key) : openProfiles.add(key);
+      try { localStorage.setItem('openProfiles', JSON.stringify([...openProfiles])); } catch {}
+      collect(); render();
+    });
+    document.querySelectorAll('[data-pick]').forEach(b => b.onclick = e => { e.preventDefault(); openPicker(+b.dataset.pick, b); });
+    $('addProfile').onclick = () => { collect(); openProfiles.add(`#${cfg.profiles.length}`); cfg.profiles.push({ name: '', match: '', matchCmdline: null, mode: 'timeline', events: 'none', fps: null, timeline: null, buffer: null, clips: null, retention: null }); render(); };
     document.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { collect(); cfg.profiles.splice(+b.dataset.del, 1); render(); });
     $('cfgText').value = meta.text; $('cfgPath').textContent = meta.path;
     const n = $('cfgNotice');
@@ -96,6 +106,34 @@
     else if (meta.sessionRunning) { n.hidden = false; n.textContent = 'a session is running: saves apply when it ends'; }
     else n.hidden = true;
   }
+
+  let openProfiles = new Set();
+  try { openProfiles = new Set(JSON.parse(localStorage.getItem('openProfiles') || '[]')); } catch {}
+
+  // Process picker: lists your running processes; choose the name or the command line as the match.
+  async function openPicker(i, anchor) {
+    document.querySelectorAll('.picker').forEach(p => p.remove());
+    const pk = document.createElement('div'); pk.className = 'picker';
+    pk.innerHTML = `<input type="text" class="text" placeholder="filter…"><div class="rows"><div class="muted">loading…</div></div>`;
+    anchor.closest('.field').appendChild(pk);
+    const rows = pk.querySelector('.rows'), filter = pk.querySelector('input');
+    const procs = await (await fetch('/api/processes')).json();
+    const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const draw = () => {
+      const q = filter.value.toLowerCase();
+      const seen = new Set();
+      rows.innerHTML = procs.filter(p => !q || p.comm.toLowerCase().includes(q) || p.cmdline.toLowerCase().includes(q))
+        .filter(p => { if (seen.has(p.comm)) return false; seen.add(p.comm); return true; })   // one row per process name
+        .slice(0, 80)
+        .map(p => `<div class="prow"><b>${p.comm}</b><span class="muted mono">${p.cmdline.replace(/</g, '&lt;')}</span><span><button class="tiny" data-name="${p.comm}">name</button><button class="tiny" data-cmd="${p.cmdline.split(' ')[0].replace(/"/g, '')}">cmdline</button></span></div>`).join('') || '<div class="muted">no match</div>';
+      rows.querySelectorAll('[data-name]').forEach(b => b.onclick = () => { setField(`profiles.${i}.match`, '^' + esc(b.dataset.name) + '$'); pk.remove(); });
+      rows.querySelectorAll('[data-cmd]').forEach(b => b.onclick = () => { setField(`profiles.${i}.matchCmdline`, esc(b.dataset.cmd.split('/').pop())); pk.remove(); });
+    };
+    filter.oninput = draw; draw(); filter.focus();
+    const close = ev => { if (!pk.contains(ev.target) && ev.target !== anchor) { pk.remove(); document.removeEventListener('mousedown', close); } };
+    setTimeout(() => document.addEventListener('mousedown', close), 0);
+  }
+  function setField(path, value) { const el = document.querySelector(`#cfgForm [data-path="${path}"]`); if (el) { el.value = value; el.dispatchEvent(new Event('input', { bubbles: true })); } }
 
   // Footage the profile needs, from the current form values, against what the machine has.
   const gb = b => (b / 1e9).toFixed(1) + ' GB';

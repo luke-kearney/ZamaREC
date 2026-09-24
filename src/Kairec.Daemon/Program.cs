@@ -40,7 +40,12 @@ var types = new FileExtensionContentTypeProvider();
 types.Mappings[".ts"] = "video/mp2t";
 types.Mappings[".m3u8"] = "application/vnd.apple.mpegurl";
 app.UseDefaultFiles();
-app.UseStaticFiles(new StaticFileOptions { ContentTypeProvider = types });
+app.UseStaticFiles(new StaticFileOptions
+{
+    ContentTypeProvider = types,
+    // The UI is tiny and changes with every update: make browsers revalidate instead of serving a stale page.
+    OnPrepareResponse = ctx => ctx.Context.Response.Headers.CacheControl = "no-cache",
+});
 app.MapWebApi();
 
 app.Services.GetRequiredService<Kairec.Core.Telemetry.EventLog>().Write("daemon", "daemon started");
