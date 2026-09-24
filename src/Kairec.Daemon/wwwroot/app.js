@@ -505,7 +505,12 @@ $('video').addEventListener('timeupdate', () => {
   $('tFull').onclick = () => { document.fullscreenElement ? document.exitFullscreen() : stage.requestFullscreen().catch(() => {}); };
   v.addEventListener('play', () => stage.classList.add('playing'));
   v.addEventListener('pause', () => stage.classList.remove('playing'));
-  v.addEventListener('volumechange', () => { stage.classList.toggle('muted', v.muted || v.volume === 0); if (!v.muted) $('tVol').value = v.volume; });
+  // volume and mute survive reloads
+  try { const sv = localStorage.getItem('volume'); if (sv != null) { v.volume = Math.max(0, Math.min(1, +sv)); $('tVol').value = v.volume; } v.muted = localStorage.getItem('muted') === '1'; stage.classList.toggle('muted', v.muted || v.volume === 0); } catch {}
+  v.addEventListener('volumechange', () => {
+    stage.classList.toggle('muted', v.muted || v.volume === 0); if (!v.muted) $('tVol').value = v.volume;
+    try { localStorage.setItem('volume', String(v.volume)); localStorage.setItem('muted', v.muted ? '1' : '0'); } catch {}
+  });
   let hideTimer;
   stage.addEventListener('mousemove', () => { stage.classList.add('show-ui'); clearTimeout(hideTimer); hideTimer = setTimeout(() => stage.classList.remove('show-ui'), 2000); });
   // Buffer sessions: when the loaded clip runs out, carry on in whichever clip covers the next moment.
