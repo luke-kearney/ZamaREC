@@ -42,6 +42,8 @@ public sealed class DaemonStatus
     [JsonPropertyName("gsi_map")] public string? GsiMap { get; set; }
     /// <summary>Empty when auto recording is on, otherwise a description of the pause.</summary>
     [JsonPropertyName("paused")] public string? Paused { get; set; }
+    [JsonPropertyName("ui_url")] public string? UiUrl { get; set; }
+    [JsonPropertyName("save_seconds")] public int? SaveSeconds { get; set; }
     [JsonPropertyName("profiles")] public List<string> Profiles { get; set; } = new();
 }
 

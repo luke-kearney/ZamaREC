@@ -105,6 +105,15 @@ markers on the right.
   when the current session ends if one is running. A raw TOML editor sits behind the form.
   `kairec reload` does the same for hand edits. Port changes still need a restart.
 
+## Tray icon
+
+`kairec-tray` is a StatusNotifierItem for Plasma (and anything else that speaks that protocol),
+installed as the `kairec-tray` user service. The dot is grey when idle, red while recording, amber
+when auto recording is off. Left click opens the web UI, middle click drops a marker, and the menu
+has the on/off durations, Mark, Save, Stop, Open web UI, Open clips folder. It talks to the daemon
+over the same socket as the CLI and never opens a window of its own. Plasma hides new tray icons
+until you promote them: right-click the tray → Configure System Tray → Entries.
+
 ## Stats and log
 
 The UI has a **Stats** page (lifetime footage written to disk vs to RAM, clip bytes, counts, what the
