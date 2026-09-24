@@ -29,6 +29,8 @@ const fmt = s => {
   return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + sec.toFixed(1).padStart(4, '0');
 };
 const fmtDate = iso => { const d = new Date(iso); return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }); };
+const fmtDay = iso => new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
+const fmtTime = iso => new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true });
 const gb = b => b > 1e9 ? (b / 1e9).toFixed(2) + ' GB' : (b / 1e6).toFixed(0) + ' MB';
 async function api(path, opts) {
   const r = await fetch('/api' + path, opts && opts.body ? { method: 'POST', headers: { 'content-type': 'application/json' }, ...opts, body: JSON.stringify(opts.body) } : opts);
@@ -96,11 +98,14 @@ function banner(el, profile) {
 function renderList() {
   const box = $('list'); box.innerHTML = '';
   if (state.tab === 'sessions') {
+    let day = null;
     for (const s of state.sessions.filter(s => !state.profile || s.profile === state.profile)) {
+      const dayOf = fmtDay(s.startedAt);
+      if (dayOf !== day) { day = dayOf; const h = document.createElement('div'); h.className = 'list-head'; h.textContent = dayOf; box.appendChild(h); }
       const d = document.createElement('div');
       d.className = 'item' + (state.current && state.current.kind === 'session' && state.current.id === s.id ? ' active' : '') + (s.footageGone ? ' gone' : '');
       const hasBanner = banner(d, s.profile);   // the banner already says which game, and greyscale says the footage is gone
-      d.innerHTML = `<div class="l1"><span>${fmtDate(s.startedAt)}</span><span class="r">${s.live ? '<span class="badge live">LIVE</span>' : ''}${s.ram && !(hasBanner && s.footageGone) ? `<span class="badge ${s.footageGone ? 'gone' : 'ram'}" title="${s.footageGone ? 'RAM footage has been dropped' : 'segments live in RAM'}">${s.footageGone ? 'gone' : 'RAM'}</span>` : ''}${hasBanner ? '' : `<span class="badge">${s.profile}</span>`}</span></div>
+      d.innerHTML = `<div class="l1"><span>${s.gameName || s.profile}</span><span class="r">${s.live ? '<span class="badge live">LIVE</span>' : ''}${s.ram && !(hasBanner && s.footageGone) ? `<span class="badge ${s.footageGone ? 'gone' : 'ram'}" title="${s.footageGone ? 'RAM footage has been dropped' : 'segments live in RAM'}">${s.footageGone ? 'gone' : 'RAM'}</span>` : ''}<span class="badge time mono" title="${fmtDate(s.startedAt)}">${fmtTime(s.startedAt)}</span></span></div>
         <div class="l2"><span>${s.map || s.mode}</span>${s.durationSeconds != null ? `<span class="mono">${fmt(s.durationSeconds)}</span>` : ''}<span>${s.markerCount} marker${s.markerCount === 1 ? '' : 's'}</span><span>${s.clipCount} clip${s.clipCount === 1 ? '' : 's'}</span></div>`;
       d.onclick = () => { if (window.closePages) window.closePages(); loadSession(s.id); };
       box.appendChild(d);
@@ -210,7 +215,7 @@ async function loadSession(id) {
   }
   $('title').textContent = `${data.profile} · ${fmtDate(data.startedAt)}` + (data.map ? ` · ${data.map}` : '');
   const covered = state.coverage.reduce((a, c) => a + (c.end - c.start), 0);
-  $('starClip').hidden = true;
+  $('starClip').hidden = true; $('deleteClip').hidden = true;
   $('subtitle').textContent = data.mode === 'timeline'
     ? `${fmt(data.recordedSeconds)} recorded · window ${fmt(data.windowStart)} – ${fmt(data.windowEnd)}` + (data.ram ? ' · RAM' : '') + (data.footageGone ? ' · footage dropped, markers and clips kept' : '') + (data.live ? ' · live' : '')
     : `buffer mode · ${data.markers.length} marks · ${state.coverage.length} clips covering ${fmt(covered)}` + (data.live ? ' · live, nothing is written until a mark or save' : '');
@@ -225,6 +230,7 @@ function loadClip(c) {
   $('video').src = `/api/clips/${encodeURIComponent(c.profile)}/${encodeURIComponent(c.file)}`;
   $('title').textContent = c.label || c.file;
   const sb = $('starClip'); sb.hidden = false; sb.classList.toggle('on', !!c.starred); sb.querySelector('span').textContent = c.starred ? 'Starred' : 'Star';
+  disarmDelete(); $('deleteClip').hidden = false;
   $('subtitle').textContent = `${c.profile} · ${c.source} · ${fmtDate(c.createdAt)} · ${fmt(c.durationSeconds)} · ${gb(c.bytes)}` + (c.expiresAt ? ` · expires ${fmtDate(c.expiresAt)}` : '');
   state.total = c.durationSeconds || 1;
   showViewer(); renderTimeline(); renderMarkers(); renderList();
@@ -408,6 +414,22 @@ $('outBtn').onclick = () => {
   renderSelection();
 };
 $('goIn').onclick = () => { if (state.inT != null) seek(state.inT); };
+// delete a clip: first click arms the button for a few seconds, second click deletes
+let deleteTimer;
+function disarmDelete() { clearTimeout(deleteTimer); const b = $('deleteClip'); b.classList.remove('arm'); b.querySelector('span').textContent = 'Delete'; }
+$('deleteClip').onclick = async e => {
+  e.stopPropagation();
+  const cur = state.current; if (!cur || cur.kind !== 'clip') return;
+  const b = $('deleteClip');
+  if (!b.classList.contains('arm')) { b.classList.add('arm'); b.querySelector('span').textContent = 'Click again to delete'; deleteTimer = setTimeout(disarmDelete, 4000); return; }
+  disarmDelete();
+  try { await api(`/clips/${encodeURIComponent(cur.data.profile)}/${encodeURIComponent(cur.data.file)}`, { method: 'DELETE' }); }
+  catch (err) { return toast('not deleted: ' + err.message, true); }
+  toast(`deleted ${cur.data.label || cur.data.file}`);
+  destroyPlayer(); playerMessage(null); state.current = null; state.inT = state.outT = null;
+  $('viewer').hidden = true; $('empty').hidden = false; $('markerList').innerHTML = ''; $('typeChips').innerHTML = ''; $('markersCount').textContent = '';
+  refreshList();
+};
 $('starClip').onclick = async () => {
   const cur = state.current; if (!cur || cur.kind !== 'clip') return;
   const r = await api(`/clips/${encodeURIComponent(cur.data.profile)}/${encodeURIComponent(cur.data.file)}/star`, { method: 'POST' });

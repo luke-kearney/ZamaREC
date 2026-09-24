@@ -165,6 +165,7 @@ public static class WebApi
                 s.MarkerCount, ClipCount = s.Info.Clips.Count, Live = s.Id == rec.ActiveSessionId,
                 Ram = s.Info.MediaDir is not null, s.Info.FootageGone,
                 Game = GamePresets.ResolveByProfileName(cfg, s.Info.Profile)?.Id,
+                GameName = GamePresets.ResolveByProfileName(cfg, s.Info.Profile)?.Name ?? s.Info.Profile,
             })));
 
         api.MapGet("/sessions/{id}", (string id, SessionCatalog cat, RecordingCoordinator rec, KairecConfig cfg) =>

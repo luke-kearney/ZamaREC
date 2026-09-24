@@ -107,7 +107,10 @@
           <div id="title" class="title"></div>
           <div id="subtitle" class="subtitle"></div>
         </div>
-        <button class="btn ghost star" id="starClip" title="star this clip: it is never deleted by retention" hidden>★ <span>Star</span></button>
+        <div class="title-acts">
+          <button class="btn ghost star" id="starClip" title="star this clip: it is never deleted by retention" hidden>★ <span>Star</span></button>
+          <button class="btn ghost danger" id="deleteClip" title="delete this clip" hidden><span>Delete</span></button>
+        </div>
       </div>
       <div class="stage" id="stage">
         <div class="player"><video id="video" preload="metadata" playsinline></video>
