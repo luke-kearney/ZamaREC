@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Tomlyn;
 
 namespace Kairec.Core.Config;
@@ -15,9 +16,20 @@ public sealed class KairecConfig
     public DaemonConfig Daemon { get; set; } = new();
     public List<ProfileConfig> Profiles { get; set; } = new();
 
-    public string RootDir => Paths.Expand(Storage.Root);
-    public string SessionsDir => Path.Combine(RootDir, "sessions");
-    public string ClipsDir => Path.Combine(RootDir, "clips");
+    [JsonIgnore] public string RootDir => Paths.Expand(Storage.Root);
+    [JsonIgnore] public string SessionsDir => Path.Combine(RootDir, "sessions");
+    [JsonIgnore] public string ClipsDir => Path.Combine(RootDir, "clips");
+
+    /// <summary>Bumped on every reload so long-lived components can notice a change.</summary>
+    [JsonIgnore] public int Version { get; private set; }
+
+    /// <summary>Replaces this instance's contents in place, so everyone holding a reference sees the new config.</summary>
+    public void CopyFrom(KairecConfig o)
+    {
+        Storage = o.Storage; Capture = o.Capture; Timeline = o.Timeline; Buffer = o.Buffer; Clips = o.Clips;
+        Retention = o.Retention; Feedback = o.Feedback; Daemon = o.Daemon; Profiles = o.Profiles;
+        Version++;
+    }
 
     public ProfileConfig? FindProfile(string name) =>
         Profiles.FirstOrDefault(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
@@ -145,7 +157,7 @@ public sealed class ProfileConfig
     public ProfileClipOverride? Clips { get; set; }
     public ProfileRetentionOverride? Retention { get; set; }
 
-    public CaptureMode CaptureMode => Mode.ToLowerInvariant() switch
+    [JsonIgnore] public CaptureMode CaptureMode => Mode.ToLowerInvariant() switch
     {
         "timeline" => CaptureMode.Timeline,
         "buffer" => CaptureMode.Buffer,
@@ -190,7 +202,13 @@ public static class ConfigLoader
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
         PropertyNameCaseInsensitive = true,
+        DefaultIgnoreCondition = TomlIgnoreCondition.WhenWritingNull,
     };
+
+    /// <summary>Renders a config back to TOML. Comments from the original file are not preserved.</summary>
+    public static string Serialize(KairecConfig cfg) =>
+        "# kairec configuration (written by the settings UI; see config.example.toml in the repo for a commented version)\n\n"
+        + TomlSerializer.Serialize(cfg, Options);
 
     public static KairecConfig Parse(string toml)
     {
@@ -211,7 +229,7 @@ public static class ConfigLoader
         return Parse(File.ReadAllText(path));
     }
 
-    private static void Validate(KairecConfig cfg)
+    public static void Validate(KairecConfig cfg)
     {
         var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var p in cfg.Profiles)

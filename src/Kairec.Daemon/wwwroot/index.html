@@ -11,6 +11,7 @@
   <div class="brand">kairec</div>
   <div id="status" class="status idle">idle</div>
   <div class="spacer"></div>
+  <button id="settingsBtn" class="btn">⚙ Settings</button>
   <button id="markBtn" class="btn" title="M">● Mark</button>
 </header>
 
@@ -25,6 +26,22 @@
   </aside>
 
   <main>
+    <div id="settings" class="settings" hidden>
+      <div class="settings-head">
+        <div class="title">Settings</div>
+        <div id="cfgNotice" class="notice" hidden></div>
+        <div class="spacer"></div>
+        <button class="btn" id="cfgRawToggle">Raw TOML</button>
+        <button class="btn primary" id="cfgSave">Save</button>
+        <button class="btn" id="cfgClose">Close</button>
+      </div>
+      <div id="cfgForm"></div>
+      <div id="cfgRaw" hidden>
+        <p class="muted">The file as it is on disk. Saving here bypasses the form. Comments are kept when you save from here, lost when you save from the form.</p>
+        <textarea id="cfgText" spellcheck="false"></textarea>
+        <div class="group"><button class="btn primary" id="cfgSaveRaw">Save raw</button><span class="muted" id="cfgPath"></span></div>
+      </div>
+    </div>
     <div id="empty" class="empty">Pick a session or clip on the left.</div>
     <div id="viewer" hidden>
       <div class="titlebar">
@@ -80,5 +97,6 @@
 <div id="toast" class="toast" hidden></div>
 <script src="hls.min.js"></script>
 <script src="app.js"></script>
+<script src="settings.js"></script>
 </body>
 </html>

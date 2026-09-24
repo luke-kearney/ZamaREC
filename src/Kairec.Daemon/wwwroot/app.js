@@ -160,7 +160,7 @@ function loadClip(c) {
   state.total = c.durationSeconds || 1;
   showViewer(); renderTimeline(); renderMarkers(); renderList();
 }
-function showViewer() { $('empty').hidden = true; $('viewer').hidden = false; }
+function showViewer() { if (window.settingsOpen && window.settingsOpen()) document.getElementById('cfgClose').click(); $('empty').hidden = true; $('viewer').hidden = false; }
 
 // ------------------------------------------------------------------ timeline
 function markersOf() {
@@ -277,4 +277,5 @@ document.addEventListener('keydown', e => {
   }
 });
 
+window.state = state; window.toast = toast;
 refreshStatus(); refreshList(); setInterval(refreshStatus, 3000);

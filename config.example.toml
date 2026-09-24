@@ -1,0 +1,61 @@
+# Kairec configuration. Restart the daemon after editing:
+#   systemctl --user restart kairec
+
+[storage]
+root = "~/Videos/kairec"          # sessions/ and clips/ live under here
+
+[capture]
+monitor = "DP-1"                  # gpu-screen-recorder --list-monitors
+fps = 60
+codec = "h264"                    # h264 | hevc | av1. h264 plays in every browser.
+bitrate_kbps = 20000              # constant bitrate; 20000 is ~9 GB per hour
+keyframe_seconds = 1.0            # clips are cut on keyframes
+audio = ["default_output"]        # add "default_input" to record the microphone
+cursor = false
+
+# Two capture modes, chosen per profile:
+#   timeline  a rolling window of the last N minutes on disk. Scrub and export from anywhere
+#             in the window, even mid-session. Older footage is deleted as you play.
+#   buffer    a ring buffer in RAM. Nothing touches the disk until you mark or save.
+#             A mark dumps mark_before_seconds + mark_after_seconds around it into a clip.
+
+[timeline]                        # defaults; profiles override under timeline.*
+window_minutes = 120              # 0 = keep everything
+segment_seconds = 5                # a save waits for the current segment to finish, so keep this short
+
+[buffer]                          # defaults; profiles override under buffer.*
+minutes = 30                      # ~150 MB of RAM per minute at 20000 kbps
+storage = "ram"                   # ram | disk
+
+[clips]                           # defaults; profiles override under clips.*
+save_seconds = 30                 # `kairec save` with no --last
+mark_before_seconds = 1500        # buffer mode: 25 min before a mark...
+mark_after_seconds = 300          # ...and 5 min after it
+mark_clip_expire_hours = 30       # mark clips are deleted after this unless starred (0 = never)
+
+[retention]                       # applies to clips; profiles override under retention.*
+max_gb = 100
+max_days = 30
+# Starred clips are never deleted.
+
+[feedback]
+sound = true                      # short tone on mark/save. Never a popup, never focus.
+volume = 0.5
+
+[daemon]
+gsi_port = 3555                   # CS2 game state integration POSTs here
+ui_port = 3556                    # web timeline
+bind = "127.0.0.1"
+
+[[profiles]]
+name = "cs2"
+match = "^cs2$"                   # regex on the process name
+mode = "timeline"
+events = "cs2-gsi"
+timeline.window_minutes = 120
+
+[[profiles]]
+name = "minecraft"
+match_cmdline = "net\\.minecraft|minecraft-launcher|fabric|forge|prismlauncher"
+mode = "buffer"
+buffer.minutes = 30

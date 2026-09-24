@@ -9,12 +9,14 @@ public sealed class GameWatcherService : BackgroundService
     private readonly KairecConfig _cfg;
     private readonly RecordingCoordinator _rec;
     private readonly ILogger<GameWatcherService> _log;
-    private readonly ProcessWatcher _watcher;
+    private ProcessWatcher _watcher;
+    private int _watcherVersion;
 
     public GameWatcherService(KairecConfig cfg, RecordingCoordinator rec, ILogger<GameWatcherService> log)
     {
         _cfg = cfg; _rec = rec; _log = log;
         _watcher = new ProcessWatcher(cfg.Profiles, log);
+        _watcherVersion = cfg.Version;
     }
 
     protected override async Task ExecuteAsync(CancellationToken ct)
@@ -41,6 +43,7 @@ public sealed class GameWatcherService : BackgroundService
                 }
                 else
                 {
+                    if (_cfg.Version != _watcherVersion) { _watcher = new ProcessWatcher(_cfg.Profiles, _log); _watcherVersion = _cfg.Version; }
                     var game = _watcher.FindRunning(self);
                     if (game is not null)
                     {

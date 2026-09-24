@@ -41,9 +41,11 @@ public sealed class RecordingCoordinator : IAsyncDisposable
         public List<Marker> Marks = new();
     }
 
-    public RecordingCoordinator(KairecConfig cfg, SoundFeedback sound, ILogger<RecordingCoordinator> log)
+    private readonly ConfigService _configService;
+
+    public RecordingCoordinator(KairecConfig cfg, SoundFeedback sound, ConfigService configService, ILogger<RecordingCoordinator> log)
     {
-        _cfg = cfg; _sound = sound; _log = log;
+        _cfg = cfg; _sound = sound; _configService = configService; _log = log;
     }
 
     public bool IsActive => _active is not null;
@@ -110,6 +112,7 @@ public sealed class RecordingCoordinator : IAsyncDisposable
             _active = null;
             var result = await StopActiveAsync(a, reason, ct);
             _sound.Play("stop");
+            _configService.ApplyPendingIfAny();
             return result;
         }
         finally { _lock.Release(); }

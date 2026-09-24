@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using Kairec.Core.Config;
 using Kairec.Core.Export;
+using Kairec.Core.Recording;
 using Kairec.Core.Sessions;
 
 namespace Kairec.Daemon;
@@ -12,6 +13,7 @@ public static class WebApi
     public sealed record AroundRequest(string MarkerId, double Before, double After, string? Label, bool Exact);
     public sealed record BatchRequest(string Type, double Before, double After, bool Exact);
     public sealed record MarkRequest(string? Label);
+    public sealed record ConfigTextRequest(string Text);
 
     public static void MapWebApi(this WebApplication app)
     {
@@ -26,6 +28,27 @@ public static class WebApi
 
         api.MapPost("/mark", async (MarkRequest req, RecordingCoordinator rec, CancellationToken ct) =>
             Results.Ok(await rec.MarkAsync(req.Label, ct)));
+
+        // ------------------------------------------------------------ config
+
+        api.MapGet("/config", async (ConfigService cs, KairecConfig cfg, RecordingCoordinator rec, CancellationToken ct) => Results.Ok(new
+        {
+            cs.Path, Text = cs.ReadText(), Config = cfg, Pending = cs.HasPending, SessionRunning = rec.IsActive,
+            Monitors = await GsrInfo.MonitorsAsync(ct), AudioDevices = await GsrInfo.AudioDevicesAsync(ct),
+            Codecs = new[] { "h264", "hevc", "av1" },
+        }));
+
+        api.MapPut("/config", (ConfigTextRequest req, ConfigService cs, RecordingCoordinator rec) =>
+        {
+            try { return Results.Ok(new { Ok = true, Result = cs.SaveText(req.Text, rec.IsActive) }); }
+            catch (Exception ex) { return Results.BadRequest(new { Ok = false, Error = ex.Message }); }
+        });
+
+        api.MapPut("/config/structured", ([Microsoft.AspNetCore.Mvc.FromBody] KairecConfig cfg, ConfigService cs, RecordingCoordinator rec) =>
+        {
+            try { return Results.Ok(new { Ok = true, Result = cs.SaveStructured(cfg, rec.IsActive), Text = cs.ReadText() }); }
+            catch (Exception ex) { return Results.BadRequest(new { Ok = false, Error = ex.Message }); }
+        });
 
         // ------------------------------------------------------------ sessions
 

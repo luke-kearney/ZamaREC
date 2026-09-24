@@ -78,6 +78,10 @@ markers on the right.
 - "Clip around this marker" (✂) uses the before/after seconds; "Export all" does every marker
   of one type. Exports are stream copies unless *frame-exact* is ticked, which re-encodes on nvenc.
 - A clip opens the same way and can be cut down again.
+- **Settings** (top right) edits the whole config: capture, defaults and profiles, with the
+  monitor and audio devices picked from what the recorder reports. Saves apply immediately, or
+  when the current session ends if one is running. A raw TOML editor sits behind the form.
+  `kairec reload` does the same for hand edits. Port changes still need a restart.
 
 ## Status
 

@@ -10,11 +10,12 @@ public sealed class ControlSocketServer : BackgroundService
 {
     private readonly RecordingCoordinator _rec;
     private readonly Core.Config.KairecConfig _cfg;
+    private readonly ConfigService _configService;
     private readonly ILogger<ControlSocketServer> _log;
 
-    public ControlSocketServer(RecordingCoordinator rec, Core.Config.KairecConfig cfg, ILogger<ControlSocketServer> log)
+    public ControlSocketServer(RecordingCoordinator rec, Core.Config.KairecConfig cfg, ConfigService configService, ILogger<ControlSocketServer> log)
     {
-        _rec = rec; _cfg = cfg; _log = log;
+        _rec = rec; _cfg = cfg; _configService = configService; _log = log;
     }
 
     protected override async Task ExecuteAsync(CancellationToken ct)
@@ -74,6 +75,17 @@ public sealed class ControlSocketServer : BackgroundService
                 if (profile is null) return new ControlResponse { Ok = false, Message = $"unknown profile '{name}'. Known: {string.Join(", ", _cfg.Profiles.Select(p => p.Name))}" };
                 return await _rec.StartAsync(profile, "manual", null, ct);
             }
+            case "reload":
+            {
+                try
+                {
+                    var r = _configService.ReloadFromDisk(_rec.IsActive);
+                    return new ControlResponse { Ok = true, Message = r == "applied" ? "config reloaded" : "config reloaded; applies when the current session ends" };
+                }
+                catch (Exception ex) { return new ControlResponse { Ok = false, Message = "config error: " + ex.Message }; }
+            }
+            case "config":
+                return new ControlResponse { Ok = true, Message = _configService.Path };
             case "status":
             {
                 var s = _rec.Status();

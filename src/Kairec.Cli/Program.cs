@@ -35,7 +35,7 @@ switch (req.Cmd)
     case "status":
         if (rest.Contains("--watch") || rest.Contains("-w")) return await Top.RunAsync();
         break;
-    case "stop":
+    case "stop" or "reload" or "config":
         break;
     default:
         Console.Error.WriteLine($"unknown command '{req.Cmd}'");

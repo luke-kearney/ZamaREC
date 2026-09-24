@@ -21,6 +21,7 @@ builder.WebHost.ConfigureKestrel(k =>
 });
 
 builder.Services.AddSingleton(config);
+builder.Services.AddSingleton(sp => new ConfigService(config, configPath, sp.GetRequiredService<ILogger<ConfigService>>()));
 builder.Services.AddSingleton(sp => new SoundFeedback(config.Feedback, sp.GetRequiredService<ILogger<SoundFeedback>>()));
 builder.Services.AddSingleton<RecordingCoordinator>();
 builder.Services.AddSingleton<SessionCatalog>();
