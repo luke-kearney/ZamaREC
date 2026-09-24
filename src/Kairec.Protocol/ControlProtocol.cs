@@ -31,6 +31,10 @@ public sealed class DaemonStatus
     [JsonPropertyName("recorded_seconds")] public double? RecordedSeconds { get; set; }
     [JsonPropertyName("window_seconds")] public double? WindowSeconds { get; set; }
     [JsonPropertyName("pending_marks")] public int PendingMarks { get; set; }
+    [JsonPropertyName("daemon_pid")] public int DaemonPid { get; set; }
+    [JsonPropertyName("recorder_pid")] public int? RecorderPid { get; set; }
+    [JsonPropertyName("root_dir")] public string? RootDir { get; set; }
+    [JsonPropertyName("session_started_at")] public DateTimeOffset? SessionStartedAt { get; set; }
     [JsonPropertyName("profiles")] public List<string> Profiles { get; set; } = new();
 }
 

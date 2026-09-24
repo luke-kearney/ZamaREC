@@ -309,8 +309,10 @@ public sealed class RecordingCoordinator : IAsyncDisposable
     public DaemonStatus Status()
     {
         var a = _active;
-        var s = new DaemonStatus { Profiles = _cfg.Profiles.Select(p => p.Name).ToList() };
+        var s = new DaemonStatus { Profiles = _cfg.Profiles.Select(p => p.Name).ToList(), DaemonPid = Environment.ProcessId, RootDir = _cfg.RootDir };
         if (a is null) return s;
+        s.RecorderPid = a.Recorder.HasExited ? null : a.Recorder.Pid;
+        s.SessionStartedAt = a.Session.Info.StartedAt;
         s.State = a.Recorder.HasExited ? "recorder-died" : "recording";
         s.Profile = a.Profile.Name;
         s.Mode = a.Profile.Mode.ToString().ToLowerInvariant();

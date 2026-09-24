@@ -30,7 +30,12 @@ switch (req.Cmd)
     case "start":
         req.Profile = rest.FirstOrDefault();
         break;
-    case "stop" or "status":
+    case "top":
+        return await Top.RunAsync();
+    case "status":
+        if (rest.Contains("--watch") || rest.Contains("-w")) return await Top.RunAsync();
+        break;
+    case "stop":
         break;
     default:
         Console.Error.WriteLine($"unknown command '{req.Cmd}'");
@@ -39,19 +44,7 @@ switch (req.Cmd)
 
 try
 {
-    using var sock = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
-    sock.Connect(new UnixDomainSocketEndPoint(ControlPaths.SocketPath()));
-    sock.Send(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(req, ProtocolJson.Default.ControlRequest) + "\n"));
-    var buf = new byte[8192];
-    var sb = new StringBuilder();
-    while (true)
-    {
-        var n = sock.Receive(buf);
-        if (n == 0) break;
-        sb.Append(Encoding.UTF8.GetString(buf, 0, n));
-        if (sb.ToString().Contains('\n')) break;
-    }
-    var resp = JsonSerializer.Deserialize(sb.ToString().Split('\n')[0], ProtocolJson.Default.ControlResponse);
+    var resp = Daemon.Send(req);
     if (resp is null) { Console.Error.WriteLine("empty reply from daemon"); return 1; }
     Console.WriteLine(resp.Message);
     return resp.Ok ? 0 : 1;
@@ -61,6 +54,7 @@ catch (SocketException)
     Console.Error.WriteLine($"daemon not running (no socket at {ControlPaths.SocketPath()}). Start it with: systemctl --user start kairec");
     return 3;
 }
+
 
 static int? ParseSeconds(string s)
 {

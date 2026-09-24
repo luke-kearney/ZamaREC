@@ -44,6 +44,8 @@ kairec save [--last 30s] [label]  save the last N seconds from the replay buffer
 kairec start [profile]            start a session manually
 kairec stop                       stop the current session
 kairec status                     show what the daemon is doing
+kairec top                        live view until Ctrl+C: state, CPU/RAM of the daemon and
+                                  recorder, system load, storage and write rate (all from /proc)
 ```
 
 ## Layout on disk
