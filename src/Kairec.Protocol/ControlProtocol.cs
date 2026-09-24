@@ -45,8 +45,11 @@ public partial class ProtocolJson : JsonSerializerContext { }
 
 public static class ControlPaths
 {
+    /// <summary>Control socket. KAIREC_SOCKET overrides it so a test daemon never touches the real one.</summary>
     public static string SocketPath()
     {
+        var env = Environment.GetEnvironmentVariable("KAIREC_SOCKET");
+        if (!string.IsNullOrEmpty(env)) return env;
         var runtime = Environment.GetEnvironmentVariable("XDG_RUNTIME_DIR");
         if (string.IsNullOrEmpty(runtime)) runtime = Path.GetTempPath();
         return Path.Combine(runtime, "kairec.sock");

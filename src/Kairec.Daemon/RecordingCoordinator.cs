@@ -83,7 +83,7 @@ public sealed class RecordingCoordinator : IAsyncDisposable
                 }
             }
             var session = SessionStore.Create(_cfg, profileCfg, trigger, gamePid);
-            var sock = Path.Combine(Path.GetDirectoryName(ControlPaths.SocketPath())!, "kairec-gsr.sock");
+            var sock = ControlPaths.SocketPath().Replace(".sock", "") + "-gsr.sock";   // next to the control socket, so test daemons stay isolated
             var incoming = Path.Combine(_cfg.ClipsDir, ".incoming");
             Directory.CreateDirectory(incoming);
             var args = GsrArguments.Build(_cfg, profile, session.MediaDir, incoming, sock);
