@@ -50,6 +50,8 @@ header { display: flex; align-items: center; gap: 16px; height: 56px; padding: 0
 .btn:active { transform: translateY(1px); }
 .btn.ghost { background: transparent; border-color: transparent; color: var(--muted); }
 .btn.ghost:hover { background: var(--panel2); color: var(--text); }
+.btn.icon { padding: 7px; text-decoration: none; }
+.btn.icon svg { width: 18px; height: 18px; }
 .btn.primary { background: #1c4a5e; border-color: #2c6d88; color: #d9f3ff; }
 .btn.primary:hover { background: #235c74; }
 .btn.accent { background: var(--brand); border-color: var(--brand); color: #fff; font-weight: 600; }
