@@ -59,7 +59,7 @@
       <div class="empty-hint">Sessions record themselves when a profiled game starts. Press <kbd>M</kbd> or your hotkey to drop a marker.</div>
       <div class="keys">
         <span><kbd>space</kbd> play</span><span><kbd>←</kbd><kbd>→</kbd> 5 s</span><span><kbd>J</kbd><kbd>L</kbd> 10 s</span>
-        <span><kbd>,</kbd><kbd>.</kbd> frame</span><span><kbd>[</kbd><kbd>]</kbd> markers</span><span><kbd>I</kbd><kbd>O</kbd> in / out</span><span><kbd>E</kbd> export</span><span><kbd>F</kbd> fullscreen</span>
+        <span><kbd>,</kbd><kbd>.</kbd> frame</span><span><kbd>[</kbd><kbd>]</kbd> markers</span><span><kbd>I</kbd><kbd>O</kbd> in / out</span><span><kbd>E</kbd> export</span><span><kbd>F</kbd> fullscreen</span><span><kbd>+</kbd><kbd>-</kbd> zoom</span>
       </div>
     </div>
 
@@ -108,6 +108,12 @@
         <div class="tl-foot">
           <div class="tl-legend" id="legend"></div>
           <div class="spacer"></div>
+          <div class="zoom">
+            <button class="tbtn sm" id="zoomOut" title="zoom out  −">−</button>
+            <span class="mono" id="zoomLbl">fit</span>
+            <button class="tbtn sm" id="zoomIn" title="zoom in  +">+</button>
+            <button class="tbtn sm" id="zoomFit" title="fit  0">fit</button>
+          </div>
           <span class="time mono" id="curTime">0:00</span>
         </div>
       </div>

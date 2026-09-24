@@ -13,6 +13,7 @@ const state = {
   current: null,      // { kind: 'session'|'clip', id, data }
   hls: null, details: null, total: 0, inT: null, outT: null, pollTimer: null,
   coverage: [], clipLoaded: null,   // buffer sessions: footage bands and which clip is in the player
+  zoom: 1, viewStart: 0,             // timeline zoom: visible span is total/zoom starting at viewStart
 };
 
 // ------------------------------------------------------------------ helpers
@@ -149,7 +150,7 @@ async function loadSession(id) {
   state.current = { kind: 'session', id, data };
   state.coverage = (data.clipDetails || []).filter(c => c.sessionOffset != null && c.durationSeconds).map(c => ({ file: c.file, label: c.label, start: c.sessionOffset, end: c.sessionOffset + c.durationSeconds }));
   if (first) {
-    destroyPlayer(); state.inT = state.outT = null; state.clipLoaded = null;
+    destroyPlayer(); state.inT = state.outT = null; state.clipLoaded = null; state.zoom = 1; state.viewStart = 0;
     if (data.mode === 'timeline') attachHls(`/api/sessions/${id}/playlist.m3u8`);
     if (data.live) state.pollTimer = setInterval(() => loadSession(id), 5000);
   } else if (data.live && data.mode === 'timeline') {
@@ -167,7 +168,7 @@ async function loadSession(id) {
   showViewer(); renderTimeline(); renderMarkers(); renderList();
 }
 function loadClip(c) {
-  destroyPlayer(); state.inT = state.outT = null;
+  destroyPlayer(); state.inT = state.outT = null; state.zoom = 1; state.viewStart = 0;
   state.current = { kind: 'clip', id: c.profile + '/' + c.file, data: c };
   $('video').src = `/api/clips/${encodeURIComponent(c.profile)}/${encodeURIComponent(c.file)}`;
   $('title').textContent = (c.label || c.file) + (c.starred ? ' ★' : '');
@@ -183,7 +184,19 @@ function markersOf() {
   if (cur.kind === 'session') return cur.data.markers.map(m => ({ id: m.id, type: m.type, label: m.label, t: m.tVideo, starred: m.starred, clip: m.clip, data: m.data }));
   return (cur.data.markers || []).map((m, i) => ({ id: 'c' + i, type: m.type, label: m.label, t: m.t, data: m.data }));
 }
-function pct(t) { return Math.min(100, Math.max(0, t / state.total * 100)) + '%'; }
+function viewLen() { return (state.total || 1) / state.zoom; }
+function clampView() { state.viewStart = Math.max(0, Math.min(state.viewStart, (state.total || 1) - viewLen())); }
+function pct(t) { return Math.min(110, Math.max(-10, (t - state.viewStart) / viewLen() * 100)) + '%'; }
+function xToT(clientX) { const r = $('timeline').getBoundingClientRect(); return state.viewStart + (clientX - r.left) / r.width * viewLen(); }
+function setZoom(z, anchorT) {
+  const old = state.zoom; state.zoom = Math.max(1, Math.min(64, z));
+  if (anchorT != null) { const frac = (anchorT - state.viewStart) / (state.total / old); state.viewStart = anchorT - frac * viewLen(); }
+  clampView(); renderTimeline(); $('zoomLbl').textContent = state.zoom === 1 ? 'fit' : state.zoom.toFixed(state.zoom < 4 ? 1 : 0) + '×';
+}
+function followPlayhead(t) {
+  if (state.zoom === 1) return;
+  if (t < state.viewStart || t > state.viewStart + viewLen()) { state.viewStart = t - viewLen() * 0.15; clampView(); renderTimeline(); }
+}
 function renderTimeline() {
   const cur = state.current; if (!cur) return;
   const tl = $('timeline');
@@ -218,20 +231,21 @@ function renderTimeline() {
   renderRuler();
   renderChips(types);
   renderSelection();
-  tl.onclick = e => { const r = tl.getBoundingClientRect(); seek((e.clientX - r.left) / r.width * state.total); };
-  tl.onmousemove = e => { const r = tl.getBoundingClientRect(); const t = (e.clientX - r.left) / r.width * state.total; const tip = $('tlTip'); tip.style.display = 'block'; tip.style.left = Math.min(e.clientX - r.left + 8, r.width - 70) + 'px'; tip.textContent = fmt(t); };
+  tl.onclick = e => seek(xToT(e.clientX));
+  tl.onmousemove = e => { const r = tl.getBoundingClientRect(); const t = xToT(e.clientX); const tip = $('tlTip'); tip.style.display = 'block'; tip.style.left = Math.min(e.clientX - r.left + 8, r.width - 70) + 'px'; tip.textContent = fmt(t); };
   tl.onmouseleave = () => $('tlTip').style.display = 'none';
 }
 function renderRuler() {
   const r = $('tlRuler'); r.innerHTML = '';
-  const total = state.total || 1;
-  const steps = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200];
-  const step = steps.find(st => total / st <= 12) || 7200;
+  const span = viewLen(), v0 = state.viewStart, v1 = v0 + span, total = state.total || 1;
+  const steps = [0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200];
+  const step = steps.find(st => span / st <= 12) || 7200;
   const minor = step / (step >= 60 ? 4 : 5);
-  for (let t = 0; t <= total; t += minor) {
+  for (let t = Math.floor(v0 / minor) * minor; t <= Math.min(total, v1); t += minor) {
+    if (t < v0) continue;
     const major = Math.abs(t / step - Math.round(t / step)) < 1e-6;
     const d = document.createElement('div'); d.className = 'tick' + (major ? ' major' : ''); d.style.left = pct(t);
-    if (major && t < total * 0.985) d.innerHTML = `<span>${fmtShort(t)}</span>`;
+    if (major && t < v1 - span * 0.03) d.innerHTML = `<span>${fmtShort(t)}</span>`;
     r.appendChild(d);
   }
 }
@@ -328,7 +342,7 @@ $('outVal').onchange = e => { state.outT = +e.target.value; renderSelection(); }
 $('exportBtn').onclick = exportRange;
 $('batchBtn').onclick = exportBatch;
 $('markBtn').onclick = async () => { try { const r = await api('/mark', { body: { label: null } }); toast(r.message, !r.ok); } catch (e) { toast(e.message, true); } };
-$('video').addEventListener('timeupdate', () => { if (!state.current) return; const t = currentT(); $('curTime').textContent = fmt(t) + ' / ' + fmt(state.total); $('tClock').textContent = fmtShort(t) + ' / ' + fmtShort(state.total); $('tlHead').style.left = pct(t); $('tlHeadT').textContent = fmtShort(t); });
+$('video').addEventListener('timeupdate', () => { if (!state.current) return; const t = currentT(); followPlayhead(t); $('curTime').textContent = fmt(t) + ' / ' + fmt(state.total); $('tClock').textContent = fmtShort(t) + ' / ' + fmtShort(state.total); $('tlHead').style.left = pct(t); $('tlHeadT').textContent = fmtShort(t); });
 // ---------------------------------------------------------------- transport
 (() => {
   const v = $('video'), stage = $('stage');
@@ -352,6 +366,25 @@ $('video').addEventListener('timeupdate', () => { if (!state.current) return; co
   v.addEventListener('volumechange', () => { stage.classList.toggle('muted', v.muted || v.volume === 0); if (!v.muted) $('tVol').value = v.volume; });
   let hideTimer;
   stage.addEventListener('mousemove', () => { stage.classList.add('show-ui'); clearTimeout(hideTimer); hideTimer = setTimeout(() => stage.classList.remove('show-ui'), 2000); });
+  // Buffer sessions: when the loaded clip runs out, carry on in whichever clip covers the next moment.
+  // Markers never stop playback; only a real gap in footage does.
+  v.addEventListener('ended', () => {
+    const cur = state.current;
+    if (!cur || cur.kind !== 'session' || cur.data.mode !== 'buffer') return;
+    const t = fromMedia(v.duration);
+    const next = state.coverage.find(c => c.file !== state.clipLoaded && t >= c.start - 0.3 && t < c.end - 0.5);
+    if (next) { const m = toMedia(Math.max(t, next.start) + 0.05); v.currentTime = m; v.play().catch(() => {}); }
+    else toast('end of saved footage');
+  });
+  // zoom: ctrl+wheel zooms around the cursor, plain wheel pans
+  $('timeline').addEventListener('wheel', e => {
+    e.preventDefault();
+    if (e.ctrlKey || e.metaKey) setZoom(state.zoom * (e.deltaY < 0 ? 1.25 : 0.8), xToT(e.clientX));
+    else { state.viewStart += (e.deltaY || e.deltaX) / 100 * viewLen() * 0.1; clampView(); renderTimeline(); }
+  }, { passive: false });
+  $('zoomIn').onclick = () => setZoom(state.zoom * 1.5, currentT());
+  $('zoomOut').onclick = () => setZoom(state.zoom / 1.5, currentT());
+  $('zoomFit').onclick = () => setZoom(1);
   window.transport = { nudge, toggle, jumpMarker };
 })();
 // drag the in/out handles
@@ -360,8 +393,7 @@ $('video').addEventListener('timeupdate', () => { if (!state.current) return; co
   document.querySelectorAll('.tl-sel .handle').forEach(h => h.addEventListener('mousedown', e => { e.stopPropagation(); e.preventDefault(); drag = h.dataset.h; }));
   window.addEventListener('mousemove', e => {
     if (!drag) return;
-    const r = $('timeline').getBoundingClientRect();
-    const t = Math.min(state.total, Math.max(0, (e.clientX - r.left) / r.width * state.total));
+    const t = Math.min(state.total, Math.max(0, xToT(e.clientX)));
     if (drag === 'in') state.inT = Math.min(t, state.outT ?? t); else state.outT = Math.max(t, state.inT ?? t);
     renderSelection();
   });
@@ -380,6 +412,9 @@ document.addEventListener('keydown', e => {
     case 'ArrowDown': e.preventDefault(); v.volume = Math.max(0, v.volume - 0.05); break;
     case '[': jumpMarker(-1); break; case ']': jumpMarker(1); break;
     case 'f': $('tFull').click(); break;
+    case '+': case '=': setZoom(state.zoom * 1.5, currentT()); break;
+    case '-': setZoom(state.zoom / 1.5, currentT()); break;
+    case '0': setZoom(1); break;
     case 'j': nudge(-10); break; case 'l': nudge(10); break;
     case ',': nudge(-1 / 60); break; case '.': nudge(1 / 60); break;
     case 'i': $('inBtn').click(); break; case 'o': $('outBtn').click(); break;
