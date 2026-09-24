@@ -134,6 +134,7 @@
     await load();
   }
   function show(on) {
+    if (on && window.closePages) window.closePages();
     open = on;
     $('settings').hidden = !on;
     document.querySelector('.layout').classList.toggle('settings-open', on);

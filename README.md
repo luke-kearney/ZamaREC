@@ -53,6 +53,7 @@ kairec save [--last 30s] [label]  save the last N seconds from the replay buffer
 kairec start [profile]            start a session manually
 kairec stop                       stop the current session
 kairec status                     show what the daemon is doing
+kairec log [-n 40] [kind]         recent events from the daemon's log
 kairec top                        live view until Ctrl+C: state, CPU/RAM of the daemon and
                                   recorder, system load, storage and write rate (all from /proc)
 ```
@@ -91,6 +92,14 @@ markers on the right.
   monitor and audio devices picked from what the recorder reports. Saves apply immediately, or
   when the current session ends if one is running. A raw TOML editor sits behind the form.
   `kairec reload` does the same for hand edits. Port changes still need a restart.
+
+## Stats and log
+
+The UI has a **Stats** page (lifetime footage written to disk vs to RAM, clip bytes, counts, what the
+folders hold right now, and a per-session table) and a **Log** page (every session, mark, clip,
+export, purge and config change, filterable, live-tailing). The log is `~/.local/share/kairec/events.jsonl`,
+one JSON object per line; `kairec log [-n 40] [kind]` prints the tail from a terminal. Lifetime
+counters live in `stats.json` next to it, so they survive sessions being deleted.
 
 ## Status
 

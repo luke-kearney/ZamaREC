@@ -24,6 +24,10 @@ public sealed class SessionInfo
     [JsonPropertyName("media_dir")] public string? MediaDir { get; set; }
     /// <summary>Set once a RAM timeline's segments have been dropped.</summary>
     [JsonPropertyName("footage_gone")] public bool FootageGone { get; set; }
+    /// <summary>Footage bytes this session produced (all segments ever written, or the buffer's churn).</summary>
+    [JsonPropertyName("recorded_bytes")] public long RecordedBytes { get; set; }
+    /// <summary>True for buffer sessions, where the figure is elapsed x bitrate rather than measured.</summary>
+    [JsonPropertyName("bytes_estimated")] public bool BytesEstimated { get; set; }
     /// <summary>Timeline mode: total seconds recorded (including footage already purged from the window).</summary>
     [JsonPropertyName("duration_seconds")] public double? DurationSeconds { get; set; }
     [JsonPropertyName("game_pid")] public int? GamePid { get; set; }
@@ -59,6 +63,7 @@ public sealed class SegmentEntry
     /// <summary>Seconds from the first frame of the session to the start of this segment.</summary>
     [JsonPropertyName("start")] public double Start { get; set; }
     [JsonPropertyName("duration")] public double Duration { get; set; }
+    [JsonPropertyName("bytes")] public long Bytes { get; set; }
 }
 
 public sealed class SegmentFile

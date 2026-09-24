@@ -69,7 +69,7 @@ function renderList() {
       d.className = 'item' + (state.current && state.current.kind === 'session' && state.current.id === s.id ? ' active' : '');
       d.innerHTML = `<div class="l1"><span>${fmtDate(s.startedAt)}</span><span class="r">${s.live ? '<span class="badge live">LIVE</span>' : ''}${s.ram ? `<span class="badge ${s.footageGone ? 'gone' : 'ram'}" title="${s.footageGone ? 'RAM footage has been dropped' : 'segments live in RAM'}">${s.footageGone ? 'gone' : 'RAM'}</span>` : ''}<span class="badge">${s.profile}</span></span></div>
         <div class="l2"><span>${s.map || s.mode}</span>${s.durationSeconds != null ? `<span class="mono">${fmt(s.durationSeconds)}</span>` : ''}<span>${s.markerCount} marker${s.markerCount === 1 ? '' : 's'}</span><span>${s.clipCount} clip${s.clipCount === 1 ? '' : 's'}</span></div>`;
-      d.onclick = () => loadSession(s.id);
+      d.onclick = () => { if (window.closePages) window.closePages(); loadSession(s.id); };
       box.appendChild(d);
     }
     if (!box.children.length) box.innerHTML = '<div class="empty">no sessions yet</div>';
@@ -80,7 +80,7 @@ function renderList() {
       const exp = c.expiresAt ? `<span class="badge exp" title="expires ${fmtDate(c.expiresAt)}">⌛</span>` : '';
       d.innerHTML = `<div class="l1"><span>${c.label || c.file.replace('.mp4', '')}</span><span class="r">${c.starred ? '<span class="badge star">★</span>' : ''}${exp}<span class="badge">${c.profile}</span></span></div>
         <div class="l2"><span>${fmtDate(c.createdAt)}</span><span class="mono">${fmt(c.durationSeconds)}</span><span>${gb(c.bytes)}</span><span>${c.source}</span></div>`;
-      d.onclick = () => loadClip(c);
+      d.onclick = () => { if (window.closePages) window.closePages(); loadClip(c); };
       box.appendChild(d);
     }
     if (!box.children.length) box.innerHTML = '<div class="empty">no clips yet</div>';
@@ -180,7 +180,7 @@ function loadClip(c) {
   state.total = c.durationSeconds || 1;
   showViewer(); renderTimeline(); renderMarkers(); renderList();
 }
-function showViewer() { if (window.settingsOpen && window.settingsOpen()) return; $('empty').hidden = true; $('viewer').hidden = false; }
+function showViewer() { if ((window.settingsOpen && window.settingsOpen()) || (window.pageOpen && window.pageOpen())) return; $('empty').hidden = true; $('viewer').hidden = false; }
 
 // ------------------------------------------------------------------ timeline
 function markersOf() {

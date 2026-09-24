@@ -35,6 +35,35 @@ static class Top
     private static (long Busy, long Total)? _lastSys;
     private static (long Bytes, long At)? _lastSessions;
 
+    /// <summary>Prints the tail of events.jsonl. Reads the file directly, so it works even when the daemon is down.</summary>
+    public static int PrintLog(int n, string? kind)
+    {
+        var xdg = Environment.GetEnvironmentVariable("XDG_DATA_HOME");
+        var dataDir = string.IsNullOrEmpty(xdg) ? Path.Combine(Environment.GetEnvironmentVariable("HOME") ?? "", ".local", "share") : xdg;
+        var path = Path.Combine(dataDir, "kairec", "events.jsonl");
+        if (!File.Exists(path)) { Console.WriteLine("no events yet"); return 0; }
+        var lines = File.ReadAllLines(path);
+        var shown = 0;
+        var picked = new List<string>();
+        for (int i = lines.Length - 1; i >= 0 && picked.Count < n; i--)
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(lines[i]);
+                var r = doc.RootElement;
+                var k = r.GetProperty("kind").GetString() ?? "";
+                if (kind is not null && k != kind) continue;
+                var ts = DateTimeOffset.Parse(r.GetProperty("ts").GetString()!).ToString("MM-dd HH:mm:ss");
+                var prof = r.TryGetProperty("profile", out var p) ? p.GetString() : null;
+                picked.Add($"{ts}  {k,-8} {r.GetProperty("message").GetString()}{(prof is null ? "" : $"  [{prof}]")}");
+            }
+            catch { }
+        }
+        picked.Reverse();
+        foreach (var l in picked) { Console.WriteLine(l); shown++; }
+        return 0;
+    }
+
     public static async Task<int> RunAsync()
     {
         var cts = new CancellationTokenSource();

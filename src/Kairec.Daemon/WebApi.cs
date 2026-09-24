@@ -4,6 +4,7 @@ using Kairec.Core.Config;
 using Kairec.Core.Export;
 using Kairec.Core.Recording;
 using Kairec.Core.Sessions;
+using Kairec.Core.Telemetry;
 
 namespace Kairec.Daemon;
 
@@ -28,6 +29,37 @@ public static class WebApi
 
         api.MapPost("/mark", async (MarkRequest req, RecordingCoordinator rec, CancellationToken ct) =>
             Results.Ok(await rec.MarkAsync(req.Label, ct)));
+
+        // ------------------------------------------------------------ log + stats
+
+        api.MapGet("/events", (EventLog log, int? limit, string? kind) => Results.Ok(log.Tail(Math.Clamp(limit ?? 200, 1, 2000), string.IsNullOrEmpty(kind) ? null : kind)));
+
+        api.MapGet("/stats", (StatsStore stats, SessionCatalog cat, RecordingCoordinator rec, KairecConfig cfg) =>
+        {
+            var clips = cat.Clips();
+            var clipBytesBySession = clips.Where(c => c.Info.SessionId is not null).GroupBy(c => c.Info.SessionId!).ToDictionary(g => g.Key, g => (Bytes: g.Sum(c => c.Bytes), Count: g.Count()));
+            var sessions = cat.Sessions().Select(s =>
+            {
+                var live = s.Id == rec.ActiveSessionId;
+                var toRam = s.Info.Mode == "buffer" || s.Info.MediaDir is not null;
+                var recorded = live ? rec.ActiveRecordedBytes : s.Info.RecordedBytes;
+                clipBytesBySession.TryGetValue(s.Id, out var cb);
+                return new { s.Id, s.Info.Profile, s.Info.Mode, Storage = toRam ? "ram" : "disk", s.Info.StartedAt, s.Info.EndedAt, s.Info.DurationSeconds, Live = live,
+                    RecordedBytes = recorded, Estimated = s.Info.BytesEstimated || (live && s.Info.Mode == "buffer"), ClipBytes = cb.Bytes, ClipCount = cb.Count, s.MarkerCount, s.Info.FootageGone };
+            }).ToList();
+            long dirSize(string d) { try { return Directory.Exists(d) ? Directory.EnumerateFiles(d, "*", SearchOption.AllDirectories).Sum(f => new FileInfo(f).Length) : 0; } catch { return 0; } }
+            long ramUsed = 0; try { var rd = Paths.Expand(cfg.Timeline.RamDir); ramUsed = dirSize(rd); } catch { }
+            long free = 0; try { free = new DriveInfo(cfg.RootDir).AvailableFreeSpace; } catch { }
+            var c = stats.Counters;
+            var liveRam = rec.ActiveSessionId is not null && sessions.FirstOrDefault(s => s.Live) is { } ls && ls.Storage == "ram" ? ls.RecordedBytes : 0;
+            var liveDisk = rec.ActiveSessionId is not null && sessions.FirstOrDefault(s => s.Live) is { } ld && ld.Storage == "disk" ? ld.RecordedBytes : 0;
+            return Results.Ok(new
+            {
+                Totals = new { c.Sessions, c.SecondsRecorded, DiskBytes = c.DiskBytes + liveDisk, RamBytes = c.RamBytes + liveRam, c.ClipBytes, c.Clips, c.Marks, c.Saves, c.Exports },
+                OnDisk = new { SessionsBytes = dirSize(cfg.SessionsDir), ClipsBytes = dirSize(cfg.ClipsDir), FreeBytes = free, RamDirBytes = ramUsed },
+                Sessions = sessions,
+            });
+        });
 
         // ------------------------------------------------------------ config
 
@@ -197,7 +229,7 @@ public static class WebApi
             return Results.Ok();
         });
 
-        api.MapPost("/clips/{profile}/{file}/export", async (string profile, string file, ExportRequest req, SessionCatalog cat, KairecConfig cfg, ILogger<Program> log, CancellationToken ct) =>
+        api.MapPost("/clips/{profile}/{file}/export", async (string profile, string file, ExportRequest req, SessionCatalog cat, KairecConfig cfg, RecordingCoordinator rec, ILogger<Program> log, CancellationToken ct) =>
         {
             var p = cat.ClipPath(profile, file);
             if (p is null) return Results.NotFound();
@@ -212,6 +244,7 @@ public static class WebApi
                 Markers = src.Markers.Where(m => m.T >= req.Start && m.T <= req.End).Select(m => new ClipMarker { T = m.T - req.Start, Type = m.Type, Label = m.Label, Data = m.Data }).ToList(),
             };
             SessionCatalog.SaveClipInfo(target, info);
+            rec.RecordExport(profile, src.SessionId, target, r.Duration);
             return Results.Ok(new { r.Ok, Path = target, File = Path.GetFileName(target), r.Duration });
         });
     }
@@ -252,6 +285,7 @@ public static class WebApi
         store.Info.Clips.Add(Path.GetFileName(target));
         store.Save();
         log.LogInformation("exported {start:0.0}-{end:0.0}s of {id} -> {path}", start, end, store.Info.Id, target);
+        rec.RecordExport(store.Info.Profile, store.Info.Id, target, r.Duration);
         return new ExportResult(true, target, Path.GetFileName(target), r.Duration, null);
     }
 }

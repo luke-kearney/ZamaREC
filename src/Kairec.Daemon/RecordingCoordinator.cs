@@ -4,6 +4,7 @@ using Kairec.Core.Export;
 using Kairec.Core.Feedback;
 using Kairec.Core.Recording;
 using Kairec.Core.Sessions;
+using Kairec.Core.Telemetry;
 using Kairec.Protocol;
 
 namespace Kairec.Daemon;
@@ -42,11 +43,17 @@ public sealed class RecordingCoordinator : IAsyncDisposable
     }
 
     private readonly ConfigService _configService;
+    private readonly EventLog _events;
+    private readonly StatsStore _stats;
 
-    public RecordingCoordinator(KairecConfig cfg, SoundFeedback sound, ConfigService configService, ILogger<RecordingCoordinator> log)
+    public RecordingCoordinator(KairecConfig cfg, SoundFeedback sound, ConfigService configService, EventLog events, StatsStore stats, ILogger<RecordingCoordinator> log)
     {
-        _cfg = cfg; _sound = sound; _configService = configService; _log = log;
+        _cfg = cfg; _sound = sound; _configService = configService; _events = events; _stats = stats; _log = log;
     }
+
+    /// <summary>Live footage bytes for the active session (measured for timelines, estimated for buffers).</summary>
+    public long ActiveRecordedBytes => _active is null ? 0 : _active.Segments?.TotalBytes ?? EstimateBufferBytes(_active);
+    private long EstimateBufferBytes(Active a) => (long)((MonotonicClock.NowMicros() - a.Session.Info.SpawnMonoUs) / 1e6 * _cfg.Capture.BitrateKbps * 125);
 
     public bool IsActive => _active is not null;
     public string? ActiveSessionId => _active?.Session.Info.Id;
@@ -98,6 +105,7 @@ public sealed class RecordingCoordinator : IAsyncDisposable
                 _log.LogError(ex, "could not start gpu-screen-recorder");
                 TryDeleteSession(session.Dir);
                 _sound.Play("error");
+                _events.Write("error", "could not start gpu-screen-recorder: " + ex.Message, profile.Name, level: "error");
                 return Fail("could not start gpu-screen-recorder: " + ex.Message);
             }
 
@@ -110,6 +118,7 @@ public sealed class RecordingCoordinator : IAsyncDisposable
                 ? (profile.WindowMinutes > 0 ? $"{profile.WindowMinutes} min window" : "unlimited window") + (profile.TimelineStorage == "ram" ? " in RAM" : "")
                 : $"{profile.BufferMinutes} min {profile.BufferStorage} buffer";
             _log.LogInformation("session {id} started ({mode}, {detail}, trigger={trigger}, pid={pid})", session.Info.Id, profile.Mode, detail, trigger, gamePid);
+            _events.Write("session", $"session started ({profile.Mode.ToString().ToLower()}, {detail}, {trigger})", profile.Name, session.Info.Id);
             _sound.Play("start");
             return Ok($"recording '{profile.Name}' ({profile.Mode.ToString().ToLower()}, {detail}) -> {session.Dir}");
         }
@@ -152,8 +161,19 @@ public sealed class RecordingCoordinator : IAsyncDisposable
         {
             a.Segments.Refresh();
             duration = a.Segments.TotalSeconds;
+            a.Session.Info.RecordedBytes = a.Segments.TotalBytes;
+        }
+        else
+        {
+            duration = (MonotonicClock.NowMicros() - a.Session.Info.SpawnMonoUs) / 1e6;
+            a.Session.Info.RecordedBytes = EstimateBufferBytes(a);
+            a.Session.Info.BytesEstimated = true;
         }
         a.Session.Finish(duration);
+        var toRam = a.Profile.Mode == CaptureMode.Buffer || a.Session.Info.MediaDir is not null;
+        _stats.Update(c => { c.Sessions++; c.SecondsRecorded += duration ?? 0; if (toRam) c.RamBytes += a.Session.Info.RecordedBytes; else c.DiskBytes += a.Session.Info.RecordedBytes; c.Marks += a.Session.Markers.Count(m => m.Type == "manual"); });
+        _events.Write("session", $"session ended ({reason}): {duration:0}s, {a.Session.Info.RecordedBytes / 1e6:0} MB to {(toRam ? "RAM" : "disk")}{(a.Session.Info.BytesEstimated ? " (estimated)" : "")}, {a.Session.Markers.Count} markers, {a.Session.Info.Clips.Count} clips",
+            a.Profile.Name, a.Session.Info.Id, bytes: a.Session.Info.RecordedBytes, seconds: duration);
 
         var keep = a.Profile.Mode == CaptureMode.Timeline || a.Session.Markers.Count > 0;
         if (!keep) { TryDeleteSession(a.Session.Dir); return Ok($"session {a.Session.Info.Id} ended (nothing saved)"); }
@@ -182,6 +202,7 @@ public sealed class RecordingCoordinator : IAsyncDisposable
             _sound.Play("mark");
 
             var where = m.TVideo is double tv ? $"{tv:0.00}s" : "t=?";
+            _events.Write("mark", $"mark at {where}" + (label is null ? "" : $" \"{label}\"") + (a.Profile.MarkSaves ? $", clip in {a.Profile.MarkAfterSeconds}s" : ""), a.Profile.Name, a.Session.Info.Id, seconds: m.TVideo);
             if (!a.Profile.MarkSaves)
             {
                 _log.LogInformation("marker {id} '{label}' at {where}", m.Id, label ?? "", where);
@@ -275,6 +296,7 @@ public sealed class RecordingCoordinator : IAsyncDisposable
         a.Session.Info.Clips.Add(Path.GetFileName(target));
         a.Session.Save();
         _log.LogInformation("{source}: wrote {dur:0.0}s ({start:0.0}-{end:0.0}s) -> {path}", source, r.Duration ?? 0, actualStart, end, target);
+        RecordClip(source, target, r.Duration, a);
         return Ok(source == "save" ? $"saved last {secs}s -> {target}" : $"mark clip written -> {target}");
     }
 
@@ -309,6 +331,7 @@ public sealed class RecordingCoordinator : IAsyncDisposable
         a.Session.Info.Clips.Add(Path.GetFileName(target));
         a.Session.Save();
         _log.LogInformation("{source}: wrote {dur:0.0}s -> {path}", source, duration, target);
+        RecordClip(source, target, duration, a);
         return Ok($"saved {duration:0}s -> {target}");
     }
 
@@ -352,7 +375,9 @@ public sealed class RecordingCoordinator : IAsyncDisposable
             var missing = !Directory.Exists(store.Info.MediaDir);
             if (all || expired || missing)
             {
-                _log.LogInformation("dropping RAM footage of {id} ({why})", store.Info.Id, missing ? "already gone" : all ? "new session" : "keep time passed");
+                var why = missing ? "already gone" : all ? "new session" : "keep time passed";
+                _log.LogInformation("dropping RAM footage of {id} ({why})", store.Info.Id, why);
+                _events.Write("purge", $"RAM footage dropped ({why})", store.Info.Profile, store.Info.Id, bytes: store.Info.RecordedBytes);
                 store.DropMedia();
             }
         }
@@ -399,6 +424,21 @@ public sealed class RecordingCoordinator : IAsyncDisposable
         }
         s.PendingMarks = a.Pending?.Marks.Count ?? 0;
         return s;
+    }
+
+    private void RecordClip(string source, string path, double? duration, Active a)
+    {
+        long bytes = 0; try { bytes = new FileInfo(path).Length; } catch { }
+        _stats.Update(c => { c.Clips++; c.ClipBytes += bytes; if (source == "save") c.Saves++; });
+        _events.Write("clip", $"{(source == "mark" ? "mark clip" : source == "save" ? "save" : "export")} written: {duration ?? 0:0.0}s, {bytes / 1e6:0.0} MB", a.Profile.Name, a.Session.Info.Id, Path.GetFileName(path), bytes, duration);
+    }
+
+    /// <summary>For exports made through the web API (which do not go through the coordinator).</summary>
+    public void RecordExport(string profile, string? session, string path, double? duration)
+    {
+        long bytes = 0; try { bytes = new FileInfo(path).Length; } catch { }
+        _stats.Update(c => { c.Clips++; c.ClipBytes += bytes; c.Exports++; });
+        _events.Write("export", $"export written: {duration ?? 0:0.0}s, {bytes / 1e6:0.0} MB", profile, session, Path.GetFileName(path), bytes, duration);
     }
 
     private static ControlResponse Ok(string msg) => new() { Ok = true, Message = msg };

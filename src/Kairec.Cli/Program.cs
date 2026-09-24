@@ -32,6 +32,11 @@ switch (req.Cmd)
         break;
     case "top":
         return await Top.RunAsync();
+    case "log":
+    {
+        var n = 40; for (int i = 0; i < rest.Count; i++) if (rest[i] is "-n" && i + 1 < rest.Count && int.TryParse(rest[i + 1], out var v)) n = v;
+        return Top.PrintLog(n, rest.FirstOrDefault(r => !r.StartsWith('-') && !int.TryParse(r, out _)));
+    }
     case "status":
         if (rest.Contains("--watch") || rest.Contains("-w")) return await Top.RunAsync();
         break;

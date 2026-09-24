@@ -10,15 +10,16 @@ public sealed class ConfigService
 {
     private readonly KairecConfig _live;
     private readonly ILogger<ConfigService> _log;
+    private readonly Core.Telemetry.EventLog _events;
     private readonly object _lock = new();
     private KairecConfig? _pending;
 
     public string Path { get; }
     public bool HasPending { get { lock (_lock) return _pending is not null; } }
 
-    public ConfigService(KairecConfig live, string path, ILogger<ConfigService> log)
+    public ConfigService(KairecConfig live, string path, Core.Telemetry.EventLog events, ILogger<ConfigService> log)
     {
-        _live = live; Path = path; _log = log;
+        _live = live; Path = path; _events = events; _log = log;
     }
 
     public string ReadText() => File.Exists(Path) ? File.ReadAllText(Path) : DefaultConfig.Toml;
@@ -76,5 +77,6 @@ public sealed class ConfigService
         Directory.CreateDirectory(_live.ClipsDir);
         _log.LogInformation("config applied (v{v}); profiles: {profiles}{note}", _live.Version,
             string.Join(", ", _live.Profiles.Select(p => $"{p.Name} ({p.Mode})")), portsChanged ? "; port/bind changes need a daemon restart" : "");
+        if (_live.Version > 1) _events.Write("config", $"config applied: {string.Join(", ", _live.Profiles.Select(p => $"{p.Name} ({p.Mode})"))}" + (portsChanged ? " (port change needs restart)" : ""));
     }
 }

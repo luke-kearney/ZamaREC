@@ -31,6 +31,9 @@ public sealed class SegmentIndex
 
     public IReadOnlyList<SegmentEntry> All { get { lock (_lock) return _file.Segments.ToList(); } }
 
+    /// <summary>Total bytes of every segment ever seen, including ones since purged.</summary>
+    public long TotalBytes { get { lock (_lock) return _file.Segments.Sum(s => s.Bytes); } }
+
     /// <summary>Total seconds recorded so far, including segments already purged.</summary>
     public double TotalSeconds { get { lock (_lock) { var l = _file.Segments.LastOrDefault(); return l is null ? 0 : l.Start + l.Duration; } } }
 
@@ -82,7 +85,8 @@ public sealed class SegmentIndex
                 var start = prev is null ? 0 : prev.Start + prev.Duration;
                 if (prev is not null && seq != prev.Seq + 1)
                     start += (seq - prev.Seq - 1) * duration;   // missed segments (daemon lag): assume equal length
-                _file.Segments.Add(new SegmentEntry { Seq = seq, File = file, Start = start, Duration = duration });
+                long bytes = 0; try { bytes = new FileInfo(Path.Combine(_media, file)).Length; } catch { }
+                _file.Segments.Add(new SegmentEntry { Seq = seq, File = file, Start = start, Duration = duration, Bytes = bytes });
                 added = true;
             }
             if (added) Recompute();
