@@ -5,13 +5,14 @@
   </picture>
 </p>
 
-# kairec
-
 *kairec*, from *kairos* (καιρός): the opportune moment.
 
-A Linux game session recorder with a marker timeline and clip export, built for people who want
-what Steam's game recording does, without Steam, without an overlay, and without anything that
-polls the GPU or steals focus from the game.
+A Linux game session recorder built around a marker timeline. It records on its own when a game
+starts, puts markers on the timeline from a hotkey or from the game itself, and cuts clips from
+those markers afterwards, so you never have to hit a save key in the moment. Steam's recorder does
+some of this but depends on the Steam overlay, which never reaches native Wayland games; replay
+buffers like gpu-screen-recorder's UI or OBS give you a save hotkey and nothing more. kairec is the
+part after the save: the timeline, the events on it, and the clips library.
 
 - Records automatically when a profiled game starts, on the GPU encoder, via
   [gpu-screen-recorder](https://git.dec05eba.com/gpu-screen-recorder/).
@@ -22,7 +23,8 @@ polls the GPU or steals focus from the game.
 - Clips around markers and events, saves of the last N seconds, and range exports, all as stream
   copies with no re-encode, or frame-exact on nvenc if you ask.
 - A web UI with a timeline, a settings page, stats and a log. A tray icon. A CLI.
-- No GPU/driver polling, no popups, no windows opened on their own. Feedback is sound only.
+- Stays out of the way while you play: no popups, no windows opened on their own, nothing that
+  takes focus from the game. Feedback is a short tone.
 
 > **Early software.** kairec is a few days old and has been used on exactly one machine: CachyOS,
 > KDE Plasma 6 on Wayland, an NVIDIA card. It records, it deletes old footage on purpose (see
@@ -36,7 +38,7 @@ desktops are untested.
 ## Quick start
 
 ```sh
-sudo pacman -S gpu-screen-recorder ffmpeg   # Arch / CachyOS; see docs for other distros
+sudo pacman -S gpu-screen-recorder ffmpeg   # Arch / CachyOS; other distros: docs/install.md
 git clone <this repo> && cd kairec
 ./install.sh
 ```
@@ -73,6 +75,7 @@ its own clip and retention settings.
 
 ## Documentation
 
+- [Installing](docs/install.md): dependencies per distro, gpu-screen-recorder from Flatpak or source.
 - [Configuration reference](docs/configuration.md): every key in `config.toml`, with defaults.
 - [Architecture](docs/architecture.md): components, data on disk, how timing and clips work.
 - [CLI](docs/cli.md): `kairec` commands and hotkey setup.
