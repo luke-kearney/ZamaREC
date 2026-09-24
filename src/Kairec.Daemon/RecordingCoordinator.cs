@@ -391,6 +391,40 @@ public sealed class RecordingCoordinator : IAsyncDisposable
     }
 
     private long _lastPurgeMono;
+    private readonly ProcessUsage _usage = new();
+    private ProcessUsage.Sample _lastUsage = new(0, 0, 0);
+    private long _lastUsageAt;
+
+    /// <summary>CPU and RSS of the daemon plus the recorder and its helper. Sampled at most every 2 s.</summary>
+    public ProcessUsage.Sample Usage()
+    {
+        var now = Environment.TickCount64;
+        if (now - _lastUsageAt < 2000) return _lastUsage;
+        _lastUsageAt = now;
+        var pids = new List<int> { Environment.ProcessId };
+        if (_active is { Recorder.HasExited: false } a) { pids.Add(a.Recorder.Pid); pids.AddRange(ProcessUsage.Children(a.Recorder.Pid)); }
+        return _lastUsage = _usage.Measure(pids);
+    }
+
+    /// <summary>Frees the tmpfs: drops RAM footage of every finished session and any stray directories. Never touches the live session.</summary>
+    public (int Sessions, long Bytes) ClearRam()
+    {
+        var ramDir = Paths.Expand(_cfg.Timeline.RamDir);
+        var before = ProcessUsage.DirBytes(ramDir);
+        var n = 0;
+        PurgeRamSessions(all: true);
+        if (Directory.Exists(ramDir))
+        {
+            foreach (var d in Directory.EnumerateDirectories(ramDir))
+            {
+                if (d == _active?.Session.MediaDir) continue;
+                try { Directory.Delete(d, true); n++; } catch { }
+            }
+        }
+        var freed = before - ProcessUsage.DirBytes(ramDir);
+        _events.Write("purge", $"RAM cleared by request: {freed / 1e9:0.00} GB freed", bytes: freed);
+        return (n, freed);
+    }
 
     /// <summary>Drops RAM footage of finished sessions: all of them, or only those past their keep time.</summary>
     public void PurgeRamSessions(bool all)

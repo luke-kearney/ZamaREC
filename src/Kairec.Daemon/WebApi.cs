@@ -23,10 +23,15 @@ public static class WebApi
         api.MapGet("/status", (RecordingCoordinator rec, KairecConfig cfg, GsiService gsi) =>
         {
             var s = rec.Status();
+            var u = rec.Usage();
+            var ramDir = Paths.Expand(cfg.Timeline.RamDir);
             return Results.Ok(new { s.State, s.Profile, s.Mode, SessionId = rec.ActiveSessionId, s.ElapsedSeconds, s.RecordedSeconds, s.WindowSeconds, s.MarkerCount, s.PendingMarks,
                 GsiLastSeconds = gsi.SecondsSinceLastPayload, GsiMap = gsi.CurrentMap, GsiCfg = gsi.CfgPath,
+                Usage = new { u.CpuPercent, u.RssBytes, u.Processes, RamFsBytes = ProcessUsage.DirBytes(ramDir), RamFsFree = FreeBytes(ramDir) },
                 Profiles = cfg.Profiles.Select(p => new { p.Name, p.Mode }) });
         });
+
+        api.MapPost("/ram/clear", (RecordingCoordinator rec) => { var (n, bytes) = rec.ClearRam(); return Results.Ok(new { Sessions = n, Bytes = bytes }); });
 
         // CS2 posts its game state here (see gamestate_integration_kairec.cfg). Timestamped on arrival.
         app.MapPost("/gsi", async (HttpRequest req, GsiService gsi, CancellationToken ct) =>

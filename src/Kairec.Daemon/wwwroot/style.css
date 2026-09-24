@@ -22,6 +22,13 @@ header { display: flex; align-items: center; gap: 16px; height: 56px; padding: 0
 .status.recording .dot { background: #ff5c5c; box-shadow: 0 0 0 0 rgba(255,92,92,.6); animation: ping 1.4s infinite; }
 @keyframes ping { 70% { box-shadow: 0 0 0 7px rgba(255,92,92,0); } 100% { box-shadow: 0 0 0 0 rgba(255,92,92,0); } }
 
+.usage { display: flex; gap: 14px; align-items: center; font-size: 12px; color: var(--muted); }
+.usage .u { display: inline-flex; align-items: center; gap: 5px; }
+.usage .k { text-transform: uppercase; letter-spacing: .06em; font-size: 10.5px; }
+.usage .v { color: var(--text); }
+.tiny { background: transparent; border: 1px solid var(--line2); color: var(--muted); border-radius: 5px; padding: 1px 7px; font-size: 11px; cursor: pointer; margin-left: 2px; }
+.tiny:hover { color: var(--text); border-color: var(--muted); }
+.tiny.confirm { color: var(--danger); border-color: var(--danger); }
 .btn { white-space: nowrap; display: inline-flex; align-items: center; gap: 7px; background: var(--panel2); border: 1px solid var(--line2); padding: 7px 13px; border-radius: 8px; cursor: pointer; font-weight: 500; font-size: 13px; transition: background .12s, border-color .12s, transform .05s; }
 .btn svg { width: 16px; height: 16px; }
 .btn:hover { background: #222b3c; border-color: #3a475d; }

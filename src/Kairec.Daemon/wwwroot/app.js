@@ -52,6 +52,12 @@ async function refreshStatus() {
       el.className = 'status recording';
       txt.textContent = `recording ${s.profile} · ${s.mode} · ${fmt(s.elapsedSeconds)}` + (s.windowSeconds != null ? ` · ${fmt(s.windowSeconds)} in window` : '') + (s.pendingMarks ? ` · ${s.pendingMarks} pending clip` : '');
     } else { el.className = 'status idle'; txt.textContent = s.state; }
+    if (s.usage) {
+      $('uCpu').textContent = s.usage.cpuPercent.toFixed(1) + '%';
+      $('uRss').textContent = (s.usage.rssBytes / 1048576).toFixed(0) + ' MiB';
+      $('uFs').textContent = (s.usage.ramFsBytes / 1e9).toFixed(2) + ' GB';
+      $('uFs').title = `RAM footage in tmpfs · ${(s.usage.ramFsFree / 1e9).toFixed(1)} GB free`;
+    }
     if (!state.profilesLoaded) {
       const sel = $('profileFilter');
       for (const p of s.profiles) { const o = document.createElement('option'); o.value = p.name; o.textContent = `${p.name} (${p.mode})`; sel.appendChild(o); }
@@ -367,6 +373,15 @@ $('inVal').onchange = e => { state.inT = +e.target.value; renderSelection(); };
 $('outVal').onchange = e => { state.outT = +e.target.value; renderSelection(); };
 $('exportBtn').onclick = exportRange;
 $('batchBtn').onclick = exportBatch;
+(() => {
+  const b = $('clearRam'); let armed = null;
+  b.onclick = async () => {
+    if (!armed) { armed = setTimeout(() => { armed = null; b.classList.remove('confirm'); b.textContent = 'clear'; }, 3000); b.classList.add('confirm'); b.textContent = 'sure?'; return; }
+    clearTimeout(armed); armed = null; b.classList.remove('confirm'); b.textContent = 'clear';
+    try { const r = await api('/ram/clear', { method: 'POST' }); toast(`freed ${(r.bytes / 1e9).toFixed(2)} GB of RAM footage`); refreshStatus(); if (state.tab === 'sessions') refreshList(); }
+    catch (e) { toast(e.message, true); }
+  };
+})();
 $('markBtn').onclick = async () => { try { const r = await api('/mark', { body: { label: null } }); toast(r.message, !r.ok); } catch (e) { toast(e.message, true); } };
 $('video').addEventListener('timeupdate', () => {
   if (!state.current) return;
