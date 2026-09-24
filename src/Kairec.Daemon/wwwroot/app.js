@@ -39,18 +39,18 @@ function toast(msg, err) {
 async function refreshStatus() {
   try {
     const s = await api('/status');
-    const el = $('status');
+    const el = $('status'), txt = el.querySelector('.txt');
     if (s.state === 'recording') {
       el.className = 'status recording';
-      el.textContent = `recording ${s.profile} (${s.mode}) · ${fmt(s.elapsedSeconds)}` + (s.windowSeconds != null ? ` · ${fmt(s.windowSeconds)} in window` : '') + (s.pendingMarks ? ` · ${s.pendingMarks} pending clip` : '');
-    } else { el.className = 'status idle'; el.textContent = s.state; }
+      txt.textContent = `recording ${s.profile} · ${s.mode} · ${fmt(s.elapsedSeconds)}` + (s.windowSeconds != null ? ` · ${fmt(s.windowSeconds)} in window` : '') + (s.pendingMarks ? ` · ${s.pendingMarks} pending clip` : '');
+    } else { el.className = 'status idle'; txt.textContent = s.state; }
     if (!state.profilesLoaded) {
       const sel = $('profileFilter');
       for (const p of s.profiles) { const o = document.createElement('option'); o.value = p.name; o.textContent = `${p.name} (${p.mode})`; sel.appendChild(o); }
       state.profilesLoaded = true;
     }
     if (state.current && state.current.kind === 'session' && state.current.data.live && s.sessionId !== state.current.id) loadSession(state.current.id);
-  } catch { $('status').className = 'status idle'; $('status').textContent = 'daemon unreachable'; }
+  } catch { $('status').className = 'status idle'; $('status').querySelector('.txt').textContent = 'daemon unreachable'; }
 }
 
 // ------------------------------------------------------------------ lists
@@ -64,8 +64,8 @@ function renderList() {
     for (const s of state.sessions.filter(s => !state.profile || s.profile === state.profile)) {
       const d = document.createElement('div');
       d.className = 'item' + (state.current && state.current.kind === 'session' && state.current.id === s.id ? ' active' : '');
-      d.innerHTML = `<div class="l1"><span>${fmtDate(s.startedAt)}</span><span>${s.live ? '<span class="badge live">LIVE</span>' : ''}<span class="badge">${s.profile}</span></span></div>
-        <div class="l2"><span>${s.map || s.mode}</span><span>${s.durationSeconds != null ? fmt(s.durationSeconds) : ''}</span><span>${s.markerCount} markers</span><span>${s.clipCount} clips</span></div>`;
+      d.innerHTML = `<div class="l1"><span>${fmtDate(s.startedAt)}</span><span class="r">${s.live ? '<span class="badge live">LIVE</span>' : ''}<span class="badge">${s.profile}</span></span></div>
+        <div class="l2"><span>${s.map || s.mode}</span>${s.durationSeconds != null ? `<span class="mono">${fmt(s.durationSeconds)}</span>` : ''}<span>${s.markerCount} marker${s.markerCount === 1 ? '' : 's'}</span><span>${s.clipCount} clip${s.clipCount === 1 ? '' : 's'}</span></div>`;
       d.onclick = () => loadSession(s.id);
       box.appendChild(d);
     }
@@ -75,8 +75,8 @@ function renderList() {
       const d = document.createElement('div');
       d.className = 'item' + (state.current && state.current.kind === 'clip' && state.current.id === c.profile + '/' + c.file ? ' active' : '');
       const exp = c.expiresAt ? `<span class="badge exp" title="expires ${fmtDate(c.expiresAt)}">⌛</span>` : '';
-      d.innerHTML = `<div class="l1"><span>${c.label || c.file.replace('.mp4', '')}</span><span>${c.starred ? '<span class="badge star">★</span>' : ''}${exp}<span class="badge">${c.profile}</span></span></div>
-        <div class="l2"><span>${fmtDate(c.createdAt)}</span><span>${fmt(c.durationSeconds)}</span><span>${gb(c.bytes)}</span><span>${c.source}</span></div>`;
+      d.innerHTML = `<div class="l1"><span>${c.label || c.file.replace('.mp4', '')}</span><span class="r">${c.starred ? '<span class="badge star">★</span>' : ''}${exp}<span class="badge">${c.profile}</span></span></div>
+        <div class="l2"><span>${fmtDate(c.createdAt)}</span><span class="mono">${fmt(c.durationSeconds)}</span><span>${gb(c.bytes)}</span><span>${c.source}</span></div>`;
       d.onclick = () => loadClip(c);
       box.appendChild(d);
     }
@@ -187,13 +187,41 @@ function renderTimeline() {
     box.appendChild(d);
   }
   $('legend').innerHTML = [...types].map(t => `<span style="--c:${colorOf(t)}">${t}</span>`).join('');
-  const tf = $('typeFilter'), bt = $('batchType'); const keep = tf.value;
-  tf.innerHTML = '<option value="">all</option>' + [...types].map(t => `<option>${t}</option>`).join(''); tf.value = keep;
+  const bt = $('batchType');
   bt.innerHTML = [...types].map(t => `<option>${t}</option>`).join('');
+  renderRuler();
+  renderChips(types);
   renderSelection();
   tl.onclick = e => { const r = tl.getBoundingClientRect(); seek((e.clientX - r.left) / r.width * state.total); };
   tl.onmousemove = e => { const r = tl.getBoundingClientRect(); const t = (e.clientX - r.left) / r.width * state.total; const tip = $('tlTip'); tip.style.display = 'block'; tip.style.left = Math.min(e.clientX - r.left + 8, r.width - 70) + 'px'; tip.textContent = fmt(t); };
   tl.onmouseleave = () => $('tlTip').style.display = 'none';
+}
+function renderRuler() {
+  const r = $('tlRuler'); r.innerHTML = '';
+  const total = state.total || 1;
+  const steps = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200];
+  const step = steps.find(st => total / st <= 12) || 7200;
+  const minor = step / (step >= 60 ? 4 : 5);
+  for (let t = 0; t <= total; t += minor) {
+    const major = Math.abs(t / step - Math.round(t / step)) < 1e-6;
+    const d = document.createElement('div'); d.className = 'tick' + (major ? ' major' : ''); d.style.left = pct(t);
+    if (major && t < total * 0.985) d.innerHTML = `<span>${fmtShort(t)}</span>`;
+    r.appendChild(d);
+  }
+}
+const fmtShort = s => { const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), sec = Math.floor(s % 60); return h ? `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}` : `${m}:${String(sec).padStart(2, '0')}`; };
+function renderChips(types) {
+  const counts = {}; for (const m of markersOf()) counts[m.type] = (counts[m.type] || 0) + 1;
+  const box = $('typeChips'); box.innerHTML = '';
+  const all = document.createElement('button'); all.className = 'chip' + (state.typeFilter ? '' : ' on'); all.textContent = 'all';
+  all.onclick = () => { state.typeFilter = ''; renderTimeline(); renderMarkers(); };
+  box.appendChild(all);
+  for (const t of types) {
+    const c = document.createElement('button'); c.className = 'chip' + (state.typeFilter === t ? ' on' : ''); c.style.setProperty('--c', colorOf(t));
+    c.innerHTML = `${t} <span class="n">${counts[t] || 0}</span>`;
+    c.onclick = () => { state.typeFilter = state.typeFilter === t ? '' : t; renderTimeline(); renderMarkers(); };
+    box.appendChild(c);
+  }
 }
 function renderSelection() {
   const s = $('tlSel');
@@ -260,7 +288,21 @@ $('outVal').onchange = e => { state.outT = +e.target.value; renderSelection(); }
 $('exportBtn').onclick = exportRange;
 $('batchBtn').onclick = exportBatch;
 $('markBtn').onclick = async () => { try { const r = await api('/mark', { body: { label: null } }); toast(r.message, !r.ok); } catch (e) { toast(e.message, true); } };
-$('video').addEventListener('timeupdate', () => { if (!state.current) return; const t = currentT(); $('curTime').textContent = fmt(t) + ' / ' + fmt(state.total); $('tlHead').style.left = pct(t); });
+$('video').addEventListener('timeupdate', () => { if (!state.current) return; const t = currentT(); $('curTime').textContent = fmt(t) + ' / ' + fmt(state.total); $('tlHead').style.left = pct(t); $('tlHeadT').textContent = fmtShort(t); });
+// drag the in/out handles
+(() => {
+  let drag = null;
+  document.querySelectorAll('.tl-sel .handle').forEach(h => h.addEventListener('mousedown', e => { e.stopPropagation(); e.preventDefault(); drag = h.dataset.h; }));
+  window.addEventListener('mousemove', e => {
+    if (!drag) return;
+    const r = $('timeline').getBoundingClientRect();
+    const t = Math.min(state.total, Math.max(0, (e.clientX - r.left) / r.width * state.total));
+    if (drag === 'in') state.inT = Math.min(t, state.outT ?? t); else state.outT = Math.max(t, state.inT ?? t);
+    renderSelection();
+  });
+  window.addEventListener('mouseup', () => { drag = null; });
+  $('tlSel').addEventListener('click', e => e.stopPropagation());
+})();
 document.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
   const v = $('video');
