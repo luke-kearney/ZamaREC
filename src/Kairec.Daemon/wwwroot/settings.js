@@ -68,6 +68,7 @@
           ${field('command line regex (for Java games etc.)', inp(P + 'matchCmdline', p.matchCmdline, 'text', 'placeholder="net\\\\.minecraft|prismlauncher"'))}
           ${field('fps override', inp(P + 'fps', p.fps, 'number'))}
         </div>
+        <div class="footprint" data-fp="${i}"></div>
         <div class="sub"><div class="lbl">overrides</div><div class="fields">
           ${field('timeline window minutes', inp(P + 'timeline.windowMinutes', ov(p.timeline, 'windowMinutes'), 'number'))}
           ${field('timeline segment seconds', inp(P + 'timeline.segmentSeconds', ov(p.timeline, 'segmentSeconds'), 'number'))}
@@ -85,6 +86,8 @@
         </div></div></div>`;
     });
     $('cfgForm').innerHTML = h;
+    $('cfgForm').addEventListener('input', updateFootprints);
+    updateFootprints();
     $('addProfile').onclick = () => { collect(); cfg.profiles.push({ name: '', match: '', matchCmdline: null, mode: 'timeline', events: 'none', fps: null, timeline: null, buffer: null, clips: null, retention: null }); render(); };
     document.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { collect(); cfg.profiles.splice(+b.dataset.del, 1); render(); });
     $('cfgText').value = meta.text; $('cfgPath').textContent = meta.path;
@@ -92,6 +95,38 @@
     if (meta.pending) { n.hidden = false; n.textContent = 'a saved change is waiting for the current session to end'; }
     else if (meta.sessionRunning) { n.hidden = false; n.textContent = 'a session is running: saves apply when it ends'; }
     else n.hidden = true;
+  }
+
+  // Footage the profile needs, from the current form values, against what the machine has.
+  const gb = b => (b / 1e9).toFixed(1) + ' GB';
+  function updateFootprints() {
+    const val = path => { const el = document.querySelector(`#cfgForm [data-path="${path}"]`); return el ? (el.type === 'checkbox' ? el.checked : el.value) : ''; };
+    const numv = (path, fallback) => { const v = val(path); return v === '' || v == null ? fallback : +v; };
+    const kbps = numv('capture.bitrateKbps', cfg.capture.bitrateKbps);
+    const perHour = kbps * 1000 / 8 * 3600;
+    document.querySelectorAll('.footprint').forEach(el => {
+      const i = el.dataset.fp, P = `profiles.${i}.`;
+      const mode = val(P + 'mode');
+      let need = 0, where = '', note = '', avail = 0, ok = true;
+      if (mode === 'buffer') {
+        const mins = numv(P + 'buffer.minutes', numv('buffer.minutes', cfg.buffer.minutes));
+        const st = val(P + 'buffer.storage') || val('buffer.storage') || 'ram';
+        need = mins * 60 * kbps * 125; where = st === 'ram' ? 'RAM' : 'disk'; avail = st === 'ram' ? meta.memTotal : meta.diskFree;
+        note = `${mins} min ring buffer at ${kbps} kbps`;
+        ok = need < avail * 0.8;
+      } else {
+        const win = numv(P + 'timeline.windowMinutes', numv('timeline.windowMinutes', cfg.timeline.windowMinutes));
+        const st = val(P + 'timeline.storage') || val('timeline.storage') || 'disk';
+        where = st === 'ram' ? 'RAM (tmpfs)' : 'disk'; avail = st === 'ram' ? meta.ramFree : meta.diskFree;
+        if (win > 0) { need = win * 60 * kbps * 125 * 1.1; note = `${win} min window at ${kbps} kbps`; ok = need <= avail; }
+        else { note = `no window: grows ${gb(perHour)} per hour on ${where}`; }
+      }
+      const extra = mode !== 'buffer' && where.startsWith('RAM') ? ` · tmpfs is ${gb(meta.ramTotal)} of ${gb(meta.memTotal)} RAM` : '';
+      el.className = 'footprint ' + (ok ? 'ok' : 'bad');
+      el.innerHTML = need
+        ? `<b>${gb(need)}</b> of ${where} needed <span class="muted">(${note})</span> · <b>${gb(avail)}</b> available${extra}${ok ? '' : ' · <b>will not start</b>: shorten the window, lower the bitrate, or switch storage'}`
+        : `<span class="muted">${note}</span> · ${gb(avail)} available`;
+    });
   }
 
   // Reads the form back into cfg. Blank numbers become null (= use default); empty override groups become null.

@@ -76,6 +76,8 @@ public static class WebApi
         api.MapGet("/config", async (ConfigService cs, KairecConfig cfg, RecordingCoordinator rec, CancellationToken ct) => Results.Ok(new
         {
             cs.Path, Text = cs.ReadText(), Config = cfg, Pending = cs.HasPending, SessionRunning = rec.IsActive,
+            RamFree = FreeBytes(Paths.Expand(cfg.Timeline.RamDir)), RamTotal = TotalBytes(Paths.Expand(cfg.Timeline.RamDir)),
+            DiskFree = FreeBytes(cfg.RootDir), MemTotal = MemTotalBytes(),
             Monitors = await GsrInfo.MonitorsAsync(ct), AudioDevices = await GsrInfo.AudioDevicesAsync(ct),
             Codecs = new[] { "h264", "hevc", "av1" },
         }));
@@ -257,6 +259,20 @@ public static class WebApi
             rec.RecordExport(profile, src.SessionId, target, r.Duration);
             return Results.Ok(new { r.Ok, Path = target, File = Path.GetFileName(target), r.Duration });
         });
+    }
+
+    private static long FreeBytes(string path)
+    {
+        try { var p = path; while (!Directory.Exists(p)) p = Path.GetDirectoryName(p) ?? "/"; return new DriveInfo(p).AvailableFreeSpace; } catch { return 0; }
+    }
+    private static long TotalBytes(string path)
+    {
+        try { var p = path; while (!Directory.Exists(p)) p = Path.GetDirectoryName(p) ?? "/"; return new DriveInfo(p).TotalSize; } catch { return 0; }
+    }
+    private static long MemTotalBytes()
+    {
+        try { foreach (var l in File.ReadLines("/proc/meminfo")) if (l.StartsWith("MemTotal:")) return long.Parse(l.Split(' ', StringSplitOptions.RemoveEmptyEntries)[1]) * 1024; } catch { }
+        return 0;
     }
 
     private static ClipInfo ReadClipInfo(string clipPath, string profile)

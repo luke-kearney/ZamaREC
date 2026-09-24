@@ -189,6 +189,10 @@ video { width: 100%; max-height: 58vh; display: block; background: #000; cursor:
 .audio-list label.other { grid-template-columns: auto 1fr; margin-top: 4px; }
 .audio-list label.other input[type=text] { background: var(--bg2); border: 1px solid var(--line2); border-radius: 8px; padding: 5px 9px; color: var(--text); }
 .profile { border-left: 3px solid var(--accent); }
+.footprint { margin-top: 10px; padding: 8px 12px; border-radius: 8px; font-size: 12.5px; background: var(--bg2); border: 1px solid var(--line); }
+.footprint.ok b { color: var(--ok); }
+.footprint.bad { border-color: #5a2024; background: #2a1416; }
+.footprint.bad b { color: var(--danger); }
 .profile .name { font-size: 15px; color: var(--text); text-transform: none; letter-spacing: 0; font-weight: 600; }
 .sub { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line2); }
 .sub .lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 6px; }
