@@ -47,6 +47,11 @@ public sealed class RecordingCoordinator : IAsyncDisposable
     }
 
     public bool IsActive => _active is not null;
+    public string? ActiveSessionId => _active?.Session.Info.Id;
+    public string? ActiveSessionDir => _active?.Session.Dir;
+    /// <summary>Lets the web API read the live session's markers/segments without racing the recorder.</summary>
+    public SessionStore? ActiveSession => _active?.Session;
+    public SegmentIndex? ActiveSegments => _active?.Segments;
     public int? ActiveGamePid => _active?.GamePid;
     public bool RecorderDied => _active is { Recorder.HasExited: true };
 

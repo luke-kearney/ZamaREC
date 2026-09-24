@@ -6,6 +6,9 @@
     <UseAppHost>true</UseAppHost>
   </PropertyGroup>
   <ItemGroup>
+    <Content Update="wwwroot\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="../Kairos.Core/Kairos.Core.csproj" />
     <ProjectReference Include="../Kairos.Protocol/Kairos.Protocol.csproj" />
   </ItemGroup>

@@ -53,6 +53,27 @@ public static class ClipExporter
         finally { try { File.Delete(listFile); } catch { } }
     }
 
+    /// <summary>Cuts [start, end] out of a finished MP4 clip. Input seeking works here, so the cut is keyframe-accurate.</summary>
+    public static async Task<Result> ExportFromFileAsync(string sourcePath, double start, double end, string outputPath, bool exact, ILogger log, CancellationToken ct)
+    {
+        if (end <= start) return new Result(false, null, null, "end must be after start");
+        var args = new List<string> { "-hide_banner", "-loglevel", "error", "-y" };
+        if (exact) args.AddRange(["-hwaccel", "cuda"]);
+        args.AddRange(["-ss", F(start), "-i", sourcePath, "-t", F(end - start)]);
+        if (exact) args.AddRange(["-c:v", "h264_nvenc", "-preset", "p4", "-rc", "vbr", "-cq", "21", "-b:v", "0", "-c:a", "copy"]);
+        else args.AddRange(["-c", "copy"]);
+        args.AddRange(["-avoid_negative_ts", "make_zero", "-movflags", "+faststart", outputPath]);
+        Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
+        var (code, stderr) = await RunAsync("ffmpeg", args, ct);
+        if (code != 0)
+        {
+            log.LogError("ffmpeg failed ({code}): {err}", code, stderr);
+            return new Result(false, null, null, stderr.Trim().Split('\n').LastOrDefault() ?? "ffmpeg failed");
+        }
+        var dur = await Recording.VideoProbe.DurationSecondsAsync(outputPath, ct);
+        return new Result(true, outputPath, dur, null);
+    }
+
     private static string F(double v) => v.ToString("0.###", CultureInfo.InvariantCulture);
 
     private static async Task<(int Code, string Stderr)> RunAsync(string exe, IEnumerable<string> args, CancellationToken ct)

@@ -62,10 +62,25 @@ kairos status                     show what the daemon is doing
     2026-09-24_20-20-08_clutch.mp4.json  source, expiry, and the clip's own markers
 ```
 
+## Web UI
+
+Open <http://127.0.0.1:3556> in a browser (never opened automatically; nothing in kairos
+takes focus from a game). Sessions and clips on the left, player and timeline in the middle,
+markers on the right.
+
+- Timeline sessions play as HLS via hls.js, including a session that is still recording (a few
+  seconds behind). The greyed part of the bar is footage already purged from the window.
+- Click a marker or the bar to jump. `I`/`O` set the in/out points from the playhead,
+  `E` exports the range, `M` drops a marker, space pauses, arrows seek 5 s (shift: 30 s),
+  `,`/`.` step a frame.
+- "Clip around this marker" (✂) uses the before/after seconds; "Export all" does every marker
+  of one type. Exports are stream copies unless *frame-exact* is ticked, which re-encodes on nvenc.
+- A clip opens the same way and can be cut down again.
+
 ## Status
 
 - [x] phase a: daemon, profiles, timeline/buffer modes, auto start/stop, save, CLI, systemd
 - [ ] phase b: CS2 game state integration markers
-- [ ] phase c: clip export from the CLI (ranges, around markers, batch, optional nvenc re-encode)
-- [ ] phase d: web timeline
+- [~] phase c: export exists in the API/UI; CLI `export` command still to do
+- [x] phase d: web timeline (sessions, clips, live playback, markers, range/marker/batch export)
 - [ ] phase e: retention (clip caps, mark-clip expiry, starred), polish
