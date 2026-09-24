@@ -1,0 +1,759 @@
+[
+ {
+  "note": "menu",
+  "payload": {
+   "provider": {
+    "name": "Counter-Strike: Global Offensive",
+    "appid": 730,
+    "version": 14000,
+    "steamid": "76561198000000001",
+    "timestamp": 1
+   },
+   "player": {
+    "steamid": "76561198000000001",
+    "name": "player",
+    "activity": "menu"
+   }
+  }
+ },
+ {
+  "note": "map live",
+  "payload": {
+   "provider": {
+    "name": "Counter-Strike: Global Offensive",
+    "appid": 730,
+    "version": 14000,
+    "steamid": "76561198000000001",
+    "timestamp": 2
+   },
+   "map": {
+    "name": "de_mirage",
+    "phase": "live",
+    "round": 0,
+    "team_ct": {
+     "score": 0
+    },
+    "team_t": {
+     "score": 0
+    }
+   },
+   "round": {
+    "phase": "freezetime"
+   },
+   "player": {
+    "steamid": "76561198000000001",
+    "name": "player",
+    "team": "CT",
+    "activity": "playing",
+    "state": {
+     "health": 100,
+     "armor": 100,
+     "round_kills": 0,
+     "round_killhs": 0
+    },
+    "match_stats": {
+     "kills": 0,
+     "assists": 0,
+     "deaths": 0,
+     "mvps": 0,
+     "score": 0
+    }
+   }
+  }
+ },
+ {
+  "note": "live",
+  "payload": {
+   "provider": {
+    "name": "Counter-Strike: Global Offensive",
+    "appid": 730,
+    "version": 14000,
+    "steamid": "76561198000000001",
+    "timestamp": 3
+   },
+   "map": {
+    "name": "de_mirage",
+    "phase": "live",
+    "round": 0,
+    "team_ct": {
+     "score": 0
+    },
+    "team_t": {
+     "score": 0
+    }
+   },
+   "round": {
+    "phase": "live"
+   },
+   "player": {
+    "steamid": "76561198000000001",
+    "name": "player",
+    "team": "CT",
+    "activity": "playing",
+    "state": {
+     "health": 100,
+     "armor": 100,
+     "round_kills": 0,
+     "round_killhs": 0
+    },
+    "match_stats": {
+     "kills": 0,
+     "assists": 0,
+     "deaths": 0,
+     "mvps": 0,
+     "score": 0
+    }
+   }
+  }
+ },
+ {
+  "note": "kill 1",
+  "payload": {
+   "provider": {
+    "name": "Counter-Strike: Global Offensive",
+    "appid": 730,
+    "version": 14000,
+    "steamid": "76561198000000001",
+    "timestamp": 4
+   },
+   "map": {
+    "name": "de_mirage",
+    "phase": "live",
+    "round": 0,
+    "team_ct": {
+     "score": 0
+    },
+    "team_t": {
+     "score": 0
+    }
+   },
+   "round": {
+    "phase": "live"
+   },
+   "player": {
+    "steamid": "76561198000000001",
+    "name": "player",
+    "team": "CT",
+    "activity": "playing",
+    "state": {
+     "health": 100,
+     "armor": 100,
+     "round_kills": 1,
+     "round_killhs": 0
+    },
+    "match_stats": {
+     "kills": 1,
+     "assists": 0,
+     "deaths": 0,
+     "mvps": 0,
+     "score": 0
+    }
+   }
+  }
+ },
+ {
+  "note": "kill 2 hs",
+  "payload": {
+   "provider": {
+    "name": "Counter-Strike: Global Offensive",
+    "appid": 730,
+    "version": 14000,
+    "steamid": "76561198000000001",
+    "timestamp": 5
+   },
+   "map": {
+    "name": "de_mirage",
+    "phase": "live",
+    "round": 0,
+    "team_ct": {
+     "score": 0
+    },
+    "team_t": {
+     "score": 0
+    }
+   },
+   "round": {
+    "phase": "live"
+   },
+   "player": {
+    "steamid": "76561198000000001",
+    "name": "player",
+    "team": "CT",
+    "activity": "playing",
+    "state": {
+     "health": 100,
+     "armor": 100,
+     "round_kills": 2,
+     "round_killhs": 1
+    },
+    "match_stats": {
+     "kills": 2,
+     "assists": 0,
+     "deaths": 0,
+     "mvps": 0,
+     "score": 0
+    }
+   }
+  }
+ },
+ {
+  "note": "kill 3",
+  "payload": {
+   "provider": {
+    "name": "Counter-Strike: Global Offensive",
+    "appid": 730,
+    "version": 14000,
+    "steamid": "76561198000000001",
+    "timestamp": 6
+   },
+   "map": {
+    "name": "de_mirage",
+    "phase": "live",
+    "round": 0,
+    "team_ct": {
+     "score": 0
+    },
+    "team_t": {
+     "score": 0
+    }
+   },
+   "round": {
+    "phase": "live"
+   },
+   "player": {
+    "steamid": "76561198000000001",
+    "name": "player",
+    "team": "CT",
+    "activity": "playing",
+    "state": {
+     "health": 100,
+     "armor": 100,
+     "round_kills": 3,
+     "round_killhs": 1
+    },
+    "match_stats": {
+     "kills": 3,
+     "assists": 0,
+     "deaths": 0,
+     "mvps": 0,
+     "score": 0
+    }
+   }
+  }
+ },
+ {
+  "note": "round over win",
+  "payload": {
+   "provider": {
+    "name": "Counter-Strike: Global Offensive",
+    "appid": 730,
+    "version": 14000,
+    "steamid": "76561198000000001",
+    "timestamp": 7
+   },
+   "map": {
+    "name": "de_mirage",
+    "phase": "live",
+    "round": 0,
+    "team_ct": {
+     "score": 0
+    },
+    "team_t": {
+     "score": 0
+    }
+   },
+   "round": {
+    "phase": "over",
+    "win_team": "CT"
+   },
+   "player": {
+    "steamid": "76561198000000001",
+    "name": "player",
+    "team": "CT",
+    "activity": "playing",
+    "state": {
+     "health": 100,
+     "armor": 100,
+     "round_kills": 3,
+     "round_killhs": 1
+    },
+    "match_stats": {
+     "kills": 3,
+     "assists": 0,
+     "deaths": 0,
+     "mvps": 1,
+     "score": 0
+    }
+   }
+  }
+ },
+ {
+  "note": "new round",
+  "payload": {
+   "provider": {
+    "name": "Counter-Strike: Global Offensive",
+    "appid": 730,
+    "version": 14000,
+    "steamid": "76561198000000001",
+    "timestamp": 8
+   },
+   "map": {
+    "name": "de_mirage",
+    "phase": "live",
+    "round": 1,
+    "team_ct": {
+     "score": 0
+    },
+    "team_t": {
+     "score": 0
+    }
+   },
+   "round": {
+    "phase": "freezetime"
+   },
+   "player": {
+    "steamid": "76561198000000001",
+    "name": "player",
+    "team": "CT",
+    "activity": "playing",
+    "state": {
+     "health": 100,
+     "armor": 100,
+     "round_kills": 0,
+     "round_killhs": 0
+    },
+    "match_stats": {
+     "kills": 3,
+     "assists": 0,
+     "deaths": 0,
+     "mvps": 1,
+     "score": 0
+    }
+   }
+  }
+ },
+ {
+  "note": "live r2",
+  "payload": {
+   "provider": {
+    "name": "Counter-Strike: Global Offensive",
+    "appid": 730,
+    "version": 14000,
+    "steamid": "76561198000000001",
+    "timestamp": 9
+   },
+   "map": {
+    "name": "de_mirage",
+    "phase": "live",
+    "round": 1,
+    "team_ct": {
+     "score": 0
+    },
+    "team_t": {
+     "score": 0
+    }
+   },
+   "round": {
+    "phase": "live"
+   },
+   "player": {
+    "steamid": "76561198000000001",
+    "name": "player",
+    "team": "CT",
+    "activity": "playing",
+    "state": {
+     "health": 100,
+     "armor": 100,
+     "round_kills": 0,
+     "round_killhs": 0
+    },
+    "match_stats": {
+     "kills": 3,
+     "assists": 0,
+     "deaths": 0,
+     "mvps": 1,
+     "score": 0
+    }
+   }
+  }
+ },
+ {
+  "note": "i die",
+  "payload": {
+   "provider": {
+    "name": "Counter-Strike: Global Offensive",
+    "appid": 730,
+    "version": 14000,
+    "steamid": "76561198000000001",
+    "timestamp": 10
+   },
+   "map": {
+    "name": "de_mirage",
+    "phase": "live",
+    "round": 1,
+    "team_ct": {
+     "score": 0
+    },
+    "team_t": {
+     "score": 0
+    }
+   },
+   "round": {
+    "phase": "live"
+   },
+   "player": {
+    "steamid": "76561198000000001",
+    "name": "player",
+    "team": "CT",
+    "activity": "playing",
+    "state": {
+     "health": 0,
+     "armor": 100,
+     "round_kills": 0,
+     "round_killhs": 0
+    },
+    "match_stats": {
+     "kills": 3,
+     "assists": 0,
+     "deaths": 1,
+     "mvps": 1,
+     "score": 0
+    }
+   }
+  }
+ },
+ {
+  "note": "spectating mate",
+  "payload": {
+   "provider": {
+    "name": "Counter-Strike: Global Offensive",
+    "appid": 730,
+    "version": 14000,
+    "steamid": "76561198000000001",
+    "timestamp": 11
+   },
+   "map": {
+    "name": "de_mirage",
+    "phase": "live",
+    "round": 1,
+    "team_ct": {
+     "score": 0
+    },
+    "team_t": {
+     "score": 0
+    }
+   },
+   "round": {
+    "phase": "live"
+   },
+   "player": {
+    "steamid": "76561198000000002",
+    "name": "mate",
+    "team": "CT",
+    "activity": "playing",
+    "state": {
+     "health": 100,
+     "armor": 100,
+     "round_kills": 1,
+     "round_killhs": 0
+    },
+    "match_stats": {
+     "kills": 5,
+     "assists": 0,
+     "deaths": 0,
+     "mvps": 0,
+     "score": 0
+    }
+   }
+  }
+ },
+ {
+  "note": "mate kills more",
+  "payload": {
+   "provider": {
+    "name": "Counter-Strike: Global Offensive",
+    "appid": 730,
+    "version": 14000,
+    "steamid": "76561198000000001",
+    "timestamp": 12
+   },
+   "map": {
+    "name": "de_mirage",
+    "phase": "live",
+    "round": 1,
+    "team_ct": {
+     "score": 0
+    },
+    "team_t": {
+     "score": 0
+    }
+   },
+   "round": {
+    "phase": "live"
+   },
+   "player": {
+    "steamid": "76561198000000002",
+    "name": "mate",
+    "team": "CT",
+    "activity": "playing",
+    "state": {
+     "health": 100,
+     "armor": 100,
+     "round_kills": 2,
+     "round_killhs": 0
+    },
+    "match_stats": {
+     "kills": 6,
+     "assists": 0,
+     "deaths": 0,
+     "mvps": 0,
+     "score": 0
+    }
+   }
+  }
+ },
+ {
+  "note": "mate dies",
+  "payload": {
+   "provider": {
+    "name": "Counter-Strike: Global Offensive",
+    "appid": 730,
+    "version": 14000,
+    "steamid": "76561198000000001",
+    "timestamp": 13
+   },
+   "map": {
+    "name": "de_mirage",
+    "phase": "live",
+    "round": 1,
+    "team_ct": {
+     "score": 0
+    },
+    "team_t": {
+     "score": 0
+    }
+   },
+   "round": {
+    "phase": "live"
+   },
+   "player": {
+    "steamid": "76561198000000002",
+    "name": "mate",
+    "team": "CT",
+    "activity": "playing",
+    "state": {
+     "health": 0,
+     "armor": 100,
+     "round_kills": 2,
+     "round_killhs": 0
+    },
+    "match_stats": {
+     "kills": 6,
+     "assists": 0,
+     "deaths": 1,
+     "mvps": 0,
+     "score": 0
+    }
+   }
+  }
+ },
+ {
+  "note": "round over loss",
+  "payload": {
+   "provider": {
+    "name": "Counter-Strike: Global Offensive",
+    "appid": 730,
+    "version": 14000,
+    "steamid": "76561198000000001",
+    "timestamp": 14
+   },
+   "map": {
+    "name": "de_mirage",
+    "phase": "live",
+    "round": 1,
+    "team_ct": {
+     "score": 0
+    },
+    "team_t": {
+     "score": 0
+    }
+   },
+   "round": {
+    "phase": "over",
+    "win_team": "T"
+   },
+   "player": {
+    "steamid": "76561198000000002",
+    "name": "mate",
+    "team": "CT",
+    "activity": "playing",
+    "state": {
+     "health": 0,
+     "armor": 100,
+     "round_kills": 2,
+     "round_killhs": 0
+    },
+    "match_stats": {
+     "kills": 6,
+     "assists": 0,
+     "deaths": 1,
+     "mvps": 0,
+     "score": 0
+    }
+   }
+  }
+ },
+ {
+  "note": "r3 me alive",
+  "payload": {
+   "provider": {
+    "name": "Counter-Strike: Global Offensive",
+    "appid": 730,
+    "version": 14000,
+    "steamid": "76561198000000001",
+    "timestamp": 15
+   },
+   "map": {
+    "name": "de_mirage",
+    "phase": "live",
+    "round": 2,
+    "team_ct": {
+     "score": 0
+    },
+    "team_t": {
+     "score": 0
+    }
+   },
+   "round": {
+    "phase": "live"
+   },
+   "player": {
+    "steamid": "76561198000000001",
+    "name": "player",
+    "team": "CT",
+    "activity": "playing",
+    "state": {
+     "health": 100,
+     "armor": 100,
+     "round_kills": 0,
+     "round_killhs": 0
+    },
+    "match_stats": {
+     "kills": 3,
+     "assists": 0,
+     "deaths": 1,
+     "mvps": 1,
+     "score": 0
+    }
+   }
+  }
+ },
+ {
+  "note": "r3 kill",
+  "payload": {
+   "provider": {
+    "name": "Counter-Strike: Global Offensive",
+    "appid": 730,
+    "version": 14000,
+    "steamid": "76561198000000001",
+    "timestamp": 16
+   },
+   "map": {
+    "name": "de_mirage",
+    "phase": "live",
+    "round": 2,
+    "team_ct": {
+     "score": 0
+    },
+    "team_t": {
+     "score": 0
+    }
+   },
+   "round": {
+    "phase": "live"
+   },
+   "player": {
+    "steamid": "76561198000000001",
+    "name": "player",
+    "team": "CT",
+    "activity": "playing",
+    "state": {
+     "health": 100,
+     "armor": 100,
+     "round_kills": 1,
+     "round_killhs": 0
+    },
+    "match_stats": {
+     "kills": 4,
+     "assists": 0,
+     "deaths": 1,
+     "mvps": 1,
+     "score": 0
+    }
+   }
+  }
+ },
+ {
+  "note": "gameover",
+  "payload": {
+   "provider": {
+    "name": "Counter-Strike: Global Offensive",
+    "appid": 730,
+    "version": 14000,
+    "steamid": "76561198000000001",
+    "timestamp": 17
+   },
+   "map": {
+    "name": "de_mirage",
+    "phase": "gameover",
+    "round": 2,
+    "team_ct": {
+     "score": 0
+    },
+    "team_t": {
+     "score": 0
+    }
+   },
+   "round": {
+    "phase": "over",
+    "win_team": "CT"
+   },
+   "player": {
+    "steamid": "76561198000000001",
+    "name": "player",
+    "team": "CT",
+    "activity": "playing",
+    "state": {
+     "health": 100,
+     "armor": 100,
+     "round_kills": 1,
+     "round_killhs": 0
+    },
+    "match_stats": {
+     "kills": 4,
+     "assists": 0,
+     "deaths": 1,
+     "mvps": 1,
+     "score": 0
+    }
+   }
+  }
+ },
+ {
+  "note": "back to menu",
+  "payload": {
+   "provider": {
+    "name": "Counter-Strike: Global Offensive",
+    "appid": 730,
+    "version": 14000,
+    "steamid": "76561198000000001",
+    "timestamp": 18
+   },
+   "player": {
+    "steamid": "76561198000000001",
+    "name": "player",
+    "activity": "menu"
+   }
+  }
+ }
+]

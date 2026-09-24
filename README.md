@@ -74,6 +74,16 @@ kairec top                        live view until Ctrl+C: state, CPU/RAM of the 
     2026-09-24_20-20-08_clutch.mp4.json  source, expiry, and the clip's own markers
 ```
 
+## CS2 events
+
+With `events = "cs2-gsi"` on a profile the daemon writes `gamestate_integration_kairec.cfg` into
+CS2's cfg folder (found through Steam's library list, or `gsi.cfg_dir`) and listens on
+`daemon.gsi_port`. CS2 reads the cfg at launch, so restart the game once after installing. Every
+kill (with the round count and headshot flag), death, round win or loss, MVP, and map start or end
+becomes a typed marker at the moment it arrived. Only payloads about *your* steamid count, so
+spectating never produces events. The map name is added to the session folder. `clips.event_clips`
+lists which events also write a clip, default a 2-kill round or better and an MVP.
+
 ## Web UI
 
 Open <http://127.0.0.1:3556> in a browser (never opened automatically; nothing in kairec
@@ -104,7 +114,7 @@ counters live in `stats.json` next to it, so they survive sessions being deleted
 ## Status
 
 - [x] phase a: daemon, profiles, timeline/buffer modes, auto start/stop, save, CLI, systemd
-- [ ] phase b: CS2 game state integration markers
+- [x] phase b: CS2 game state integration markers (kills with count/HS, death, round result, MVP, map)
 - [~] phase c: export exists in the API/UI; CLI `export` command still to do
 - [x] phase d: web timeline (sessions, clips, live playback, markers, range/marker/batch export)
 - [ ] phase e: retention (clip caps, mark-clip expiry, starred), polish

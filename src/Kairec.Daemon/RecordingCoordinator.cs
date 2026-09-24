@@ -2,6 +2,7 @@ using Kairec.Core;
 using Kairec.Core.Config;
 using Kairec.Core.Export;
 using Kairec.Core.Feedback;
+using Kairec.Core.Gsi;
 using Kairec.Core.Recording;
 using Kairec.Core.Sessions;
 using Kairec.Core.Telemetry;
@@ -179,9 +180,9 @@ public sealed class RecordingCoordinator : IAsyncDisposable
         if (!keep) { TryDeleteSession(a.Session.Dir); return Ok($"session {a.Session.Info.Id} ended (nothing saved)"); }
         if (a.Profile.Mode == CaptureMode.Timeline && a.Session.Info.FirstFrameMonoUs is null)
             _log.LogWarning("session {id}: no first-frame timestamp found; markers keep monotonic times only", a.Session.Info.Id);
+        var kept = a.Segments?.Available(includeTail: false).Sum(s => s.Duration);
         a.Session.RenameForMap();
 
-        var kept = a.Segments?.Available(includeTail: false).Sum(s => s.Duration);
         var msg = $"session {a.Session.Info.Id} saved" + (duration is double d ? $" ({d:0}s recorded" + (kept is double k && k < d - 1 ? $", last {k:0}s kept)" : ")") : "");
         _log.LogInformation("{msg}", msg);
         return Ok(msg);
@@ -208,25 +209,56 @@ public sealed class RecordingCoordinator : IAsyncDisposable
                 _log.LogInformation("marker {id} '{label}' at {where}", m.Id, label ?? "", where);
                 return Ok($"marked at {where}" + (label is null ? "" : $" \"{label}\""));
             }
-
-            // Schedule a clip of [before, after] around the mark. Marks that arrive while one is pending
-            // join it, unless the buffer/window could not hold the combined span.
-            var p = a.Profile;
-            var job = a.Pending;
-            if (job is not null)
-            {
-                var span = (tMono - job.FirstMarkMonoUs) / 1_000_000.0 + p.MarkBeforeSeconds + p.MarkAfterSeconds;
-                var capacity = p.Mode == CaptureMode.Buffer ? p.BufferMinutes * 60 : (p.WindowMinutes > 0 ? p.WindowMinutes * 60 : int.MaxValue);
-                if (span > capacity) { await FlushMarkJobAsync(a, "buffer full", ct); job = null; }
-            }
-            if (job is null) { job = new MarkJob { FirstMarkMonoUs = tMono }; a.Pending = job; }
-            job.LastMarkMonoUs = tMono;
-            job.DueMonoUs = tMono + (long)p.MarkAfterSeconds * 1_000_000;
-            job.Marks.Add(m);
-            _log.LogInformation("marker {id} '{label}' at {where} queued; clip will be written in {after}s ({n} marks in clip)", m.Id, label ?? "", where, p.MarkAfterSeconds, job.Marks.Count);
-            return Ok($"marked at {where}; clip in {p.MarkAfterSeconds}s" + (label is null ? "" : $" \"{label}\""));
+            await ScheduleMarkClipAsync(a, m, tMono, ct);
+            return Ok($"marked at {where}; clip in {a.Profile.MarkAfterSeconds}s" + (label is null ? "" : $" \"{label}\""));
         }
         finally { _lock.Release(); }
+    }
+
+    /// <summary>A game event from GSI: becomes a typed marker, and a clip if the profile's event_clips say so.</summary>
+    public async Task EventMarkAsync(GsiEvent ev, long tMono, CancellationToken ct)
+    {
+        await _lock.WaitAsync(ct);
+        try
+        {
+            var a = _active;
+            if (a is null || a.Profile.Profile.Events != "cs2-gsi") return;
+            a.Session.TryResolveFirstFrame();
+            var m = a.Session.AddMarker(ev.Type, ev.Label, tMono, ev.Data);
+            var where = m.TVideo is double tv ? $"{tv:0.00}s" : "t=?";
+            var kills = ev.Data.TryGetValue("count", out var c) && c.TryGetInt32(out var k) ? k : 0;
+            var clip = a.Profile.EventWantsClip(ev.Type, kills);
+            _log.LogInformation("event {type} '{label}' at {where}{clip}", ev.Type, ev.Label ?? "", where, clip ? " (clip)" : "");
+            _events.Write("mark", $"{ev.Type}{(ev.Label is null ? "" : " " + ev.Label)} at {where}" + (clip ? $", clip in {a.Profile.MarkAfterSeconds}s" : ""), a.Profile.Name, a.Session.Info.Id, seconds: m.TVideo);
+            if (clip) { _sound.Play("mark"); await ScheduleMarkClipAsync(a, m, tMono, ct); }
+        }
+        finally { _lock.Release(); }
+    }
+
+    public void SetMap(string map)
+    {
+        var a = _active;
+        if (a is null) return;
+        a.Session.SetMap(map);
+        _log.LogInformation("map {map}", map);
+    }
+
+    /// <summary>Queues a clip of [before, after] around a marker. Marks that arrive while one is pending join it.</summary>
+    private async Task ScheduleMarkClipAsync(Active a, Marker m, long tMono, CancellationToken ct)
+    {
+        var p = a.Profile;
+        var job = a.Pending;
+        if (job is not null)
+        {
+            var span = (tMono - job.FirstMarkMonoUs) / 1_000_000.0 + p.MarkBeforeSeconds + p.MarkAfterSeconds;
+            var capacity = p.Mode == CaptureMode.Buffer ? p.BufferMinutes * 60 : (p.WindowMinutes > 0 ? p.WindowMinutes * 60 : int.MaxValue);
+            if (span > capacity) { await FlushMarkJobAsync(a, "buffer full", ct); job = null; }
+        }
+        if (job is null) { job = new MarkJob { FirstMarkMonoUs = tMono }; a.Pending = job; }
+        job.LastMarkMonoUs = tMono;
+        job.DueMonoUs = tMono + (long)p.MarkAfterSeconds * 1_000_000;
+        job.Marks.Add(m);
+        _log.LogInformation("marker {id} queued; clip will be written in {after}s ({n} marks in clip)", m.Id, p.MarkAfterSeconds, job.Marks.Count);
     }
 
     public async Task<ControlResponse> SaveAsync(int? seconds, string? label, CancellationToken ct)

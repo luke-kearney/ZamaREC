@@ -14,6 +14,7 @@ public sealed class KairecConfig
     public RetentionConfig Retention { get; set; } = new();
     public FeedbackConfig Feedback { get; set; } = new();
     public DaemonConfig Daemon { get; set; } = new();
+    public GsiConfig Gsi { get; set; } = new();
     public List<ProfileConfig> Profiles { get; set; } = new();
 
     [JsonIgnore] public string RootDir => Paths.Expand(Storage.Root);
@@ -27,7 +28,7 @@ public sealed class KairecConfig
     public void CopyFrom(KairecConfig o)
     {
         Storage = o.Storage; Capture = o.Capture; Timeline = o.Timeline; Buffer = o.Buffer; Clips = o.Clips;
-        Retention = o.Retention; Feedback = o.Feedback; Daemon = o.Daemon; Profiles = o.Profiles;
+        Retention = o.Retention; Feedback = o.Feedback; Daemon = o.Daemon; Gsi = o.Gsi; Profiles = o.Profiles;
         Version++;
     }
 
@@ -51,6 +52,7 @@ public sealed class KairecConfig
         MarkAfterSeconds = p.Clips?.MarkAfterSeconds ?? Clips.MarkAfterSeconds,
         MarkClipExpireHours = p.Clips?.MarkClipExpireHours ?? Clips.MarkClipExpireHours,
         MarkSaves = p.CaptureMode == CaptureMode.Buffer || (p.Clips?.MarkSaves ?? Clips.MarkSaves ?? ((p.Timeline?.Storage ?? Timeline.Storage) == "ram")),
+        EventClips = p.Clips?.EventClips ?? Clips.EventClips,
         MaxGb = p.Retention?.MaxGb ?? Retention.MaxGb,
         MaxDays = p.Retention?.MaxDays ?? Retention.MaxDays,
     };
@@ -75,6 +77,20 @@ public sealed class EffectiveProfile
     public required int MarkAfterSeconds { get; init; }
     public required int MarkClipExpireHours { get; init; }
     public required bool MarkSaves { get; init; }
+    public required List<string> EventClips { get; init; }
+
+    /// <summary>Does this game event deserve a clip? Matches "type" or "kill:N" entries.</summary>
+    public bool EventWantsClip(string type, int killCount)
+    {
+        foreach (var e in EventClips)
+        {
+            var parts = e.Split(':');
+            if (parts[0] != type) continue;
+            if (parts.Length == 1) return true;
+            if (int.TryParse(parts[1], out var min) && killCount >= min) return true;
+        }
+        return false;
+    }
     public required double? MaxGb { get; init; }
     public required int? MaxDays { get; init; }
 }
@@ -132,6 +148,16 @@ public sealed class ClipConfig
     public int MarkClipExpireHours { get; set; } = 30;
     /// <summary>Timeline mode: also write a clip around every mark (buffer mode always does). Null = on for RAM timelines, off for disk.</summary>
     public bool? MarkSaves { get; set; }
+    /// <summary>Game events that also write a clip like a manual mark: kill:N (N or more kills in the round), mvp, death, round_win, round_loss.</summary>
+    public List<string> EventClips { get; set; } = new() { "kill:2", "mvp" };
+}
+
+public sealed class GsiConfig
+{
+    /// <summary>CS2 cfg folder. Empty = find it through Steam's library list.</summary>
+    public string CfgDir { get; set; } = "";
+    /// <summary>Append every payload to gsi.jsonl in the session folder (useful for building test fixtures).</summary>
+    public bool CaptureRaw { get; set; } = true;
 }
 
 public sealed class RetentionConfig
@@ -182,7 +208,7 @@ public sealed class ProfileConfig
 
 public sealed class ProfileTimelineOverride { public int? WindowMinutes { get; set; } public int? SegmentSeconds { get; set; } public string? Storage { get; set; } public double? RamKeepHours { get; set; } }
 public sealed class ProfileBufferOverride { public int? Minutes { get; set; } public string? Storage { get; set; } }
-public sealed class ProfileClipOverride { public int? SaveSeconds { get; set; } public int? MarkBeforeSeconds { get; set; } public int? MarkAfterSeconds { get; set; } public int? MarkClipExpireHours { get; set; } public bool? MarkSaves { get; set; } }
+public sealed class ProfileClipOverride { public int? SaveSeconds { get; set; } public int? MarkBeforeSeconds { get; set; } public int? MarkAfterSeconds { get; set; } public int? MarkClipExpireHours { get; set; } public bool? MarkSaves { get; set; } public List<string>? EventClips { get; set; } }
 public sealed class ProfileRetentionOverride { public double? MaxGb { get; set; } public int? MaxDays { get; set; } }
 
 public enum CaptureMode { Timeline, Buffer }

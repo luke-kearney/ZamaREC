@@ -11,11 +11,12 @@ public sealed class ControlSocketServer : BackgroundService
     private readonly RecordingCoordinator _rec;
     private readonly Core.Config.KairecConfig _cfg;
     private readonly ConfigService _configService;
+    private readonly GsiService _gsi;
     private readonly ILogger<ControlSocketServer> _log;
 
-    public ControlSocketServer(RecordingCoordinator rec, Core.Config.KairecConfig cfg, ConfigService configService, ILogger<ControlSocketServer> log)
+    public ControlSocketServer(RecordingCoordinator rec, Core.Config.KairecConfig cfg, ConfigService configService, GsiService gsi, ILogger<ControlSocketServer> log)
     {
-        _rec = rec; _cfg = cfg; _configService = configService; _log = log;
+        _rec = rec; _cfg = cfg; _configService = configService; _gsi = gsi; _log = log;
     }
 
     protected override async Task ExecuteAsync(CancellationToken ct)
@@ -80,6 +81,7 @@ public sealed class ControlSocketServer : BackgroundService
                 try
                 {
                     var r = _configService.ReloadFromDisk(_rec.IsActive);
+                    _gsi.EnsureConfigFile();
                     return new ControlResponse { Ok = true, Message = r == "applied" ? "config reloaded" : "config reloaded; applies when the current session ends" };
                 }
                 catch (Exception ex) { return new ControlResponse { Ok = false, Message = "config error: " + ex.Message }; }
@@ -89,11 +91,13 @@ public sealed class ControlSocketServer : BackgroundService
             case "status":
             {
                 var s = _rec.Status();
-                var msg = s.State == "idle" ? "idle"
+                s.GsiLastSeconds = _gsi.SecondsSinceLastPayload; s.GsiMap = _gsi.CurrentMap;
+                var gsiNote = s.GsiLastSeconds is double g ? $", gsi {g:0}s ago" + (s.GsiMap is null ? "" : $" on {s.GsiMap}") : "";
+                var msg = s.State == "idle" ? "idle" + gsiNote
                     : $"{s.State}: {s.Profile} ({s.Mode}) {s.ElapsedSeconds:0}s elapsed"
                       + (s.WindowSeconds is double w ? $", {w:0}s in window" : "")
                       + $", {s.MarkerCount} markers" + (s.PendingMarks > 0 ? $" ({s.PendingMarks} pending clip)" : "")
-                      + $", {s.SessionDir}";
+                      + gsiNote + $", {s.SessionDir}";
                 return new ControlResponse { Ok = true, Message = msg, Status = s };
             }
             default: return new ControlResponse { Ok = false, Message = $"unknown command '{req.Cmd}'" };

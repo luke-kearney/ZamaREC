@@ -20,11 +20,21 @@ public static class WebApi
     {
         var api = app.MapGroup("/api");
 
-        api.MapGet("/status", (RecordingCoordinator rec, KairecConfig cfg) =>
+        api.MapGet("/status", (RecordingCoordinator rec, KairecConfig cfg, GsiService gsi) =>
         {
             var s = rec.Status();
             return Results.Ok(new { s.State, s.Profile, s.Mode, SessionId = rec.ActiveSessionId, s.ElapsedSeconds, s.RecordedSeconds, s.WindowSeconds, s.MarkerCount, s.PendingMarks,
+                GsiLastSeconds = gsi.SecondsSinceLastPayload, GsiMap = gsi.CurrentMap, GsiCfg = gsi.CfgPath,
                 Profiles = cfg.Profiles.Select(p => new { p.Name, p.Mode }) });
+        });
+
+        // CS2 posts its game state here (see gamestate_integration_kairec.cfg). Timestamped on arrival.
+        app.MapPost("/gsi", async (HttpRequest req, GsiService gsi, CancellationToken ct) =>
+        {
+            var arrival = Core.MonotonicClock.NowMicros();
+            using var doc = await JsonDocument.ParseAsync(req.Body, cancellationToken: ct);
+            var ok = await gsi.HandleAsync(doc.RootElement, arrival, ct);
+            return ok ? Results.Ok() : Results.Unauthorized();
         });
 
         api.MapPost("/mark", async (MarkRequest req, RecordingCoordinator rec, CancellationToken ct) =>

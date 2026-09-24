@@ -26,6 +26,7 @@ builder.Services.AddSingleton(new Kairec.Core.Telemetry.StatsStore());
 builder.Services.AddSingleton(sp => new ConfigService(config, configPath, sp.GetRequiredService<Kairec.Core.Telemetry.EventLog>(), sp.GetRequiredService<ILogger<ConfigService>>()));
 builder.Services.AddSingleton(sp => new SoundFeedback(config.Feedback, sp.GetRequiredService<ILogger<SoundFeedback>>()));
 builder.Services.AddSingleton<RecordingCoordinator>();
+builder.Services.AddSingleton<GsiService>();
 builder.Services.AddSingleton<SessionCatalog>();
 builder.Services.AddHostedService<GameWatcherService>();
 builder.Services.AddHostedService<ControlSocketServer>();
@@ -40,6 +41,7 @@ app.UseStaticFiles(new StaticFileOptions { ContentTypeProvider = types });
 app.MapWebApi();
 
 app.Services.GetRequiredService<Kairec.Core.Telemetry.EventLog>().Write("daemon", "daemon started");
+app.Services.GetRequiredService<GsiService>().EnsureConfigFile();
 app.Services.GetRequiredService<ILogger<Program>>()
     .LogInformation("kairec daemon starting; config {path}; ui http://{bind}:{port}; profiles: {profiles}",
         configPath, config.Daemon.Bind, config.Daemon.UiPort, string.Join(", ", config.Profiles.Select(p => $"{p.Name} ({p.Mode})")));

@@ -5,7 +5,11 @@ const COLORS = {
   manual: '#f5c542', save: '#4cc9f0', export: '#4cc9f0', kill: '#ff5c5c', multikill: '#ff2d95', headshot: '#ff8c42',
   death: '#8d99ae', round_win: '#43d17a', round_loss: '#c1121f', mvp: '#c77dff', map_start: '#6c757d', map_end: '#6c757d',
 };
-const colorOf = t => COLORS[t] || '#9aa4b2';
+const colorOf = (t, data) => (t === 'kill' && data && data.count >= 3) ? COLORS.multikill : (COLORS[t] || '#9aa4b2');
+const markerName = m => {
+  if (m.type === 'kill' && m.data) { const c = m.data.count || 1; return (c >= 2 ? `${c}k` : 'kill') + (m.data.headshot ? ' · HS' : ''); }
+  return m.type + (m.label && m.label !== m.type ? ' · ' + m.label : '');
+};
 
 const $ = id => document.getElementById(id);
 const state = {
@@ -227,7 +231,7 @@ function renderTimeline() {
     if (m.t == null) continue; types.add(m.type);
     if (state.typeFilter && m.type !== state.typeFilter) continue;
     const d = document.createElement('div'); d.className = 'tl-mark' + (m.starred ? ' starred' : '');
-    d.style.left = pct(m.t); d.style.background = colorOf(m.type); d.title = `${fmt(m.t)} ${m.type}${m.label ? ' · ' + m.label : ''}`;
+    d.style.left = pct(m.t); d.style.background = colorOf(m.type, m.data); d.title = `${fmt(m.t)} ${markerName(m)}`;
     d.onclick = e => { e.stopPropagation(); seek(m.t); };
     box.appendChild(d);
   }
@@ -283,9 +287,8 @@ function renderMarkers() {
     const isBuffer = cur.kind === 'session' && cur.data.mode === 'buffer';
     const gone = (isTimeline && m.t != null && m.t < cur.data.windowStart) || (isBuffer && m.t != null && !coverageAt(m.t));
     const d = document.createElement('div'); d.className = 'mk' + (gone ? ' gone' : '');
-    const extra = m.data && m.data.count ? ` ×${m.data.count}` : '';
-    d.innerHTML = `<div class="bar" style="background:${colorOf(m.type)}"></div>
-      <div><div class="name">${m.type}${extra}${m.label ? ' · ' + m.label : ''}</div><div class="t">${fmt(m.t)}${gone ? (isBuffer ? (cur.data.live && !m.clip ? ' · clip pending' : ' · no footage') : ' · purged') : ''}${m.clip ? ' · ' + m.clip : ''}</div></div>
+    d.innerHTML = `<div class="bar" style="background:${colorOf(m.type, m.data)}"></div>
+      <div><div class="name">${markerName(m)}</div><div class="t">${fmt(m.t)}${gone ? (isBuffer ? (cur.data.live && !m.clip ? ' · clip pending' : ' · no footage') : ' · purged') : ''}${m.clip ? ' · ' + m.clip : ''}</div></div>
       <div class="acts">${cur.kind === 'session' ? `<button title="star" class="${m.starred ? 'on' : ''}" data-star>★</button>` : ''}${(isTimeline || isBuffer) && !gone ? '<button title="clip around this marker" data-clip>✂</button>' : ''}</div>`;
     d.onclick = () => { if (m.t != null && (!gone)) seek(m.t); };
     const st = d.querySelector('[data-star]');

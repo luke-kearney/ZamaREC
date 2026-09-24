@@ -42,6 +42,11 @@ public static class DefaultConfig
         mark_clip_expire_hours = 30       # mark clips are deleted after this unless starred (0 = never)
         # mark_saves = true               # timeline mode: also write a clip around every mark.
                                           # unset = on for RAM timelines, off for disk ones. buffer mode always does.
+        event_clips = ["kill:2", "mvp"]   # game events that write a clip like a mark: kill:N, mvp, death, round_win, round_loss
+
+        [gsi]                             # CS2 game state integration
+        cfg_dir = ""                      # CS2's csgo/cfg folder; empty = find it via Steam. CS2 reads the cfg at launch.
+        capture_raw = true                # keep every payload in the session folder (gsi.jsonl)
 
         [retention]                       # applies to clips; profiles override under retention.*
         max_gb = 100

@@ -35,6 +35,8 @@ public sealed class DaemonStatus
     [JsonPropertyName("recorder_pid")] public int? RecorderPid { get; set; }
     [JsonPropertyName("root_dir")] public string? RootDir { get; set; }
     [JsonPropertyName("session_started_at")] public DateTimeOffset? SessionStartedAt { get; set; }
+    [JsonPropertyName("gsi_last_seconds")] public double? GsiLastSeconds { get; set; }
+    [JsonPropertyName("gsi_map")] public string? GsiMap { get; set; }
     [JsonPropertyName("profiles")] public List<string> Profiles { get; set; } = new();
 }
 
