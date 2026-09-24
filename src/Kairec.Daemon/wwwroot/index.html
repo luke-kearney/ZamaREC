@@ -59,7 +59,7 @@
       <div class="empty-hint">Sessions record themselves when a profiled game starts. Press <kbd>M</kbd> or your hotkey to drop a marker.</div>
       <div class="keys">
         <span><kbd>space</kbd> play</span><span><kbd>←</kbd><kbd>→</kbd> 5 s</span><span><kbd>J</kbd><kbd>L</kbd> 10 s</span>
-        <span><kbd>,</kbd><kbd>.</kbd> frame</span><span><kbd>I</kbd><kbd>O</kbd> in / out</span><span><kbd>E</kbd> export</span>
+        <span><kbd>,</kbd><kbd>.</kbd> frame</span><span><kbd>[</kbd><kbd>]</kbd> markers</span><span><kbd>I</kbd><kbd>O</kbd> in / out</span><span><kbd>E</kbd> export</span><span><kbd>F</kbd> fullscreen</span>
       </div>
     </div>
 
@@ -70,8 +70,29 @@
           <div id="subtitle" class="subtitle"></div>
         </div>
       </div>
-      <div class="player">
-        <video id="video" controls preload="metadata"></video>
+      <div class="stage" id="stage">
+        <div class="player"><video id="video" preload="metadata" playsinline></video></div>
+        <div class="transport">
+          <button class="tbtn" id="tPrev" title="previous marker  [">
+            <svg viewBox="0 0 24 24"><path d="M6 5v14M19 5l-10 7 10 7z"/></svg></button>
+          <button class="tbtn" id="tBack" title="back 10 s  J / ←">
+            <svg viewBox="0 0 24 24"><path d="M11 5L4 12l7 7M20 5l-7 7 7 7"/></svg><span class="tsub">10</span></button>
+          <button class="tbtn big" id="tPlay" title="play / pause  space">
+            <svg class="ic-play" viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z"/></svg>
+            <svg class="ic-pause" viewBox="0 0 24 24"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg></button>
+          <button class="tbtn" id="tFwd" title="forward 10 s  L / →">
+            <svg viewBox="0 0 24 24"><path d="M13 5l7 7-7 7M4 5l7 7-7 7"/></svg><span class="tsub">10</span></button>
+          <button class="tbtn" id="tNext" title="next marker  ]">
+            <svg viewBox="0 0 24 24"><path d="M18 5v14M5 5l10 7-10 7z"/></svg></button>
+          <span class="tclock mono" id="tClock">0:00 / 0:00</span>
+          <span class="spacer"></span>
+          <button class="tbtn" id="tMute" title="mute">
+            <svg class="ic-vol" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9zM16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></svg>
+            <svg class="ic-muted" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9zM16 9l5 6M21 9l-5 6"/></svg></button>
+          <input type="range" id="tVol" class="vol" min="0" max="1" step="0.02" value="1" title="volume">
+          <button class="tbtn" id="tFull" title="fullscreen  F">
+            <svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+        </div>
       </div>
 
       <div class="tl-wrap">

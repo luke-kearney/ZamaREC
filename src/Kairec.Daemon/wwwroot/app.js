@@ -328,7 +328,32 @@ $('outVal').onchange = e => { state.outT = +e.target.value; renderSelection(); }
 $('exportBtn').onclick = exportRange;
 $('batchBtn').onclick = exportBatch;
 $('markBtn').onclick = async () => { try { const r = await api('/mark', { body: { label: null } }); toast(r.message, !r.ok); } catch (e) { toast(e.message, true); } };
-$('video').addEventListener('timeupdate', () => { if (!state.current) return; const t = currentT(); $('curTime').textContent = fmt(t) + ' / ' + fmt(state.total); $('tlHead').style.left = pct(t); $('tlHeadT').textContent = fmtShort(t); });
+$('video').addEventListener('timeupdate', () => { if (!state.current) return; const t = currentT(); $('curTime').textContent = fmt(t) + ' / ' + fmt(state.total); $('tClock').textContent = fmtShort(t) + ' / ' + fmtShort(state.total); $('tlHead').style.left = pct(t); $('tlHeadT').textContent = fmtShort(t); });
+// ---------------------------------------------------------------- transport
+(() => {
+  const v = $('video'), stage = $('stage');
+  const nudge = d => { v.currentTime = Math.max(0, v.currentTime + d); };
+  const toggle = () => { if (!state.current) return; v.paused ? v.play().catch(() => {}) : v.pause(); };
+  const jumpMarker = dir => {
+    const t = currentT();
+    const ts = markersOf().map(m => m.t).filter(x => x != null).sort((a, b) => a - b);
+    const next = dir > 0 ? ts.find(x => x > t + 0.3) : [...ts].reverse().find(x => x < t - 0.3);
+    if (next == null) return toast(dir > 0 ? 'no later marker' : 'no earlier marker');
+    seek(next);
+  };
+  $('tPlay').onclick = toggle; v.onclick = toggle;
+  $('tBack').onclick = () => nudge(-10); $('tFwd').onclick = () => nudge(10);
+  $('tPrev').onclick = () => jumpMarker(-1); $('tNext').onclick = () => jumpMarker(1);
+  $('tMute').onclick = () => { v.muted = !v.muted; };
+  $('tVol').oninput = e => { v.volume = +e.target.value; v.muted = v.volume === 0; };
+  $('tFull').onclick = () => { document.fullscreenElement ? document.exitFullscreen() : stage.requestFullscreen().catch(() => {}); };
+  v.addEventListener('play', () => stage.classList.add('playing'));
+  v.addEventListener('pause', () => stage.classList.remove('playing'));
+  v.addEventListener('volumechange', () => { stage.classList.toggle('muted', v.muted || v.volume === 0); if (!v.muted) $('tVol').value = v.volume; });
+  let hideTimer;
+  stage.addEventListener('mousemove', () => { stage.classList.add('show-ui'); clearTimeout(hideTimer); hideTimer = setTimeout(() => stage.classList.remove('show-ui'), 2000); });
+  window.transport = { nudge, toggle, jumpMarker };
+})();
 // drag the in/out handles
 (() => {
   let drag = null;
@@ -346,11 +371,15 @@ $('video').addEventListener('timeupdate', () => { if (!state.current) return; co
 document.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
   const v = $('video');
-  const nudge = d => { v.currentTime = Math.max(0, v.currentTime + d); };
+  const { nudge, toggle, jumpMarker } = window.transport;
   switch (e.key) {
-    case ' ': e.preventDefault(); v.paused ? v.play() : v.pause(); break;
+    case ' ': e.preventDefault(); toggle(); break;
     case 'ArrowLeft': nudge(e.shiftKey ? -30 : -5); break;
     case 'ArrowRight': nudge(e.shiftKey ? 30 : 5); break;
+    case 'ArrowUp': e.preventDefault(); v.volume = Math.min(1, v.volume + 0.05); break;
+    case 'ArrowDown': e.preventDefault(); v.volume = Math.max(0, v.volume - 0.05); break;
+    case '[': jumpMarker(-1); break; case ']': jumpMarker(1); break;
+    case 'f': $('tFull').click(); break;
     case 'j': nudge(-10); break; case 'l': nudge(10); break;
     case ',': nudge(-1 / 60); break; case '.': nudge(1 / 60); break;
     case 'i': $('inBtn').click(); break; case 'o': $('outBtn').click(); break;
