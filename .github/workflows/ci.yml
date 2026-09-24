@@ -1,0 +1,21 @@
+name: ci
+on:
+  push:
+    branches: [master]
+  pull_request:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet restore
+      - run: dotnet build --no-restore -c Release
+      - run: dotnet test tests/Kairec.Tests --no-build -c Release --logger "trx;LogFileName=results.trx"
+      - name: publish CLI (NativeAOT smoke)
+        run: |
+          sudo apt-get install -y clang zlib1g-dev >/dev/null
+          dotnet publish src/Kairec.Cli -c Release -r linux-x64 -o /tmp/cli --nologo -v q
+          /tmp/cli/kairec --help | head -3

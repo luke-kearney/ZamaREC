@@ -17,8 +17,14 @@ polls the GPU or steals focus from the game.
 - A web UI with a timeline, a settings page, stats and a log. A tray icon. A CLI.
 - No GPU/driver polling, no popups, no windows opened on their own. Feedback is sound only.
 
-Built and tested on CachyOS with KDE Plasma 6 on Wayland and an Nvidia card. Anything with
-systemd, PipeWire and a gpu-screen-recorder that works should be fine.
+> **Early software.** kairec is a few days old and has been used on exactly one machine: CachyOS,
+> KDE Plasma 6 on Wayland, an NVIDIA card. It records, it deletes old footage on purpose (see
+> retention), and it has bugs I have not found yet. Use it at your own risk, keep anything you
+> care about starred or copied elsewhere, and read the log when something looks off. Reports and
+> pull requests are welcome.
+
+Anything with systemd, PipeWire and a working gpu-screen-recorder should run it; other GPUs and
+desktops are untested.
 
 ## Quick start
 
@@ -83,5 +89,9 @@ its own clip and retention settings.
 
 Working: daemon, both capture modes, RAM timelines, hotkeys, CS2 events, web UI with timeline,
 settings, stats and log, tray icon, retention, quality presets. Still on the list: a CLI export
-command, real-match GSI fixtures, marker editing in the UI, and a licence and CI for a public
-release.
+command, real-match GSI fixtures, marker editing in the UI.
+
+## Licence
+
+[MIT](LICENSE). gpu-screen-recorder and ffmpeg are separate programs that kairec runs; they keep
+their own licences.
