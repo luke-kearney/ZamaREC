@@ -181,28 +181,29 @@ public sealed class RecordingCoordinator : IAsyncDisposable
             var m = a.Session.AddMarker("manual", label, tMono);
             _sound.Play("mark");
 
-            if (a.Profile.Mode == CaptureMode.Timeline)
+            var where = m.TVideo is double tv ? $"{tv:0.00}s" : "t=?";
+            if (!a.Profile.MarkSaves)
             {
-                var where = m.TVideo is double t ? $"{t:0.00}s" : "t=?";
                 _log.LogInformation("marker {id} '{label}' at {where}", m.Id, label ?? "", where);
                 return Ok($"marked at {where}" + (label is null ? "" : $" \"{label}\""));
             }
 
-            // Buffer mode: schedule a dump of [before, after] around the mark. Marks that arrive while
-            // one is pending join it, unless the buffer could not hold the combined span.
+            // Schedule a clip of [before, after] around the mark. Marks that arrive while one is pending
+            // join it, unless the buffer/window could not hold the combined span.
             var p = a.Profile;
             var job = a.Pending;
             if (job is not null)
             {
                 var span = (tMono - job.FirstMarkMonoUs) / 1_000_000.0 + p.MarkBeforeSeconds + p.MarkAfterSeconds;
-                if (span > p.BufferMinutes * 60) { await FlushMarkJobAsync(a, "buffer full", ct); job = null; }
+                var capacity = p.Mode == CaptureMode.Buffer ? p.BufferMinutes * 60 : (p.WindowMinutes > 0 ? p.WindowMinutes * 60 : int.MaxValue);
+                if (span > capacity) { await FlushMarkJobAsync(a, "buffer full", ct); job = null; }
             }
             if (job is null) { job = new MarkJob { FirstMarkMonoUs = tMono }; a.Pending = job; }
             job.LastMarkMonoUs = tMono;
             job.DueMonoUs = tMono + (long)p.MarkAfterSeconds * 1_000_000;
             job.Marks.Add(m);
-            _log.LogInformation("marker {id} '{label}' queued; clip will be written in {after}s ({n} marks in clip)", m.Id, label ?? "", p.MarkAfterSeconds, job.Marks.Count);
-            return Ok($"marked; clip in {p.MarkAfterSeconds}s" + (label is null ? "" : $" \"{label}\""));
+            _log.LogInformation("marker {id} '{label}' at {where} queued; clip will be written in {after}s ({n} marks in clip)", m.Id, label ?? "", where, p.MarkAfterSeconds, job.Marks.Count);
+            return Ok($"marked at {where}; clip in {p.MarkAfterSeconds}s" + (label is null ? "" : $" \"{label}\""));
         }
         finally { _lock.Release(); }
     }
@@ -227,11 +228,16 @@ public sealed class RecordingCoordinator : IAsyncDisposable
     private async Task<ControlResponse> SaveFromTimelineAsync(Active a, int secs, string? label, long tMono, CancellationToken ct)
     {
         a.Session.TryResolveFirstFrame();
-        a.Segments!.Refresh();
         var now = a.Session.ToVideoTime(tMono);
         if (now is null) { _sound.Play("error"); return Fail("timeline has no first frame yet"); }
-        var end = now.Value;
-        var start = Math.Max(0, end - secs);
+        return await ExportFromTimelineAsync(a, Math.Max(0, now.Value - secs), now.Value, label, "save", null, tMono, ct);
+    }
+
+    /// <summary>Cuts [start, end] of the live timeline to a clip. Waits for the segment covering "end" to close first.</summary>
+    private async Task<ControlResponse> ExportFromTimelineAsync(Active a, double start, double end, string? label, string source, MarkJob? job, long tMono, CancellationToken ct)
+    {
+        a.Segments!.Refresh();
+        var secs = (int)Math.Round(end - start);
         // The recorder writes a segment to disk only when it completes, so wait for the one covering "now".
         var deadline = MonotonicClock.NowMicros() + (long)(a.Profile.SegmentSeconds + 5) * 1_000_000;
         while (a.Segments.TotalSeconds < end && MonotonicClock.NowMicros() < deadline && !a.Recorder.HasExited)
@@ -241,21 +247,35 @@ public sealed class RecordingCoordinator : IAsyncDisposable
         }
         var target = ClipNaming.NewPath(_cfg.ClipsDir, a.Profile.Name, label);
         var r = await ClipExporter.ExportAsync(a.Session.Dir, a.Segments, start, end, target, exact: false, _log, ct);
-        if (!r.Ok) { _sound.Play("error"); return Fail("save failed: " + r.Error); }
+        if (!r.Ok) { _sound.Play("error"); return Fail($"{source} failed: " + r.Error); }
 
-        var m = a.Session.AddMarker("save", label, tMono);
+        var actualStart = end - (r.Duration ?? (end - start));   // stream copy may begin up to a keyframe early
         var info = new ClipInfo
         {
-            Profile = a.Profile.Name, Label = label, Source = "save", SessionId = a.Session.Info.Id,
-            SessionOffset = start, DurationSeconds = r.Duration, CreatedAt = DateTimeOffset.Now,
-            Markers = [new ClipMarker { T = Math.Max(0, (r.Duration ?? secs) - 0.0), Type = "save", Label = label }],
+            Profile = a.Profile.Name, Label = label, Source = source, SessionId = a.Session.Info.Id,
+            SessionOffset = actualStart, DurationSeconds = r.Duration, CreatedAt = DateTimeOffset.Now,
+            ExpiresAt = source == "mark" && a.Profile.MarkClipExpireHours > 0 ? DateTimeOffset.Now.AddHours(a.Profile.MarkClipExpireHours) : null,
         };
+        if (job is not null)
+        {
+            foreach (var m in job.Marks)
+            {
+                var t = (m.TVideo ?? a.Session.ToVideoTime(m.TMonoUs) ?? actualStart) - actualStart;
+                info.Markers.Add(new ClipMarker { T = Math.Max(0, t), Type = m.Type, Label = m.Label, Data = m.Data });
+                a.Session.MarkerWrittenToClip(m, Path.GetFileName(target));
+            }
+        }
+        else
+        {
+            var m = a.Session.AddMarker("save", label, tMono);
+            info.Markers.Add(new ClipMarker { T = Math.Max(0, (r.Duration ?? secs)), Type = "save", Label = label });
+            a.Session.MarkerWrittenToClip(m, Path.GetFileName(target));
+        }
         ClipNaming.WriteSidecar(target, info);
-        a.Session.MarkerWrittenToClip(m, Path.GetFileName(target));
         a.Session.Info.Clips.Add(Path.GetFileName(target));
         a.Session.Save();
-        _log.LogInformation("saved last {secs}s ({dur:0.0}s) -> {path}", secs, r.Duration ?? 0, target);
-        return Ok($"saved last {secs}s -> {target}");
+        _log.LogInformation("{source}: wrote {dur:0.0}s ({start:0.0}-{end:0.0}s) -> {path}", source, r.Duration ?? 0, actualStart, end, target);
+        return Ok(source == "save" ? $"saved last {secs}s -> {target}" : $"mark clip written -> {target}");
     }
 
     private async Task<ControlResponse> SaveFromBufferAsync(Active a, int secs, string? label, string source, MarkJob? job, CancellationToken ct)
@@ -302,7 +322,15 @@ public sealed class RecordingCoordinator : IAsyncDisposable
         var secs = (int)Math.Ceiling((now - job.FirstMarkMonoUs) / 1_000_000.0) + p.MarkBeforeSeconds;
         var label = job.Marks.Select(m => m.Label).FirstOrDefault(l => !string.IsNullOrWhiteSpace(l));
         _log.LogInformation("writing mark clip ({why}): {n} marks, last {secs}s", why, job.Marks.Count, secs);
-        var r = await SaveFromBufferAsync(a, secs, label, "mark", job, ct);
+        ControlResponse r;
+        if (p.Mode == CaptureMode.Buffer) r = await SaveFromBufferAsync(a, secs, label, "mark", job, ct);
+        else
+        {
+            a.Session.TryResolveFirstFrame();
+            var end = a.Session.ToVideoTime(now) ?? 0;
+            var first = a.Session.ToVideoTime(job.FirstMarkMonoUs) ?? end;
+            r = await ExportFromTimelineAsync(a, Math.Max(0, first - p.MarkBeforeSeconds), end, label, "mark", job, now, ct);
+        }
         if (r.Ok) _sound.Play("save");
     }
 

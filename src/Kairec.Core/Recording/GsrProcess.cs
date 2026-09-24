@@ -43,7 +43,8 @@ public sealed class GsrProcess : IAsyncDisposable
         proc.ErrorDataReceived += (_, e) =>
         {
             if (e.Data is null) return;
-            if (e.Data.Contains("error", StringComparison.OrdinalIgnoreCase)) log.LogWarning("gsr: {line}", e.Data);
+            // "failed to write frame ... to muxer" is the recorder flushing its last packet after we asked it to stop; harmless.
+            if (e.Data.Contains("error", StringComparison.OrdinalIgnoreCase) && !e.Data.Contains("failed to write frame")) log.LogWarning("gsr: {line}", e.Data);
             else log.LogDebug("gsr: {line}", e.Data);
         };
         proc.Start();

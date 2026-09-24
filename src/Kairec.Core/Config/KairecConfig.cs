@@ -50,6 +50,7 @@ public sealed class KairecConfig
         MarkBeforeSeconds = p.Clips?.MarkBeforeSeconds ?? Clips.MarkBeforeSeconds,
         MarkAfterSeconds = p.Clips?.MarkAfterSeconds ?? Clips.MarkAfterSeconds,
         MarkClipExpireHours = p.Clips?.MarkClipExpireHours ?? Clips.MarkClipExpireHours,
+        MarkSaves = p.CaptureMode == CaptureMode.Buffer || (p.Clips?.MarkSaves ?? Clips.MarkSaves ?? ((p.Timeline?.Storage ?? Timeline.Storage) == "ram")),
         MaxGb = p.Retention?.MaxGb ?? Retention.MaxGb,
         MaxDays = p.Retention?.MaxDays ?? Retention.MaxDays,
     };
@@ -73,6 +74,7 @@ public sealed class EffectiveProfile
     public required int MarkBeforeSeconds { get; init; }
     public required int MarkAfterSeconds { get; init; }
     public required int MarkClipExpireHours { get; init; }
+    public required bool MarkSaves { get; init; }
     public required double? MaxGb { get; init; }
     public required int? MaxDays { get; init; }
 }
@@ -128,6 +130,8 @@ public sealed class ClipConfig
     public int MarkAfterSeconds { get; set; } = 300;
     /// <summary>Clips produced by a mark are deleted after this many hours unless starred. 0 = never.</summary>
     public int MarkClipExpireHours { get; set; } = 30;
+    /// <summary>Timeline mode: also write a clip around every mark (buffer mode always does). Null = on for RAM timelines, off for disk.</summary>
+    public bool? MarkSaves { get; set; }
 }
 
 public sealed class RetentionConfig
@@ -178,7 +182,7 @@ public sealed class ProfileConfig
 
 public sealed class ProfileTimelineOverride { public int? WindowMinutes { get; set; } public int? SegmentSeconds { get; set; } public string? Storage { get; set; } public double? RamKeepHours { get; set; } }
 public sealed class ProfileBufferOverride { public int? Minutes { get; set; } public string? Storage { get; set; } }
-public sealed class ProfileClipOverride { public int? SaveSeconds { get; set; } public int? MarkBeforeSeconds { get; set; } public int? MarkAfterSeconds { get; set; } public int? MarkClipExpireHours { get; set; } }
+public sealed class ProfileClipOverride { public int? SaveSeconds { get; set; } public int? MarkBeforeSeconds { get; set; } public int? MarkAfterSeconds { get; set; } public int? MarkClipExpireHours { get; set; } public bool? MarkSaves { get; set; } }
 public sealed class ProfileRetentionOverride { public double? MaxGb { get; set; } public int? MaxDays { get; set; } }
 
 public enum CaptureMode { Timeline, Buffer }

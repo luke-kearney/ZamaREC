@@ -40,6 +40,8 @@ public static class DefaultConfig
         mark_before_seconds = 1500        # buffer mode: 25 min before a mark...
         mark_after_seconds = 300          # ...and 5 min after it
         mark_clip_expire_hours = 30       # mark clips are deleted after this unless starred (0 = never)
+        # mark_saves = true               # timeline mode: also write a clip around every mark.
+                                          # unset = on for RAM timelines, off for disk ones. buffer mode always does.
 
         [retention]                       # applies to clips; profiles override under retention.*
         max_gb = 100

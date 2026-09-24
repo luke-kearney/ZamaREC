@@ -42,6 +42,7 @@
       ${field('mark: seconds before', inp('clips.markBeforeSeconds', c.clips.markBeforeSeconds, 'number', 'min="0"'))}
       ${field('mark: seconds after', inp('clips.markAfterSeconds', c.clips.markAfterSeconds, 'number', 'min="0"'))}
       ${field('mark clips expire after hours (0 = never)', inp('clips.markClipExpireHours', c.clips.markClipExpireHours, 'number', 'min="0"'))}
+      ${field('timeline: write a clip around each mark', sel('clips.markSaves', c.clips.markSaves == null ? '' : String(c.clips.markSaves), [{ v: '', l: 'auto (on for RAM timelines)' }, { v: 'true', l: 'on' }, { v: 'false', l: 'off' }]))}
       ${field('retention max GB', inp('retention.maxGb', c.retention.maxGb, 'number', 'min="0" step="1"'))}
       ${field('retention max days', inp('retention.maxDays', c.retention.maxDays, 'number', 'min="0"'))}
       ${field('sound feedback', chk('feedback.sound', c.feedback.sound))}
@@ -77,6 +78,7 @@
           ${field('mark: seconds before', inp(P + 'clips.markBeforeSeconds', ov(p.clips, 'markBeforeSeconds'), 'number'))}
           ${field('mark: seconds after', inp(P + 'clips.markAfterSeconds', ov(p.clips, 'markAfterSeconds'), 'number'))}
           ${field('mark clips expire hours', inp(P + 'clips.markClipExpireHours', ov(p.clips, 'markClipExpireHours'), 'number'))}
+          ${field('clip around each mark', sel(P + 'clips.markSaves', ov(p.clips, 'markSaves') === '' ? '' : String(ov(p.clips, 'markSaves')), [{ v: '', l: '(default)' }, { v: 'true', l: 'on' }, { v: 'false', l: 'off' }]))}
           ${field('retention max GB', inp(P + 'retention.maxGb', ov(p.retention, 'maxGb'), 'number'))}
           ${field('retention max days', inp(P + 'retention.maxDays', ov(p.retention, 'maxDays'), 'number'))}
         </div></div></div>`;
@@ -97,6 +99,7 @@
     document.querySelectorAll('#cfgForm [data-path]').forEach(el => {
       const path = el.dataset.path;
       let v = el.type === 'checkbox' ? el.checked : el.type === 'number' ? num(el.value) : (el.value === '' ? null : el.value);
+      if (path.endsWith('markSaves') && v != null) v = v === 'true';
       setPath(cfg, path, v);
     });
     const audio = [...document.querySelectorAll('#cfgForm [data-audio]')].filter(x => x.checked).map(x => x.dataset.audio);

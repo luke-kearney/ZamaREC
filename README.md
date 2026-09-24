@@ -20,6 +20,10 @@ get scrubbing with no disk writes. It needs window × bitrate of memory (60 min 
 the daemon refuses to start a session that would not fit, and the footage is dropped after
 `ram_keep_hours` or when the next session starts. Marks and clips are on disk as usual.
 
+In timeline mode a mark can also write a clip around itself (`clips.mark_saves`), the same
+before/after window buffer mode uses. It is on by default for RAM timelines, so a marked moment is
+safe on disk even after the RAM footage is dropped, and off by default for disk timelines.
+
 `kairec save` works in both: it writes the last N seconds to a clip. Every clip carries its own
 markers so it can be opened in the timeline UI and cut down further.
 
