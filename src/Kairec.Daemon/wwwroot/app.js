@@ -404,7 +404,11 @@ $('batchBtn').onclick = exportBatch;
 (() => {
   const layout = document.querySelector('.layout');
   const mkBtn = $('markersToggle'), asBtn = $('asideToggle'), aside = $('aside');
-  const apply = (cls, btn, on, what) => { layout.classList.toggle(cls, on); btn.setAttribute('aria-expanded', String(!on)); btn.title = (on ? 'expand ' : 'collapse ') + what; };
+  const apply = (cls, btn, on, what) => {
+    layout.classList.toggle(cls, on);
+    if (btn === asBtn) { btn.classList.toggle('on', !on); btn.setAttribute('aria-pressed', String(!on)); btn.title = on ? 'pin sidebar open' : 'unpin sidebar: it collapses and shows on hover'; }
+    else { btn.setAttribute('aria-expanded', String(!on)); btn.title = (on ? 'expand ' : 'collapse ') + what; }
+  };
   const toggle = (cls, btn, key, what) => () => { const on = !layout.classList.contains(cls); localStorage.setItem(key, on ? '1' : '0'); apply(cls, btn, on, what); aside.classList.remove('peek'); };
   const tMarkers = toggle('markers-collapsed', mkBtn, 'markersCollapsed', 'markers');
   const tAside = toggle('aside-collapsed', asBtn, 'asideCollapsed', 'sidebar');

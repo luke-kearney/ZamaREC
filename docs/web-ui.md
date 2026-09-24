@@ -38,7 +38,8 @@ dropped; markers and clips remain), starred, expiring.
   of one type. Escape or a click outside closes the panel.
 - A clip's title bar has a *Star* button: a starred clip never expires and is never removed by
   retention. Starring a marker (★ in its row) protects its whole session the same way.
-- Both side panes collapse to a strip (chevron in their header). Hovering the collapsed sidebar
+- The marker pane collapses to a strip (chevron in its header). The sidebar has a pin, on by
+  default, at the left of the Sessions/Clips switch; unpinned it collapses to a strip. Hovering that strip
   floats it over the page until the mouse leaves; clicking its strip pins it open.
 - Markers pane: chips per type with counts, star toggle, click to seek. In a live buffer session a
   mark whose clip is not written yet reads "clip pending".

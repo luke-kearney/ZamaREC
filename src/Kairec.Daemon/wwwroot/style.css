@@ -69,11 +69,13 @@ header { display: flex; align-items: center; gap: 16px; height: 56px; padding: 0
 .layout.aside-collapsed { --aside: 36px; }
 .layout.aside-collapsed aside:not(.peek) > :not(.tabs):not(.pane-tab) { display: none; }
 .layout.aside-collapsed aside:not(.peek) .tabs { padding: 6px 0 0; border: 0; justify-content: center; }
-.layout.aside-collapsed aside:not(.peek) .tabs > :not(.collapse) { display: none; }
-.layout.aside-collapsed aside:not(.peek) .collapse svg { transform: rotate(180deg); }
+.layout.aside-collapsed aside:not(.peek) .tabs > :not(.pin) { display: none; }
 .layout.aside-collapsed aside:not(.peek) .pane-tab { display: flex; }
 .layout.aside-collapsed aside.peek { position: absolute; left: 0; top: 0; bottom: 0; width: 320px; z-index: 30; box-shadow: 12px 0 30px rgba(0,0,0,.45); }
-.tabs .collapse { margin-left: auto; }
+.tbtn.pin { width: 28px; height: 28px; flex: none; }
+.tbtn.pin svg { width: 16px; height: 16px; }
+.tbtn.pin.on { color: var(--accent); }
+.tbtn.pin.on svg path { fill: color-mix(in srgb, var(--accent) 35%, transparent); }
 .layout.markers-collapsed .pane-head { padding: 6px 0 0; justify-content: center; }
 .layout.markers-collapsed .pane-head > :not(.collapse) { display: none; }
 .layout.markers-collapsed .markers .collapse svg { transform: rotate(180deg); }
