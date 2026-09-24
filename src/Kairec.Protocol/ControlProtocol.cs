@@ -10,6 +10,9 @@ public sealed class ControlRequest
     [JsonPropertyName("label")] public string? Label { get; set; }
     [JsonPropertyName("seconds")] public int? Seconds { get; set; }
     [JsonPropertyName("profile")] public string? Profile { get; set; }
+    /// <summary>pause: session | until | forever</summary>
+    [JsonPropertyName("mode")] public string? Mode { get; set; }
+    [JsonPropertyName("hours")] public double? Hours { get; set; }
 }
 
 public sealed class ControlResponse
@@ -37,6 +40,8 @@ public sealed class DaemonStatus
     [JsonPropertyName("session_started_at")] public DateTimeOffset? SessionStartedAt { get; set; }
     [JsonPropertyName("gsi_last_seconds")] public double? GsiLastSeconds { get; set; }
     [JsonPropertyName("gsi_map")] public string? GsiMap { get; set; }
+    /// <summary>Empty when auto recording is on, otherwise a description of the pause.</summary>
+    [JsonPropertyName("paused")] public string? Paused { get; set; }
     [JsonPropertyName("profiles")] public List<string> Profiles { get; set; } = new();
 }
 

@@ -52,8 +52,12 @@ async function refreshStatus() {
       el.className = 'status recording';
       txt.textContent = `recording ${s.profile} · ${s.mode} · ${fmt(s.elapsedSeconds)}` + (s.windowSeconds != null ? ` · ${fmt(s.windowSeconds)} in window` : '') + (s.pendingMarks ? ` · ${s.pendingMarks} pending clip` : '');
     } else { el.className = 'status idle'; txt.textContent = s.state; }
+    if (s.pause) { el.className = 'status paused'; txt.textContent = (s.state === 'recording' ? txt.textContent + ' · ' : '') + 'auto recording off ' + s.pause.text; }
+    $('powerBtn').className = 'switch ' + (s.pause ? 'off' : 'on');
     if (s.usage) {
-      $('uCpu').textContent = s.usage.cpuPercent.toFixed(1) + '%';
+      const perCore = localStorage.getItem('cpuPerCore') === '1';
+      $('uCpu').textContent = (perCore ? s.usage.cpuPercent : s.usage.cpuPercent / (s.usage.cores || 1)).toFixed(1) + '%';
+      $('uCpuK').textContent = perCore ? 'cpu (1 core)' : 'cpu (all)';
       $('uRss').textContent = (s.usage.rssBytes / 1048576).toFixed(0) + ' MiB';
       $('uFs').textContent = (s.usage.ramFsBytes / 1e9).toFixed(2) + ' GB';
       $('uFs').title = `RAM footage in tmpfs · ${(s.usage.ramFsFree / 1e9).toFixed(1)} GB free`;
@@ -373,6 +377,23 @@ $('inVal').onchange = e => { state.inT = +e.target.value; renderSelection(); };
 $('outVal').onchange = e => { state.outT = +e.target.value; renderSelection(); };
 $('exportBtn').onclick = exportRange;
 $('batchBtn').onclick = exportBatch;
+$('uCpuWrap').onclick = () => { localStorage.setItem('cpuPerCore', localStorage.getItem('cpuPerCore') === '1' ? '0' : '1'); refreshStatus(); };
+// on/off switch: off opens a menu of durations, on resumes at once
+(() => {
+  const menu = $('pauseMenu');
+  $('powerBtn').onclick = async e => {
+    e.stopPropagation();
+    if ($('powerBtn').classList.contains('off')) { try { const r = await api('/resume', { method: 'POST' }); toast(r.message); refreshStatus(); } catch (err) { toast(err.message, true); } return; }
+    menu.hidden = !menu.hidden;
+  };
+  menu.querySelectorAll('[data-pause]').forEach(b => b.onclick = async e => {
+    e.stopPropagation(); menu.hidden = true;
+    try { const r = await api('/pause', { body: { mode: b.dataset.pause, hours: b.dataset.hours ? +b.dataset.hours : null } }); toast(r.message); refreshStatus(); refreshList(); }
+    catch (err) { toast(err.message, true); }
+  });
+  document.addEventListener('click', () => { menu.hidden = true; });
+  menu.onclick = e => e.stopPropagation();
+})();
 (() => {
   const b = $('clearRam'); let armed = null;
   b.onclick = async () => {

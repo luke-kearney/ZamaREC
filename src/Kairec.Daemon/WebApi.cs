@@ -15,21 +15,32 @@ public static class WebApi
     public sealed record BatchRequest(string Type, double Before, double After, bool Exact);
     public sealed record MarkRequest(string? Label);
     public sealed record ConfigTextRequest(string Text);
+    public sealed record PauseRequest(string? Mode, double? Hours);
 
     public static void MapWebApi(this WebApplication app)
     {
         var api = app.MapGroup("/api");
 
-        api.MapGet("/status", (RecordingCoordinator rec, KairecConfig cfg, GsiService gsi) =>
+        api.MapGet("/status", (RecordingCoordinator rec, KairecConfig cfg, GsiService gsi, PauseControl pause) =>
         {
             var s = rec.Status();
             var u = rec.Usage();
+            var ps = pause.Current;
             var ramDir = Paths.Expand(cfg.Timeline.RamDir);
             return Results.Ok(new { s.State, s.Profile, s.Mode, SessionId = rec.ActiveSessionId, s.ElapsedSeconds, s.RecordedSeconds, s.WindowSeconds, s.MarkerCount, s.PendingMarks,
                 GsiLastSeconds = gsi.SecondsSinceLastPayload, GsiMap = gsi.CurrentMap, GsiCfg = gsi.CfgPath,
-                Usage = new { u.CpuPercent, u.RssBytes, u.Processes, RamFsBytes = ProcessUsage.DirBytes(ramDir), RamFsFree = FreeBytes(ramDir) },
+                Usage = new { u.CpuPercent, u.RssBytes, u.Processes, RamFsBytes = ProcessUsage.DirBytes(ramDir), RamFsFree = FreeBytes(ramDir), Cores = Environment.ProcessorCount },
+                Pause = ps.Mode == "off" ? null : new { ps.Mode, ps.Until, Text = PauseControl.Describe(ps) },
                 Profiles = cfg.Profiles.Select(p => new { p.Name, p.Mode }) });
         });
+
+        api.MapPost("/pause", async (PauseRequest req, PauseControl pause, RecordingCoordinator rec, CancellationToken ct) =>
+        {
+            var msg = pause.Pause(req.Mode ?? "session", req.Hours, rec.ActiveGamePid, rec.Status().Profile);
+            if (rec.IsActive) await rec.StopAsync("paused", ct);
+            return Results.Ok(new { Ok = true, Message = "recording paused " + msg });
+        });
+        api.MapPost("/resume", (PauseControl pause) => { pause.Resume(); return Results.Ok(new { Ok = true, Message = "recording on" }); });
 
         api.MapPost("/ram/clear", (RecordingCoordinator rec) => { var (n, bytes) = rec.ClearRam(); return Results.Ok(new { Sessions = n, Bytes = bytes }); });
 

@@ -27,6 +27,7 @@ builder.Services.AddSingleton(sp => new ConfigService(config, configPath, sp.Get
 builder.Services.AddSingleton(sp => new SoundFeedback(config.Feedback, sp.GetRequiredService<ILogger<SoundFeedback>>()));
 builder.Services.AddSingleton<RecordingCoordinator>();
 builder.Services.AddSingleton<GsiService>();
+builder.Services.AddSingleton<PauseControl>();
 builder.Services.AddSingleton<SessionCatalog>();
 builder.Services.AddHostedService<GameWatcherService>();
 builder.Services.AddHostedService<ControlSocketServer>();

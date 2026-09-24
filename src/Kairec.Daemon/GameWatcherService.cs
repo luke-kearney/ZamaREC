@@ -9,13 +9,14 @@ public sealed class GameWatcherService : BackgroundService
     private readonly KairecConfig _cfg;
     private readonly RecordingCoordinator _rec;
     private readonly ILogger<GameWatcherService> _log;
+    private readonly PauseControl _pause;
     private ProcessWatcher _watcher;
     private int _watcherVersion;
     private int _failedPid; private long _retryAt;
 
-    public GameWatcherService(KairecConfig cfg, RecordingCoordinator rec, ILogger<GameWatcherService> log)
+    public GameWatcherService(KairecConfig cfg, RecordingCoordinator rec, PauseControl pause, ILogger<GameWatcherService> log)
     {
-        _cfg = cfg; _rec = rec; _log = log;
+        _cfg = cfg; _rec = rec; _pause = pause; _log = log;
         _watcher = new ProcessWatcher(cfg.Profiles, log);
         _watcherVersion = cfg.Version;
     }
@@ -42,7 +43,7 @@ public sealed class GameWatcherService : BackgroundService
                         await _rec.StopAsync("game exited", ct);
                     }
                 }
-                else
+                else if (!_pause.IsPaused(ProcessWatcher.IsAlive))
                 {
                     if (_cfg.Version != _watcherVersion) { _watcher = new ProcessWatcher(_cfg.Profiles, _log); _watcherVersion = _cfg.Version; }
                     var game = _watcher.FindRunning(self);

@@ -14,9 +14,21 @@
     <svg class="logo" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3.5 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/></svg>
     <span class="wordmark">kairec</span>
   </div>
+  <div class="switch-wrap">
+    <button id="powerBtn" class="switch on" title="auto recording on/off"><span class="knob"></span></button>
+    <div id="pauseMenu" class="menu" hidden>
+      <div class="menu-title">Turn off recording</div>
+      <button data-pause="session">for the rest of this game</button>
+      <button data-pause="until" data-hours="1">for 1 hour</button>
+      <button data-pause="until" data-hours="2">for 2 hours</button>
+      <button data-pause="until" data-hours="8">for 8 hours</button>
+      <button data-pause="forever">until I turn it back on</button>
+      <div class="menu-note">A running session is stopped. Manual <code>kairec start</code> still works.</div>
+    </div>
+  </div>
   <div id="status" class="status idle"><span class="dot"></span><span class="txt">idle</span></div>
   <div class="usage" id="usage" title="kairec's own CPU (per core) and memory: daemon + recorder">
-    <span class="u"><span class="k">cpu</span><span class="v mono" id="uCpu">–</span></span>
+    <span class="u" id="uCpuWrap" title="click to switch between share of all cores and share of one core" style="cursor:pointer"><span class="k" id="uCpuK">cpu</span><span class="v mono" id="uCpu">–</span></span>
     <span class="u"><span class="k">ram</span><span class="v mono" id="uRss">–</span></span>
     <span class="u"><span class="k">tmpfs</span><span class="v mono" id="uFs">–</span><button class="tiny" id="clearRam" title="drop RAM footage of finished sessions">clear</button></span>
   </div>

@@ -40,6 +40,22 @@ switch (req.Cmd)
     case "status":
         if (rest.Contains("--watch") || rest.Contains("-w")) return await Top.RunAsync();
         break;
+    case "pause":
+    {
+        var arg = rest.FirstOrDefault();
+        if (arg is null || arg == "session") req.Mode = "session";
+        else if (arg is "forever" or "off") req.Mode = "forever";
+        else
+        {
+            var norm = arg.EndsWith('h') && double.TryParse(arg[..^1], out var h) ? ((int)(h * 60)).ToString() + "m" : arg;
+            var secs = ParseSeconds(norm);
+            if (secs is null) { Console.Error.WriteLine("usage: kairec pause [session|2h|30m|forever]"); return 2; }
+            req.Mode = "until"; req.Hours = secs.Value / 3600.0;
+        }
+        break;
+    }
+    case "resume" or "on":
+        req.Cmd = "resume"; break;
     case "stop" or "reload" or "config":
         break;
     default:
@@ -80,6 +96,12 @@ static int Usage(int code = 0)
           kairec start [profile]            start a session manually
           kairec stop                       stop the current session
           kairec status                     show what the daemon is doing
+          kairec pause [session|2h|forever] turn auto recording off (stops the current session)
+          kairec resume                     turn it back on
+          kairec top                        live view: state, CPU/RAM of daemon + recorder, storage (Ctrl+C)
+          kairec log [-n 40] [kind]         recent events (session, mark, clip, export, purge, config, error)
+          kairec reload                     re-read the config file after editing it by hand
+          kairec config                     print the config file path
         """);
     return code;
 }

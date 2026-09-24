@@ -12,11 +12,12 @@ public sealed class ControlSocketServer : BackgroundService
     private readonly Core.Config.KairecConfig _cfg;
     private readonly ConfigService _configService;
     private readonly GsiService _gsi;
+    private readonly PauseControl _pause;
     private readonly ILogger<ControlSocketServer> _log;
 
-    public ControlSocketServer(RecordingCoordinator rec, Core.Config.KairecConfig cfg, ConfigService configService, GsiService gsi, ILogger<ControlSocketServer> log)
+    public ControlSocketServer(RecordingCoordinator rec, Core.Config.KairecConfig cfg, ConfigService configService, GsiService gsi, PauseControl pause, ILogger<ControlSocketServer> log)
     {
-        _rec = rec; _cfg = cfg; _configService = configService; _gsi = gsi; _log = log;
+        _rec = rec; _cfg = cfg; _configService = configService; _gsi = gsi; _pause = pause; _log = log;
     }
 
     protected override async Task ExecuteAsync(CancellationToken ct)
@@ -76,6 +77,15 @@ public sealed class ControlSocketServer : BackgroundService
                 if (profile is null) return new ControlResponse { Ok = false, Message = $"unknown profile '{name}'. Known: {string.Join(", ", _cfg.Profiles.Select(p => p.Name))}" };
                 return await _rec.StartAsync(profile, "manual", null, ct);
             }
+            case "pause":
+            {
+                var msg = _pause.Pause(req.Mode ?? "session", req.Hours, _rec.ActiveGamePid, _rec.Status().Profile);
+                var stopped = _rec.IsActive ? await _rec.StopAsync("paused", ct) : null;
+                return new ControlResponse { Ok = true, Message = $"recording paused {msg}" + (stopped is { Ok: true } ? "; current session stopped" : "") };
+            }
+            case "resume":
+                _pause.Resume();
+                return new ControlResponse { Ok = true, Message = "recording on; a running game will be picked up within a second" };
             case "reload":
             {
                 try
@@ -92,8 +102,9 @@ public sealed class ControlSocketServer : BackgroundService
             {
                 var s = _rec.Status();
                 s.GsiLastSeconds = _gsi.SecondsSinceLastPayload; s.GsiMap = _gsi.CurrentMap;
+                var ps = _pause.Current; s.Paused = ps.Mode == "off" ? null : PauseControl.Describe(ps);
                 var gsiNote = s.GsiLastSeconds is double g ? $", gsi {g:0}s ago" + (s.GsiMap is null ? "" : $" on {s.GsiMap}") : "";
-                var msg = s.State == "idle" ? "idle" + gsiNote
+                var msg = s.State == "idle" ? "idle" + (s.Paused is null ? "" : $" (auto recording paused {s.Paused})") + gsiNote
                     : $"{s.State}: {s.Profile} ({s.Mode}) {s.ElapsedSeconds:0}s elapsed"
                       + (s.WindowSeconds is double w ? $", {w:0}s in window" : "")
                       + $", {s.MarkerCount} markers" + (s.PendingMarks > 0 ? $" ({s.PendingMarks} pending clip)" : "")
