@@ -105,6 +105,7 @@ runs one now.
 | key | default | meaning |
 |---|---|---|
 | `name` | | used for the session folder and the clips subfolder |
+| `game` | | id of a built-in game preset (`cs2`, `minecraft`, `black-ops-3`): display name and sidebar banner. A profile whose name equals a preset id or name resolves without it |
 | `match` | | regex against the process name (`/proc/PID/comm`, 15 chars max). Recording starts when it appears and stops when it exits |
 | `match_cmdline` | | regex against the full command line, for games whose process is `java` or similar |
 | `mode` | `"timeline"` | `timeline` or `buffer` |

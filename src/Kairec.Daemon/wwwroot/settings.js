@@ -65,7 +65,7 @@
       ${(c.quality || []).map((q, i) => `<input type="text" data-path="quality.${i}.name" value="${q.name ?? ''}"><input type="number" data-path="quality.${i}.fps" value="${q.fps ?? ''}" placeholder="60"><select data-path="quality.${i}.codec"><option value="" ${!q.codec ? 'selected' : ''}>(capture)</option>${meta.codecs.map(x => `<option ${q.codec === x ? 'selected' : ''}>${x}</option>`).join('')}</select><input type="number" data-path="quality.${i}.bitrateKbps" value="${q.bitrateKbps ?? ''}" placeholder="20000" step="500"><input type="number" data-path="quality.${i}.keyframeSeconds" value="${q.keyframeSeconds ?? ''}" placeholder="1" step="0.5"><input type="text" data-path="quality.${i}.scale" value="${q.scale ?? ''}" placeholder="native"><span class="mono muted qrate" data-qrate="${i}"></span><button class="tiny" data-delq="${i}" title="remove preset">✕</button>`).join('')}
       </div></div>`;
     h += `</div><div class="col right">`;
-    h += `<div class="card"><h3>Profiles <span class="spacer"></span><button class="btn small" id="addProfile">+ Add profile</button></h3>
+    h += `<div class="card"><h3>Profiles <span class="spacer"></span><span class="switch-wrap"><button class="btn small" id="addProfile">+ Add profile</button><div id="presetMenu" class="menu right" hidden><div class="menu-title">From a game preset</div>${(meta.presets || []).map(g => `<button data-preset="${g.id}">${g.name}<span class="sub">${g.match || g.matchCmdline} · ${g.mode}${g.events !== 'none' ? ' · ' + g.events : ''}</span></button>`).join('')}<div class="menu-title">Or</div><button data-preset="">blank profile</button></div></span></h3>
       <div class="help">A profile is one game. The daemon starts recording when a matching process appears. Blank override fields use the defaults above.</div></div>`;
     c.profiles.forEach((p, i) => {
       const P = `profiles.${i}.`;
@@ -76,6 +76,7 @@
       h += `<div class="card profile ${open ? 'open' : 'closed'}" data-profile="${i}"><h3 class="ph" data-toggle="${p.name || `#${i}`}"><span class="chev">${open ? '▾' : '▸'}</span><span class="name">${p.name || 'new profile'}</span><span class="badge">${p.mode}</span><span class="badge">${st}</span><span class="muted sum">${len} · ${p.quality ? p.quality + ' · ' : ''}${p.events === 'none' ? 'manual markers' : p.events} · ${p.match || p.matchCmdline || 'no match yet'}</span><span class="spacer"></span><button class="btn small danger" data-del="${i}">Delete</button></h3>
         <div class="body"><div class="fields">
           ${field('name', inp(P + 'name', p.name), false, 'used for the session folder and the clips subfolder')}
+          ${field('game', sel(P + 'game', p.game ?? '', [{ v: '', l: '(none)' }, ...(meta.presets || []).map(g => ({ v: g.id, l: g.name }))]), false, 'known game: gives the sidebar its banner. A profile named like a preset is matched automatically')}
           ${field('mode', sel(P + 'mode', p.mode, [{ v: 'timeline', l: 'timeline (rolling window on disk)' }, { v: 'buffer', l: 'buffer (RAM ring buffer)' }]), false, 'timeline: scrub the last N minutes any time. buffer: nothing is written until you mark or save')}
           ${field('events', sel(P + 'events', p.events, [{ v: 'none', l: 'none (manual markers only)' }, { v: 'cs2-gsi', l: 'cs2-gsi (CS2 game state)' }]), false, 'cs2-gsi adds kill, death, round and MVP markers from the game itself')}
           ${field('quality preset', sel(P + 'quality', p.quality ?? '', [{ v: '', l: '(capture defaults)' }, ...(c.quality || []).map(q => ({ v: q.name, l: q.name + (q.bitrateKbps ? ` · ${q.bitrateKbps} kbps` : '') + (q.fps ? ` · ${q.fps} fps` : '') }))]), false, 'fps, codec, bitrate and size for this game; presets are defined on the left')}
@@ -119,7 +120,18 @@
     document.querySelectorAll('.achip').forEach(b => b.onclick = () => { b.classList.toggle('on'); updateFootprints(); });
     $('addQuality').onclick = () => { collect(); (cfg.quality ||= []).push({ name: '', fps: null, codec: null, bitrateKbps: null, keyframeSeconds: null, scale: null }); render(); };
     document.querySelectorAll('[data-delq]').forEach(b => b.onclick = () => { collect(); cfg.quality.splice(+b.dataset.delq, 1); render(); });
-    $('addProfile').onclick = () => { collect(); openProfiles.add(`#${cfg.profiles.length}`); cfg.profiles.push({ name: '', match: '', matchCmdline: null, mode: 'timeline', events: 'none', fps: null, timeline: null, buffer: null, clips: null, retention: null }); render(); };
+    const pm = $('presetMenu');
+    $('addProfile').onclick = e => { e.stopPropagation(); pm.hidden = !pm.hidden; };
+    pm.onclick = e => e.stopPropagation();
+    document.addEventListener('click', () => { pm.hidden = true; }, { once: true });
+    pm.querySelectorAll('[data-preset]').forEach(b => b.onclick = () => {
+      const g = (meta.presets || []).find(x => x.id === b.dataset.preset);
+      collect(); openProfiles.add(`#${cfg.profiles.length}`);
+      cfg.profiles.push(g
+        ? { name: g.name, game: g.id, match: g.match, matchCmdline: g.matchCmdline, mode: g.mode, events: g.events, fps: null, timeline: null, buffer: null, clips: null, retention: null }
+        : { name: '', game: null, match: '', matchCmdline: null, mode: 'timeline', events: 'none', fps: null, timeline: null, buffer: null, clips: null, retention: null });
+      render();
+    });
     document.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { collect(); cfg.profiles.splice(+b.dataset.del, 1); render(); });
     $('cfgText').value = meta.text; $('cfgPath').textContent = meta.path;
     const n = $('cfgNotice');
@@ -208,6 +220,7 @@
     if (cfg.quality) { for (const q of cfg.quality) for (const k of Object.keys(q)) if (q[k] === '') q[k] = null; cfg.quality = cfg.quality.filter(q => q.name); }
     for (const p of cfg.profiles) {
       if (p.quality === '') p.quality = null;
+      if (p.game === '') p.game = null;
       for (const g of ['timeline', 'buffer', 'clips', 'retention']) {
         if (p[g] && Object.values(p[g]).every(v => v == null || v === '')) p[g] = null;
         else if (p[g]) for (const k of Object.keys(p[g])) if (p[g][k] === '') p[g][k] = null;
@@ -218,7 +231,7 @@
   }
 
   async function load() {
-    const r = await fetch('/api/config'); meta = await r.json(); cfg = meta.config; render();
+    const [r, pr] = await Promise.all([fetch('/api/config'), fetch('/api/presets')]); meta = await r.json(); meta.presets = pr.ok ? await pr.json() : []; cfg = meta.config; render();
   }
   async function saveStructured() {
     collect();

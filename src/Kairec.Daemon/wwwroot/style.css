@@ -34,6 +34,8 @@ header { display: flex; align-items: center; gap: 16px; height: 56px; padding: 0
 .menu-title { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); padding: 6px 10px 4px; }
 .menu button { text-align: left; background: transparent; border: 0; padding: 7px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; }
 .menu button:hover { background: var(--panel2); }
+.menu.right { left: auto; right: 0; }
+.menu button .sub { display: block; color: var(--dim); font-size: 11px; margin-top: 1px; }
 .menu-note { font-size: 11px; color: var(--dim); padding: 6px 10px 4px; }
 .status.paused { background: #2a2214; color: #f2c66d; border-color: #4a3a12; }
 .status.paused .dot { background: var(--accent); }
@@ -98,7 +100,15 @@ main { min-width: 0; display: flex; flex-direction: column; min-height: 0; overf
 .tab.active { background: var(--panel2); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.4); }
 #profileFilter { margin-left: auto; max-width: 150px; }
 .list { overflow: auto; flex: 1; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
-.item { padding: 10px 12px; border-radius: 9px; cursor: pointer; border: 1px solid transparent; background: transparent; transition: background .1s, border-color .1s; }
+.item { position: relative; overflow: hidden; padding: 10px 12px; border-radius: 9px; cursor: pointer; border: 1px solid transparent; background: transparent; transition: background .1s, border-color .1s; }
+/* game banner behind the card: dimmed, fading out to the left so the text stays readable; grey when the footage is gone */
+.item.has-banner::before { content: ""; position: absolute; inset: 0; background: var(--banner) center / cover no-repeat; opacity: .38; transition: opacity .15s; -webkit-mask-image: linear-gradient(90deg, rgba(0,0,0,.25), rgba(0,0,0,1) 70%); mask-image: linear-gradient(90deg, rgba(0,0,0,.25), rgba(0,0,0,1) 70%); }
+.item.has-banner::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, var(--panel) 0%, rgba(19,24,34,.55) 45%, rgba(19,24,34,.25) 100%); }
+.item.has-banner:hover::before, .item.has-banner.active::before { opacity: .55; }
+.item.gone.has-banner::before { filter: grayscale(1); opacity: .22; }
+.item.gone.has-banner:hover::before { opacity: .3; }
+.item > * { position: relative; z-index: 1; }
+.item.has-banner .l1, .item.has-banner .l2 { text-shadow: 0 1px 2px rgba(0,0,0,.6); }
 .item:hover { background: var(--panel2); }
 .item.active { background: var(--panel2); border-color: var(--line2); box-shadow: inset 3px 0 0 var(--accent); }
 .item .l1 { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: 500; }

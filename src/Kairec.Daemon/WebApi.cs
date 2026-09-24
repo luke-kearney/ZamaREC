@@ -136,15 +136,26 @@ public static class WebApi
 
         // ------------------------------------------------------------ sessions
 
-        api.MapGet("/sessions", (SessionCatalog cat, RecordingCoordinator rec) =>
+        // ------------------------------------------------------------ game presets and banners
+
+        api.MapGet("/presets", () => Results.Ok(GamePresets.All.Select(g => new { g.Id, g.Name, g.Match, g.MatchCmdline, g.Events, g.Mode, HasBanner = g.BannerUrl is not null })));
+
+        api.MapGet("/banners/{id}", async (string id, BannerService banners, CancellationToken ct) =>
+        {
+            var path = await banners.PathAsync(id, ct);
+            return path is null ? Results.NotFound() : Results.File(path, "image/jpeg");
+        });
+
+        api.MapGet("/sessions", (SessionCatalog cat, RecordingCoordinator rec, KairecConfig cfg) =>
             Results.Ok(cat.Sessions().Select(s => new
             {
                 s.Id, s.Info.Profile, s.Info.Mode, s.Info.Map, s.Info.StartedAt, s.Info.EndedAt, s.Info.DurationSeconds,
                 s.MarkerCount, ClipCount = s.Info.Clips.Count, Live = s.Id == rec.ActiveSessionId,
                 Ram = s.Info.MediaDir is not null, s.Info.FootageGone,
+                Game = GamePresets.ResolveByProfileName(cfg, s.Info.Profile)?.Id,
             })));
 
-        api.MapGet("/sessions/{id}", (string id, SessionCatalog cat, RecordingCoordinator rec) =>
+        api.MapGet("/sessions/{id}", (string id, SessionCatalog cat, RecordingCoordinator rec, KairecConfig cfg) =>
         {
             var dir = cat.SessionDir(id);
             if (dir is null) return Results.NotFound();
@@ -158,6 +169,7 @@ public static class WebApi
             return Results.Ok(new
             {
                 store.Info.Id, store.Info.Profile, store.Info.Mode, store.Info.Map, store.Info.StartedAt, store.Info.EndedAt, Live = live,
+                Game = GamePresets.ResolveByProfileName(cfg, store.Info.Profile)?.Id,
                 Ram = store.Info.MediaDir is not null, store.Info.FootageGone,
                 RecordedSeconds = recorded,
                 WindowStart = avail.Count > 0 ? avail[0].Start : 0.0,
@@ -248,11 +260,12 @@ public static class WebApi
 
         // ------------------------------------------------------------ clips
 
-        api.MapGet("/clips", (SessionCatalog cat) =>
+        api.MapGet("/clips", (SessionCatalog cat, KairecConfig cfg) =>
             Results.Ok(cat.Clips().Select(c => new
             {
                 c.Profile, c.File, c.Bytes, c.Info.Label, c.Info.Source, c.Info.SessionId, c.Info.SessionOffset, c.Info.DurationSeconds,
                 c.Info.CreatedAt, c.Info.Starred, c.Info.ExpiresAt, Markers = c.Info.Markers,
+                Game = GamePresets.ResolveByProfileName(cfg, c.Profile)?.Id,
             })));
 
         api.MapGet("/clips/{profile}/{file}", (string profile, string file, SessionCatalog cat) =>

@@ -61,3 +61,24 @@ public class ConfigTests
         Assert.EndsWith("Videos/k/sessions", cfg.SessionsDir);
     }
 }
+
+public class GamePresetTests
+{
+    [Xunit.Fact]
+    public void Profile_resolves_by_game_key_then_by_name()
+    {
+        Xunit.Assert.Equal("cs2", Kairec.Core.Config.GamePresets.Resolve(new Kairec.Core.Config.ProfileConfig { Name = "anything", Game = "cs2" })!.Id);
+        Xunit.Assert.Equal("cs2", Kairec.Core.Config.GamePresets.Resolve(new Kairec.Core.Config.ProfileConfig { Name = "CS2" })!.Id);
+        Xunit.Assert.Equal("black-ops-3", Kairec.Core.Config.GamePresets.Resolve(new Kairec.Core.Config.ProfileConfig { Name = "Black Ops III" })!.Id);
+        Xunit.Assert.Null(Kairec.Core.Config.GamePresets.Resolve(new Kairec.Core.Config.ProfileConfig { Name = "factorio" }));
+    }
+
+    [Xunit.Fact]
+    public void Game_key_round_trips_through_toml()
+    {
+        var cfg = Kairec.Core.Config.ConfigLoader.Parse(Kairec.Core.Config.DefaultConfig.Toml);
+        cfg.Profiles[0].Game = "cs2";
+        var back = Kairec.Core.Config.ConfigLoader.Parse(Kairec.Core.Config.ConfigLoader.Serialize(cfg));
+        Xunit.Assert.Equal("cs2", back.Profiles[0].Game);
+    }
+}

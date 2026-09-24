@@ -15,7 +15,9 @@ daemon; the only library is hls.js for timeline playback.
 
 ## Sessions and clips
 
-Left column, filterable by profile. Badges: LIVE, RAM (segments in tmpfs), gone (RAM footage
+Left column, filterable by profile. A card shows its game's banner behind it, dimmed; grey once
+the footage is gone. Banners come from built-in game presets and are fetched once by the daemon
+into `<root>/banners`, so the page never contacts the internet. Badges: LIVE, RAM (segments in tmpfs), gone (RAM footage
 dropped; markers and clips remain), starred, expiring.
 
 ## Player and timeline
@@ -51,7 +53,8 @@ in/out, shift+I jump to in, P play range, E export panel / export, M mark, F ful
 
 Left: capture (monitor, default preset, cursor, audio sources as chips), defaults for timeline,
 buffer, clips, retention, feedback and ports, and the quality presets table with GB/h. Right:
-profiles as collapsible cards with a summary line, a process picker for the match field, helper
+profiles as collapsible cards with a summary line, *Add profile* offering the game presets
+(Counter-Strike 2, Minecraft, Black Ops III) with their process hooks pre-filled, a process picker for the match field, helper
 text under every field, and a footprint line showing what the profile needs in RAM or disk against
 what is available. Overrides shown depend on the mode.
 

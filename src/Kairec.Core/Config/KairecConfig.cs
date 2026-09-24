@@ -228,6 +228,8 @@ public sealed class DaemonConfig
 public sealed class ProfileConfig
 {
     public string Name { get; set; } = "";
+    /// <summary>Id of a GamePresets entry: display name and banner. Optional; a profile named like a preset resolves too.</summary>
+    public string? Game { get; set; }
     /// <summary>Regex against the process name (/proc/PID/comm, max 15 chars).</summary>
     public string? Match { get; set; }
     /// <summary>Regex against the full command line. Needed for Java games like Minecraft.</summary>
