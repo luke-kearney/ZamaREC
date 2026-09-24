@@ -179,6 +179,7 @@ async function loadSession(id) {
   }
   $('title').textContent = `${data.profile} · ${fmtDate(data.startedAt)}` + (data.map ? ` · ${data.map}` : '');
   const covered = state.coverage.reduce((a, c) => a + (c.end - c.start), 0);
+  $('starClip').hidden = true;
   $('subtitle').textContent = data.mode === 'timeline'
     ? `${fmt(data.recordedSeconds)} recorded · window ${fmt(data.windowStart)} – ${fmt(data.windowEnd)}` + (data.ram ? ' · RAM' : '') + (data.footageGone ? ' · footage dropped, markers and clips kept' : '') + (data.live ? ' · live' : '')
     : `buffer mode · ${data.markers.length} marks · ${state.coverage.length} clips covering ${fmt(covered)}` + (data.live ? ' · live, nothing is written until a mark or save' : '');
@@ -191,7 +192,8 @@ function loadClip(c) {
   destroyPlayer(); state.inT = state.outT = null; state.zoom = 1; state.viewStart = 0; state.cursorT = 0;
   state.current = { kind: 'clip', id: c.profile + '/' + c.file, data: c };
   $('video').src = `/api/clips/${encodeURIComponent(c.profile)}/${encodeURIComponent(c.file)}`;
-  $('title').textContent = (c.label || c.file) + (c.starred ? ' ★' : '');
+  $('title').textContent = c.label || c.file;
+  const sb = $('starClip'); sb.hidden = false; sb.classList.toggle('on', !!c.starred); sb.querySelector('span').textContent = c.starred ? 'Starred' : 'Star';
   $('subtitle').textContent = `${c.profile} · ${c.source} · ${fmtDate(c.createdAt)} · ${fmt(c.durationSeconds)} · ${gb(c.bytes)}` + (c.expiresAt ? ` · expires ${fmtDate(c.expiresAt)}` : '');
   state.total = c.durationSeconds || 1;
   showViewer(); renderTimeline(); renderMarkers(); renderList();
@@ -373,6 +375,13 @@ $('outBtn').onclick = () => {
   renderSelection();
 };
 $('goIn').onclick = () => { if (state.inT != null) seek(state.inT); };
+$('starClip').onclick = async () => {
+  const cur = state.current; if (!cur || cur.kind !== 'clip') return;
+  const r = await api(`/clips/${encodeURIComponent(cur.data.profile)}/${encodeURIComponent(cur.data.file)}/star`, { method: 'POST' });
+  cur.data.starred = r.starred; if (r.starred) cur.data.expiresAt = null;
+  toast(r.starred ? 'starred: this clip is kept for good' : 'unstarred');
+  loadClip(cur.data); refreshList();
+};
 // export panel: floats over the bottom of the video; the save icon toggles it, Escape or a click outside closes it
 const exportPop = $('exportPop');
 function showExportPop(on) { exportPop.hidden = !on; $('saveBtn').classList.toggle('on', on); if (on) $('exportLabel').focus(); }

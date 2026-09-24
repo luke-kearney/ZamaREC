@@ -36,6 +36,8 @@ dropped; markers and clips remain), starred, expiring.
   which writes a clip (stream copy, or frame-exact re-encode with the box ticked). Its lower row is
   **around markers**: the before/after boxes used by ✂ on a marker, and *Export all* for every marker
   of one type. Escape or a click outside closes the panel.
+- A clip's title bar has a *Star* button: a starred clip never expires and is never removed by
+  retention. Starring a marker (★ in its row) protects its whole session the same way.
 - Markers pane: chips per type with counts, star toggle, click to seek. In a live buffer session a
   mark whose clip is not written yet reads "clip pending".
 
