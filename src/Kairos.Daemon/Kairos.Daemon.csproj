@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RollForward>LatestMajor</RollForward>
+    <SelfContained>false</SelfContained>
+    <UseAppHost>true</UseAppHost>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Kairos.Core/Kairos.Core.csproj" />
+    <ProjectReference Include="../Kairos.Protocol/Kairos.Protocol.csproj" />
+  </ItemGroup>
+</Project>
