@@ -4,7 +4,7 @@
   let cfg = null, meta = null, open = false;
 
   const num = (v) => v === '' || v == null ? null : +v;
-  const field = (label, html, wide, hint) => `<label class="field${wide ? ' wide' : ''}"><span>${label}</span>${html}${hint ? `<small class="hint">${hint}</small>` : ''}</label>`;
+  const field = (label, html, wide, hint, mode) => `<label class="field${wide ? ' wide' : ''}"${mode ? ` data-mode="${mode}"` : ''}><span>${label}</span>${html}${hint ? `<small class="hint">${hint}</small>` : ''}</label>`;
   const inp = (path, val, type = 'text', extra = '') => `<input type="${type}" data-path="${path}" value="${val ?? ''}" ${extra}>`;
   const sel = (path, val, opts) => `<select data-path="${path}">${opts.map(o => `<option value="${o.v ?? o}" ${(o.v ?? o) === val ? 'selected' : ''}>${o.l ?? o}</option>`).join('')}</select>`;
   const chk = (path, val) => `<input type="checkbox" data-path="${path}" ${val ? 'checked' : ''}>`;
@@ -80,17 +80,17 @@
         </div>
         <div class="footprint" data-fp="${i}"></div>
         <div class="sub"><div class="lbl">overrides</div><div class="fields">
-          ${field('timeline window minutes', inp(P + 'timeline.windowMinutes', ov(p.timeline, 'windowMinutes'), 'number', `placeholder="${c.timeline.windowMinutes}"`), false, 'how far back you can scrub; older footage is deleted as you play. 0 keeps everything')}
-          ${field('timeline segment seconds', inp(P + 'timeline.segmentSeconds', ov(p.timeline, 'segmentSeconds'), 'number', `placeholder="${c.timeline.segmentSeconds}"`), false, 'file chunk length; a save waits for the current chunk to finish')}
-          ${field('timeline storage', sel(P + 'timeline.storage', ov(p.timeline, 'storage'), [{ v: '', l: '(default)' }, 'disk', 'ram']), false, 'ram keeps the window in tmpfs: no disk writes, needs window × bitrate of memory')}
-          ${field('RAM footage kept for hours', inp(P + 'timeline.ramKeepHours', ov(p.timeline, 'ramKeepHours'), 'number', `placeholder="${c.timeline.ramKeepHours}"`), false, 'after a RAM session ends its footage stays this long, or until the next session starts')}
-          ${field('buffer minutes', inp(P + 'buffer.minutes', ov(p.buffer, 'minutes'), 'number', `placeholder="${c.buffer.minutes}"`), false, 'ring buffer length; the most a mark or save can reach back')}
-          ${field('buffer storage', sel(P + 'buffer.storage', ov(p.buffer, 'storage'), [{ v: '', l: '(default)' }, 'ram', 'disk']), false, 'where the ring lives; ram costs ~150 MB per minute at 20 Mbps')}
+          ${field('timeline window minutes', inp(P + 'timeline.windowMinutes', ov(p.timeline, 'windowMinutes'), 'number', `placeholder="${c.timeline.windowMinutes}"`), false, 'how far back you can scrub; older footage is deleted as you play. 0 keeps everything', 'timeline')}
+          ${field('timeline segment seconds', inp(P + 'timeline.segmentSeconds', ov(p.timeline, 'segmentSeconds'), 'number', `placeholder="${c.timeline.segmentSeconds}"`), false, 'file chunk length; a save waits for the current chunk to finish', 'timeline')}
+          ${field('timeline storage', sel(P + 'timeline.storage', ov(p.timeline, 'storage'), [{ v: '', l: '(default)' }, 'disk', 'ram']), false, 'ram keeps the window in tmpfs: no disk writes, needs window × bitrate of memory', 'timeline')}
+          ${field('RAM footage kept for hours', inp(P + 'timeline.ramKeepHours', ov(p.timeline, 'ramKeepHours'), 'number', `placeholder="${c.timeline.ramKeepHours}"`), false, 'after a RAM session ends its footage stays this long, or until the next session starts', 'timeline')}
+          ${field('buffer minutes', inp(P + 'buffer.minutes', ov(p.buffer, 'minutes'), 'number', `placeholder="${c.buffer.minutes}"`), false, 'ring buffer length; the most a mark or save can reach back', 'buffer')}
+          ${field('buffer storage', sel(P + 'buffer.storage', ov(p.buffer, 'storage'), [{ v: '', l: '(default)' }, 'ram', 'disk']), false, 'where the ring lives; ram costs ~150 MB per minute at 20 Mbps', 'buffer')}
           ${field('save seconds', inp(P + 'clips.saveSeconds', ov(p.clips, 'saveSeconds'), 'number', `placeholder="${c.clips.saveSeconds}"`), false, 'what kairec save and the tray Save write when no length is given')}
           ${field('mark: seconds before', inp(P + 'clips.markBeforeSeconds', ov(p.clips, 'markBeforeSeconds'), 'number', `placeholder="${c.clips.markBeforeSeconds}"`), false, 'a mark clip starts this long before the mark')}
           ${field('mark: seconds after', inp(P + 'clips.markAfterSeconds', ov(p.clips, 'markAfterSeconds'), 'number', `placeholder="${c.clips.markAfterSeconds}"`), false, 'and ends this long after it; marks inside that time join the same clip')}
           ${field('mark clips expire hours', inp(P + 'clips.markClipExpireHours', ov(p.clips, 'markClipExpireHours'), 'number', `placeholder="${c.clips.markClipExpireHours}"`), false, 'mark clips are deleted after this unless starred; 0 = never')}
-          ${field('clip around each mark', sel(P + 'clips.markSaves', ov(p.clips, 'markSaves') === '' ? '' : String(ov(p.clips, 'markSaves')), [{ v: '', l: '(default)' }, { v: 'true', l: 'on' }, { v: 'false', l: 'off' }]), false, 'timeline mode only: also write a clip on every mark. Default is on for RAM timelines')}
+          ${field('clip around each mark', sel(P + 'clips.markSaves', ov(p.clips, 'markSaves') === '' ? '' : String(ov(p.clips, 'markSaves')), [{ v: '', l: '(default)' }, { v: 'true', l: 'on' }, { v: 'false', l: 'off' }]), false, 'timeline mode only: also write a clip on every mark. Default is on for RAM timelines', 'timeline')}
           ${field('retention max GB', inp(P + 'retention.maxGb', ov(p.retention, 'maxGb'), 'number', `placeholder="${c.retention.maxGb ?? ''}"`), false, 'sessions + clips of this profile; oldest unprotected go first')}
           ${field('retention max days', inp(P + 'retention.maxDays', ov(p.retention, 'maxDays'), 'number', `placeholder="${c.retention.maxDays ?? ''}"`), false, 'older sessions and clips are deleted unless starred or protected')}
         </div></div></div></div>`;
@@ -105,6 +105,12 @@
       collect(); render();
     });
     document.querySelectorAll('[data-pick]').forEach(b => b.onclick = e => { e.preventDefault(); openPicker(+b.dataset.pick, b); });
+    const applyModes = () => document.querySelectorAll('.profile').forEach(card => {
+      const mode = card.querySelector('[data-path$=".mode"]').value;
+      card.querySelectorAll('[data-mode]').forEach(f => { f.hidden = f.dataset.mode !== mode; });
+    });
+    applyModes();
+    document.querySelectorAll('.profile [data-path$=".mode"]').forEach(sel => sel.addEventListener('change', applyModes));
     $('addQuality').onclick = () => { collect(); (cfg.quality ||= []).push({ name: '', fps: null, codec: null, bitrateKbps: null, keyframeSeconds: null, scale: null }); render(); };
     document.querySelectorAll('[data-delq]').forEach(b => b.onclick = () => { collect(); cfg.quality.splice(+b.dataset.delq, 1); render(); });
     $('addProfile').onclick = () => { collect(); openProfiles.add(`#${cfg.profiles.length}`); cfg.profiles.push({ name: '', match: '', matchCmdline: null, mode: 'timeline', events: 'none', fps: null, timeline: null, buffer: null, clips: null, retention: null }); render(); };
