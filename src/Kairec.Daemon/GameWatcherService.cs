@@ -11,6 +11,7 @@ public sealed class GameWatcherService : BackgroundService
     private readonly ILogger<GameWatcherService> _log;
     private ProcessWatcher _watcher;
     private int _watcherVersion;
+    private int _failedPid; private long _retryAt;
 
     public GameWatcherService(KairecConfig cfg, RecordingCoordinator rec, ILogger<GameWatcherService> log)
     {
@@ -45,10 +46,16 @@ public sealed class GameWatcherService : BackgroundService
                 {
                     if (_cfg.Version != _watcherVersion) { _watcher = new ProcessWatcher(_cfg.Profiles, _log); _watcherVersion = _cfg.Version; }
                     var game = _watcher.FindRunning(self);
-                    if (game is not null)
+                    if (game is not null && !(game.Pid == _failedPid && Environment.TickCount64 < _retryAt))
                     {
                         _log.LogInformation("detected {profile} (pid {pid}, comm {comm})", game.Profile.Name, game.Pid, game.Comm);
-                        await _rec.StartAsync(game.Profile, "auto", game.Pid, ct);
+                        var r = await _rec.StartAsync(game.Profile, "auto", game.Pid, ct);
+                        if (!r.Ok)
+                        {
+                            // Do not hammer (and beep) once a second: log it once, retry in a minute.
+                            _log.LogError("could not start a session for {profile}: {msg} (retrying in 60 s)", game.Profile.Name, r.Message);
+                            _failedPid = game.Pid; _retryAt = Environment.TickCount64 + 60_000;
+                        }
                     }
                 }
             }

@@ -87,6 +87,7 @@ public sealed class RecordingCoordinator : IAsyncDisposable
                 if (need > free)
                 {
                     _sound.Play("error");
+                    _events.Write("error", $"RAM timeline refused: {profile.WindowMinutes} min window needs {need / 1e9:0.0} GB, tmpfs has {free / 1e9:0.0} GB free", profile.Name, level: "error");
                     return Fail($"RAM timeline: a {profile.WindowMinutes} min window at {_cfg.Capture.BitrateKbps} kbps needs {need / 1e9:0.0} GB but {ramDir} has {free / 1e9:0.0} GB free. Shorten the window or lower the bitrate.");
                 }
             }
