@@ -16,10 +16,10 @@ public static class GsrArguments
         {
             "-w", c.Monitor,
             "-f", p.Fps.ToString(),
-            "-k", c.Codec,
+            "-k", p.Codec,
             "-bm", "cbr",
-            "-q", c.BitrateKbps.ToString(),
-            "-keyint", c.KeyframeSeconds.ToString("0.###", CultureInfo.InvariantCulture),
+            "-q", p.BitrateKbps.ToString(),
+            "-keyint", p.KeyframeSeconds.ToString("0.###", CultureInfo.InvariantCulture),
             "-cursor", c.Cursor ? "yes" : "no",
             "-encoder", "gpu",
             "-fallback-cpu-encoding", "no",
@@ -27,6 +27,7 @@ public static class GsrArguments
             "-ipc", ipcSocket,
         };
         if (c.Audio.Count > 0) { args.Add("-a"); args.Add(string.Join("|", c.Audio)); }
+        if (!string.IsNullOrWhiteSpace(p.Scale)) { args.Add("-s"); args.Add(p.Scale.Trim()); }
 
         switch (p.Mode)
         {

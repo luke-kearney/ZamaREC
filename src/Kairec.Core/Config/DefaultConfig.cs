@@ -63,11 +63,32 @@ public static class DefaultConfig
         ui_port = 3556                    # web timeline
         bind = "127.0.0.1"
 
+        # Quality presets. A profile picks one with quality = "high"; blank means the [capture] values.
+        # Fields left out fall back to [capture]. scale limits the output size, e.g. "1280x720".
+        [[quality]]
+        name = "low"
+        fps = 30
+        bitrate_kbps = 6000
+        scale = "1280x720"
+        [[quality]]
+        name = "medium"
+        fps = 60
+        bitrate_kbps = 12000
+        [[quality]]
+        name = "high"
+        fps = 60
+        bitrate_kbps = 20000
+        [[quality]]
+        name = "ultra"
+        fps = 60
+        bitrate_kbps = 35000
+
         [[profiles]]
         name = "cs2"
         match = "^cs2$"                   # regex on the process name
         mode = "timeline"
         events = "cs2-gsi"
+        quality = "high"
         timeline.window_minutes = 120
 
         [[profiles]]

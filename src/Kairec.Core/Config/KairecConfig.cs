@@ -15,7 +15,12 @@ public sealed class KairecConfig
     public FeedbackConfig Feedback { get; set; } = new();
     public DaemonConfig Daemon { get; set; } = new();
     public GsiConfig Gsi { get; set; } = new();
+    /// <summary>Named quality presets a profile can pick; blank profile.quality means the [capture] values.</summary>
+    public List<QualityPreset> Quality { get; set; } = QualityPreset.Defaults();
     public List<ProfileConfig> Profiles { get; set; } = new();
+
+    public QualityPreset? FindQuality(string? name) =>
+        string.IsNullOrEmpty(name) ? null : Quality.FirstOrDefault(q => string.Equals(q.Name, name, StringComparison.OrdinalIgnoreCase));
 
     [JsonIgnore] public string RootDir => Paths.Expand(Storage.Root);
     [JsonIgnore] public string SessionsDir => Path.Combine(RootDir, "sessions");
@@ -28,7 +33,7 @@ public sealed class KairecConfig
     public void CopyFrom(KairecConfig o)
     {
         Storage = o.Storage; Capture = o.Capture; Timeline = o.Timeline; Buffer = o.Buffer; Clips = o.Clips;
-        Retention = o.Retention; Feedback = o.Feedback; Daemon = o.Daemon; Gsi = o.Gsi; Profiles = o.Profiles;
+        Retention = o.Retention; Feedback = o.Feedback; Daemon = o.Daemon; Gsi = o.Gsi; Quality = o.Quality; Profiles = o.Profiles;
         Version++;
     }
 
@@ -36,11 +41,19 @@ public sealed class KairecConfig
         Profiles.FirstOrDefault(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>Effective settings for a profile: profile overrides on top of the global defaults.</summary>
-    public EffectiveProfile Effective(ProfileConfig p) => new()
+    public EffectiveProfile Effective(ProfileConfig p)
     {
+        var q = FindQuality(p.Quality);
+        return new()
+        {
         Profile = p,
         Mode = p.CaptureMode,
-        Fps = p.Fps ?? Capture.Fps,
+        QualityName = q?.Name,
+        Fps = p.Fps ?? q?.Fps ?? Capture.Fps,
+        Codec = q?.Codec ?? Capture.Codec,
+        BitrateKbps = q?.BitrateKbps ?? Capture.BitrateKbps,
+        KeyframeSeconds = q?.KeyframeSeconds ?? Capture.KeyframeSeconds,
+        Scale = q?.Scale ?? Capture.Scale,
         WindowMinutes = p.Timeline?.WindowMinutes ?? Timeline.WindowMinutes,
         SegmentSeconds = p.Timeline?.SegmentSeconds ?? Timeline.SegmentSeconds,
         TimelineStorage = p.Timeline?.Storage ?? Timeline.Storage,
@@ -55,6 +68,28 @@ public sealed class KairecConfig
         EventClips = p.Clips?.EventClips ?? Clips.EventClips,
         MaxGb = p.Retention?.MaxGb ?? Retention.MaxGb,
         MaxDays = p.Retention?.MaxDays ?? Retention.MaxDays,
+        };
+    }
+}
+
+/// <summary>A named bundle of encoder settings. Null fields fall back to [capture].</summary>
+public sealed class QualityPreset
+{
+    public string Name { get; set; } = "";
+    public int? Fps { get; set; }
+    public string? Codec { get; set; }
+    public int? BitrateKbps { get; set; }
+    public double? KeyframeSeconds { get; set; }
+    /// <summary>Output size limit like "1280x720"; empty = native.</summary>
+    public string? Scale { get; set; }
+    public string? Note { get; set; }
+
+    public static List<QualityPreset> Defaults() => new()
+    {
+        new() { Name = "low", Fps = 30, Codec = "h264", BitrateKbps = 6000, Scale = "1280x720", Note = "720p30, ~2.7 GB/h" },
+        new() { Name = "medium", Fps = 60, Codec = "h264", BitrateKbps = 12000, Note = "1080p60, ~5.4 GB/h" },
+        new() { Name = "high", Fps = 60, Codec = "h264", BitrateKbps = 20000, Note = "1080p60, ~9 GB/h" },
+        new() { Name = "ultra", Fps = 60, Codec = "h264", BitrateKbps = 35000, Note = "1080p60, ~16 GB/h" },
     };
 }
 
@@ -63,13 +98,18 @@ public sealed class EffectiveProfile
     public required ProfileConfig Profile { get; init; }
     public string Name => Profile.Name;
     public required CaptureMode Mode { get; init; }
+    public string? QualityName { get; init; }
     public required int Fps { get; init; }
+    public required string Codec { get; init; }
+    public required int BitrateKbps { get; init; }
+    public required double KeyframeSeconds { get; init; }
+    public string? Scale { get; init; }
     public required int WindowMinutes { get; init; }
     public required int SegmentSeconds { get; init; }
     public required string TimelineStorage { get; init; }
     public required double RamKeepHours { get; init; }
-    /// <summary>Bytes the window needs at the configured bitrate (video only; audio adds a few percent).</summary>
-    public long WindowBytes(int bitrateKbps) => WindowMinutes <= 0 ? 0 : (long)WindowMinutes * 60 * bitrateKbps * 1000 / 8;
+    /// <summary>Bytes the window needs at this profile's bitrate (video only; audio adds a few percent).</summary>
+    public long WindowBytes() => WindowMinutes <= 0 ? 0 : (long)WindowMinutes * 60 * BitrateKbps * 1000 / 8;
     public required int BufferMinutes { get; init; }
     public required string BufferStorage { get; init; }
     public required int SaveSeconds { get; init; }
@@ -110,6 +150,8 @@ public sealed class CaptureConfig
     /// <summary>Constant bitrate in kbps. CBR keeps the RAM buffer a predictable size.</summary>
     public int BitrateKbps { get; set; } = 20000;
     public double KeyframeSeconds { get; set; } = 1.0;
+    /// <summary>Output size limit like "1280x720"; empty = native resolution.</summary>
+    public string? Scale { get; set; }
     /// <summary>gpu-screen-recorder audio sources: default_output, default_input, device:NAME, app:NAME.</summary>
     public List<string> Audio { get; set; } = new() { "default_output" };
     public bool Cursor { get; set; } = false;
@@ -192,6 +234,8 @@ public sealed class ProfileConfig
     public string Mode { get; set; } = "timeline";
     /// <summary>Event source: none | cs2-gsi</summary>
     public string Events { get; set; } = "none";
+    /// <summary>Name of a [[quality]] preset; empty = the [capture] values.</summary>
+    public string? Quality { get; set; }
     public int? Fps { get; set; }
     public ProfileTimelineOverride? Timeline { get; set; }
     public ProfileBufferOverride? Buffer { get; set; }
@@ -278,7 +322,10 @@ public static class ConfigLoader
             if (string.IsNullOrWhiteSpace(p.Name)) throw new InvalidOperationException("Every [[profiles]] entry needs a name");
             if (!names.Add(p.Name)) throw new InvalidOperationException($"Duplicate profile name '{p.Name}'");
             if (p.Match is null && p.MatchCmdline is null) throw new InvalidOperationException($"Profile '{p.Name}' needs match or match_cmdline");
+            if (!string.IsNullOrEmpty(p.Quality) && cfg.FindQuality(p.Quality) is null)
+                throw new InvalidOperationException($"Profile '{p.Name}': unknown quality preset '{p.Quality}' (known: {string.Join(", ", cfg.Quality.Select(q => q.Name))})");
             var e = cfg.Effective(p);
+            if (e.Codec is not ("h264" or "hevc" or "av1")) throw new InvalidOperationException($"Profile '{p.Name}': codec must be h264, hevc or av1");
             if (e.BufferStorage is not ("ram" or "disk")) throw new InvalidOperationException($"Profile '{p.Name}': buffer storage must be ram or disk");
             if (e.TimelineStorage is not ("disk" or "ram")) throw new InvalidOperationException($"Profile '{p.Name}': timeline storage must be disk or ram");
             if (e.TimelineStorage == "ram" && e.WindowMinutes <= 0) throw new InvalidOperationException($"Profile '{p.Name}': a RAM timeline needs a window (window_minutes > 0)");

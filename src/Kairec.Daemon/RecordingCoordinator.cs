@@ -60,7 +60,7 @@ public sealed class RecordingCoordinator : IAsyncDisposable
 
     /// <summary>Live footage bytes for the active session (measured for timelines, estimated for buffers).</summary>
     public long ActiveRecordedBytes => _active is null ? 0 : _active.Segments?.TotalBytes ?? EstimateBufferBytes(_active);
-    private long EstimateBufferBytes(Active a) => (long)((MonotonicClock.NowMicros() - a.Session.Info.SpawnMonoUs) / 1e6 * _cfg.Capture.BitrateKbps * 125);
+    private long EstimateBufferBytes(Active a) => (long)((MonotonicClock.NowMicros() - a.Session.Info.SpawnMonoUs) / 1e6 * a.Profile.BitrateKbps * 125);
 
     public bool IsActive => _active is not null;
     public string? ActiveSessionId => _active?.Session.Info.Id;
@@ -88,13 +88,13 @@ public sealed class RecordingCoordinator : IAsyncDisposable
                 PurgeRamSessions(all: true);
                 var ramDir = Paths.Expand(_cfg.Timeline.RamDir);
                 Directory.CreateDirectory(ramDir);
-                var need = profile.WindowBytes(_cfg.Capture.BitrateKbps) * 11 / 10;   // + audio and slack
+                var need = profile.WindowBytes() * 11 / 10;   // + audio and slack
                 long free = 0; try { free = new DriveInfo(ramDir).AvailableFreeSpace; } catch { }
                 if (need > free)
                 {
                     _sound.Play("error");
-                    _events.Write("error", $"RAM timeline refused: {profile.WindowMinutes} min window needs {need / 1e9:0.0} GB, tmpfs has {free / 1e9:0.0} GB free", profile.Name, level: "error");
-                    return Fail($"RAM timeline: a {profile.WindowMinutes} min window at {_cfg.Capture.BitrateKbps} kbps needs {need / 1e9:0.0} GB but {ramDir} has {free / 1e9:0.0} GB free. Shorten the window or lower the bitrate.");
+                    _events.Write("error", $"RAM timeline refused: {profile.WindowMinutes} min window at {profile.BitrateKbps} kbps needs {need / 1e9:0.0} GB, tmpfs has {free / 1e9:0.0} GB free", profile.Name, level: "error");
+                    return Fail($"RAM timeline: a {profile.WindowMinutes} min window at {profile.BitrateKbps} kbps needs {need / 1e9:0.0} GB but {ramDir} has {free / 1e9:0.0} GB free. Shorten the window or lower the bitrate.");
                 }
             }
             var session = SessionStore.Create(_cfg, profileCfg, trigger, gamePid);
@@ -122,9 +122,9 @@ public sealed class RecordingCoordinator : IAsyncDisposable
                 Profile = profile, Session = session, Recorder = rec, Trigger = trigger, GamePid = gamePid,
                 Segments = profile.Mode == CaptureMode.Timeline ? new SegmentIndex(session.Dir, session.MediaDir) : null,
             };
-            var detail = profile.Mode == CaptureMode.Timeline
+            var detail = (profile.Mode == CaptureMode.Timeline
                 ? (profile.WindowMinutes > 0 ? $"{profile.WindowMinutes} min window" : "unlimited window") + (profile.TimelineStorage == "ram" ? " in RAM" : "")
-                : $"{profile.BufferMinutes} min {profile.BufferStorage} buffer";
+                : $"{profile.BufferMinutes} min {profile.BufferStorage} buffer") + (profile.QualityName is null ? "" : $", {profile.QualityName} quality");
             _log.LogInformation("session {id} started ({mode}, {detail}, trigger={trigger}, pid={pid})", session.Info.Id, profile.Mode, detail, trigger, gamePid);
             _events.Write("session", $"session started ({profile.Mode.ToString().ToLower()}, {detail}, {trigger})", profile.Name, session.Info.Id);
             _sound.Play("start");

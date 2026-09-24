@@ -76,6 +76,13 @@ kairec top                        live view until Ctrl+C: state, CPU/RAM of the 
     2026-09-24_20-20-08_clutch.mp4.json  source, expiry, and the clip's own markers
 ```
 
+## Quality presets
+
+`[[quality]]` entries bundle fps, codec, bitrate, keyframe interval and an optional output size
+limit. A profile picks one with `quality = "high"`; blank means the `[capture]` values. Four ship by
+default: low (720p30, 6 Mbps), medium (1080p60, 12 Mbps), high (20 Mbps), ultra (35 Mbps). Edit or
+add your own in Settings, which also shows each preset's GB per hour.
+
 ## CS2 events
 
 With `events = "cs2-gsi"` on a profile the daemon writes `gamestate_integration_kairec.cfg` into
