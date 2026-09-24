@@ -14,6 +14,7 @@ const state = {
   hls: null, details: null, total: 0, inT: null, outT: null, pollTimer: null,
   coverage: [], clipLoaded: null,   // buffer sessions: footage bands and which clip is in the player
   zoom: 1, viewStart: 0,             // timeline zoom: visible span is total/zoom starting at viewStart
+  cursorT: 0,                        // last timeline position the user chose; in/out use this, not the player
 };
 
 // ------------------------------------------------------------------ helpers
@@ -137,11 +138,14 @@ function fromMedia(m) {
   return (segs[0] ? segs[0].start : 0) + m;
 }
 function seek(t) {
+  state.cursorT = Math.max(0, Math.min(state.total, t));
+  placeHead(state.cursorT);
   const m = toMedia(t);
   if (m == null) return toast(state.current.data.mode === 'buffer' ? 'no footage was saved for that moment' : 'that moment is no longer in the timeline window', true);
   const v = $('video'); v.currentTime = m; if (v.paused) v.play().catch(() => {});
 }
-function currentT() { return fromMedia($('video').currentTime); }
+function currentT() { return state.cursorT; }
+function placeHead(t) { $('curTime').textContent = fmt(t) + ' / ' + fmt(state.total); $('tClock').textContent = fmtShort(t) + ' / ' + fmtShort(state.total); $('tlHead').style.left = pct(t); $('tlHeadT').textContent = fmtShort(t); }
 
 // ------------------------------------------------------------------ loading
 async function loadSession(id) {
@@ -150,7 +154,7 @@ async function loadSession(id) {
   state.current = { kind: 'session', id, data };
   state.coverage = (data.clipDetails || []).filter(c => c.sessionOffset != null && c.durationSeconds).map(c => ({ file: c.file, label: c.label, start: c.sessionOffset, end: c.sessionOffset + c.durationSeconds }));
   if (first) {
-    destroyPlayer(); state.inT = state.outT = null; state.clipLoaded = null; state.zoom = 1; state.viewStart = 0;
+    destroyPlayer(); state.inT = state.outT = null; state.clipLoaded = null; state.zoom = 1; state.viewStart = 0; state.cursorT = 0;
     if (data.mode === 'timeline') attachHls(`/api/sessions/${id}/playlist.m3u8`);
     if (data.live) state.pollTimer = setInterval(() => loadSession(id), 5000);
   } else if (data.live && data.mode === 'timeline') {
@@ -168,7 +172,7 @@ async function loadSession(id) {
   showViewer(); renderTimeline(); renderMarkers(); renderList();
 }
 function loadClip(c) {
-  destroyPlayer(); state.inT = state.outT = null; state.zoom = 1; state.viewStart = 0;
+  destroyPlayer(); state.inT = state.outT = null; state.zoom = 1; state.viewStart = 0; state.cursorT = 0;
   state.current = { kind: 'clip', id: c.profile + '/' + c.file, data: c };
   $('video').src = `/api/clips/${encodeURIComponent(c.profile)}/${encodeURIComponent(c.file)}`;
   $('title').textContent = (c.label || c.file) + (c.starred ? ' ★' : '');
@@ -342,11 +346,11 @@ $('outVal').onchange = e => { state.outT = +e.target.value; renderSelection(); }
 $('exportBtn').onclick = exportRange;
 $('batchBtn').onclick = exportBatch;
 $('markBtn').onclick = async () => { try { const r = await api('/mark', { body: { label: null } }); toast(r.message, !r.ok); } catch (e) { toast(e.message, true); } };
-$('video').addEventListener('timeupdate', () => { if (!state.current) return; const t = currentT(); followPlayhead(t); $('curTime').textContent = fmt(t) + ' / ' + fmt(state.total); $('tClock').textContent = fmtShort(t) + ' / ' + fmtShort(state.total); $('tlHead').style.left = pct(t); $('tlHeadT').textContent = fmtShort(t); });
+$('video').addEventListener('timeupdate', () => { if (!state.current) return; const t = fromMedia($('video').currentTime); state.cursorT = t; followPlayhead(t); placeHead(t); });
 // ---------------------------------------------------------------- transport
 (() => {
   const v = $('video'), stage = $('stage');
-  const nudge = d => { v.currentTime = Math.max(0, v.currentTime + d); };
+  const nudge = d => seek(state.cursorT + d);
   const toggle = () => { if (!state.current) return; v.paused ? v.play().catch(() => {}) : v.pause(); };
   const jumpMarker = dir => {
     const t = currentT();
