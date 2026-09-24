@@ -1,0 +1,15 @@
+[Unit]
+Description=Kairec session recorder daemon
+After=graphical-session.target pipewire.service
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/share/kairec/daemon/Kairec.Daemon
+Restart=on-failure
+RestartSec=3
+# The recorder needs the Wayland session and PipeWire; systemd --user imports these from the session.
+Environment=DOTNET_gcServer=0
+
+[Install]
+WantedBy=graphical-session.target

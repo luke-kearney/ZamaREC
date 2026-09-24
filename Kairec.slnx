@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Kairec.Cli/Kairec.Cli.csproj" />
+    <Project Path="src/Kairec.Core/Kairec.Core.csproj" />
+    <Project Path="src/Kairec.Daemon/Kairec.Daemon.csproj" />
+    <Project Path="src/Kairec.Protocol/Kairec.Protocol.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Kairec.Tests/Kairec.Tests.csproj" />
+  </Folder>
+</Solution>
