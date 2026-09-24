@@ -101,7 +101,29 @@
         </div>
       </div>
       <div class="stage" id="stage">
-        <div class="player"><video id="video" preload="metadata" playsinline></video></div>
+        <div class="player"><video id="video" preload="metadata" playsinline></video>
+          <div id="exportPop" class="export-pop" hidden>
+            <div class="row">
+              <span class="lbl">range</span>
+              <input id="inVal" class="num mono" type="number" step="0.1" min="0" placeholder="in" title="in (s)">
+              <span class="unit">→</span>
+              <input id="outVal" class="num mono" type="number" step="0.1" min="0" placeholder="out" title="out (s)">
+              <span class="lbl">len</span><input id="rangeLen" class="num mono short" type="number" min="1" value="30" title="default range length in seconds"><span class="unit">s</span>
+            </div>
+            <div class="row">
+              <input id="exportLabel" class="text" placeholder="clip label (optional)">
+              <label class="chk"><input type="checkbox" id="exact"> frame-exact</label>
+              <button class="btn primary" id="exportBtn" title="E">Export range</button>
+            </div>
+            <div class="row batch">
+              <span class="lbl">around markers</span>
+              <input id="before" class="num mono short" type="number" value="10" min="0"><span class="unit">s before</span>
+              <input id="after" class="num mono short" type="number" value="5" min="0"><span class="unit">s after</span>
+              <select id="batchType" class="sel"></select>
+              <button class="btn" id="batchBtn">Export all</button>
+            </div>
+          </div>
+        </div>
         <div class="transport">
           <button class="tbtn" id="tPrev" title="previous marker  [">
             <svg viewBox="0 0 24 24"><path d="M6 5v14M19 5l-10 7 10 7z"/></svg></button>
@@ -115,6 +137,18 @@
           <button class="tbtn" id="tNext" title="next marker  ]">
             <svg viewBox="0 0 24 24"><path d="M18 5v14M5 5l10 7-10 7z"/></svg></button>
           <span class="tclock mono" id="tClock">0:00 / 0:00</span>
+          <span class="tsep"></span>
+          <button class="tbtn tsm" id="inBtn" title="set in  I">
+            <svg viewBox="0 0 24 24"><path d="M5 4v16M9 12h10M15 8l4 4-4 4"/></svg></button>
+          <button class="tbtn tsm" id="outBtn" title="set out  O">
+            <svg viewBox="0 0 24 24"><path d="M19 4v16M15 12H5M9 8l-4 4 4 4"/></svg></button>
+          <button class="tbtn tsm" id="goIn" title="jump to in  shift+I">
+            <svg viewBox="0 0 24 24"><path d="M5 5v14M19 12H8M12 8l-4 4 4 4"/></svg></button>
+          <button class="tbtn tsm" id="playRange" title="play in → out  P">
+            <svg viewBox="0 0 24 24"><path d="M4 5v14M20 5v14M9 8l7 4-7 4z"/></svg></button>
+          <span class="trange mono" id="tRange"></span>
+          <button class="tbtn tsm" id="saveBtn" title="export…">
+            <svg viewBox="0 0 24 24"><path d="M5 4h11l3 3v13H5zM8 4v5h7V4M8 20v-6h8v6"/></svg></button>
           <span class="spacer"></span>
           <button class="tbtn" id="tMute" title="mute">
             <svg class="ic-vol" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9zM16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></svg>
@@ -147,39 +181,18 @@
           <span class="time mono" id="curTime">0:00</span>
         </div>
       </div>
-
-      <div class="toolbar">
-        <div class="tgroup">
-          <button class="btn" id="inBtn" title="I">Set in</button>
-          <input id="inVal" class="num mono" type="number" step="0.1" min="0" placeholder="in">
-          <button class="btn" id="outBtn" title="O">Set out</button>
-          <input id="outVal" class="num mono" type="number" step="0.1" min="0" placeholder="out">
-          <span class="lbl">len</span><input id="rangeLen" class="num mono" type="number" min="1" value="20" title="default range length in seconds"><span class="unit">s</span>
-          <button class="btn" id="goIn" title="jump to in  shift+I">⇤</button>
-          <button class="btn" id="playRange" title="play in → out  P">▶ range</button>
-          <button class="btn" id="goOut" title="jump to out  shift+O">⇥</button>
-        </div>
-        <div class="tgroup grow">
-          <input id="exportLabel" class="text" placeholder="clip label (optional)">
-          <label class="chk"><input type="checkbox" id="exact"> frame-exact</label>
-          <button class="btn primary" id="exportBtn" title="E">Export range</button>
-        </div>
-        <div class="tgroup">
-          <span class="lbl">around marker</span>
-          <input id="before" class="num mono" type="number" value="10" min="0"><span class="unit">s before</span>
-          <input id="after" class="num mono" type="number" value="5" min="0"><span class="unit">s after</span>
-          <select id="batchType" class="sel"></select>
-          <button class="btn" id="batchBtn">Export all</button>
-        </div>
-      </div>
     </div>
   </main>
 
   <section id="markersPane" class="markers">
     <div class="pane-head">
-      <span>Markers</span>
+      <button class="tbtn collapse" id="markersToggle" title="collapse markers" aria-expanded="true">
+        <svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+      </button>
+      <span class="pane-title">Markers</span>
       <select id="typeFilter" class="sel" hidden><option value="">all</option></select>
     </div>
+    <div class="pane-tab" id="markersTab" title="expand markers">Markers<span id="markersCount" class="n"></span></div>
     <div id="typeChips" class="chips"></div>
     <div id="markerList"></div>
   </section>

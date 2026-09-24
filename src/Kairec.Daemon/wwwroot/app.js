@@ -206,11 +206,12 @@ function markersOf() {
 }
 function viewLen() { return (state.total || 1) / state.zoom; }
 function clampView() { state.viewStart = Math.max(0, Math.min(state.viewStart, (state.total || 1) - viewLen())); }
-function pct(t) { return Math.min(110, Math.max(-10, (t - state.viewStart) / viewLen() * 100)) + '%'; }
+function pct(t) { return Math.min(200, Math.max(-100, (t - state.viewStart) / viewLen() * 100)) + '%'; }
 function xToT(clientX) { const r = $('timeline').getBoundingClientRect(); return state.viewStart + (clientX - r.left) / r.width * viewLen(); }
-function setZoom(z, anchorT) {
+function setZoom(z, anchorT, centre) {
   const old = state.zoom; state.zoom = Math.max(1, Math.min(64, z));
-  if (anchorT != null) { const frac = (anchorT - state.viewStart) / (state.total / old); state.viewStart = anchorT - frac * viewLen(); }
+  if (anchorT != null && centre) state.viewStart = anchorT - viewLen() / 2;
+  else if (anchorT != null) { const frac = (anchorT - state.viewStart) / (state.total / old); state.viewStart = anchorT - frac * viewLen(); }
   clampView(); renderTimeline(); $('zoomLbl').textContent = state.zoom === 1 ? 'fit' : state.zoom.toFixed(state.zoom < 4 ? 1 : 0) + '×';
 }
 function followPlayhead(t) {
@@ -251,6 +252,7 @@ function renderTimeline() {
   renderRuler();
   renderChips(types);
   renderSelection();
+  placeHead(state.cursorT);
   tl.onclick = e => seek(xToT(e.clientX));
   tl.onmousemove = e => { const r = tl.getBoundingClientRect(); const t = xToT(e.clientX); const tip = $('tlTip'); tip.style.display = 'block'; tip.style.left = Math.min(e.clientX - r.left + 8, r.width - 70) + 'px'; tip.textContent = fmt(t); };
   tl.onmouseleave = () => $('tlTip').style.display = 'none';
@@ -285,9 +287,12 @@ function renderChips(types) {
 }
 function renderSelection() {
   const s = $('tlSel');
-  if (state.inT != null && state.outT != null && state.outT > state.inT) { s.style.display = 'block'; s.style.left = pct(state.inT); s.style.width = pct(state.outT - state.inT); }
+  if (state.inT != null && state.outT != null && state.outT > state.inT) { s.style.display = 'block'; s.style.left = pct(state.inT); s.style.width = (state.outT - state.inT) / viewLen() * 100 + '%'; }
   else s.style.display = 'none';
   $('inVal').value = state.inT != null ? state.inT.toFixed(1) : ''; $('outVal').value = state.outT != null ? state.outT.toFixed(1) : '';
+  const has = state.inT != null && state.outT != null && state.outT > state.inT;
+  $('tRange').textContent = has ? `${fmt(state.inT)} → ${fmt(state.outT)} (${(state.outT - state.inT).toFixed(1)}s)` : '';
+  $('inBtn').classList.toggle('on', state.inT != null); $('outBtn').classList.toggle('on', state.outT != null);
 }
 function renderMarkers() {
   const cur = state.current; const box = $('markerList'); box.innerHTML = '';
@@ -307,7 +312,8 @@ function renderMarkers() {
     if (cl) cl.onclick = async e => { e.stopPropagation(); await exportAround(m); };
     box.appendChild(d);
   }
-  if (!box.children.length) box.innerHTML = '<div class="empty">no markers</div>';
+  const n = box.children.length; $('markersCount').textContent = n ? String(n) : '';
+  if (!n) box.innerHTML = '<div class="empty">no markers</div>';
 }
 
 // ------------------------------------------------------------------ export
@@ -354,19 +360,26 @@ async function exportBatch() {
 document.querySelectorAll('.tab').forEach(b => b.onclick = () => { document.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x === b)); state.tab = b.dataset.tab; refreshList(); });
 $('profileFilter').onchange = e => { state.profile = e.target.value; renderList(); };
 $('typeFilter').onchange = e => { state.typeFilter = e.target.value; renderTimeline(); renderMarkers(); };
-const rangeLen = () => Math.max(1, +$('rangeLen').value || 20);
+const rangeLen = () => Math.max(1, +$('rangeLen').value || 30);
 $('inBtn').onclick = () => {
   state.inT = currentT();
   if (state.outT == null || state.outT <= state.inT) state.outT = Math.min(state.total, state.inT + rangeLen());
   renderSelection();
 };
 $('outBtn').onclick = () => {
+  if (state.inT != null && Math.abs(currentT() - state.inT) < 0.5) return toast('move the playhead to where the range should end first', true);
   state.outT = currentT();
   if (state.inT == null || state.inT >= state.outT) state.inT = Math.max(0, state.outT - rangeLen());
   renderSelection();
 };
 $('goIn').onclick = () => { if (state.inT != null) seek(state.inT); };
-$('goOut').onclick = () => { if (state.outT != null) seek(state.outT); };
+// export panel: floats over the bottom of the video; the save icon toggles it, Escape or a click outside closes it
+const exportPop = $('exportPop');
+function showExportPop(on) { exportPop.hidden = !on; $('saveBtn').classList.toggle('on', on); if (on) $('exportLabel').focus(); }
+$('saveBtn').onclick = e => { e.stopPropagation(); showExportPop(exportPop.hidden); };
+exportPop.onclick = e => e.stopPropagation();
+exportPop.addEventListener('keydown', e => { if (e.key === 'Escape') { showExportPop(false); $('video').focus(); } });
+document.addEventListener('click', () => { if (!exportPop.hidden) showExportPop(false); });
 function playRange() {
   if (state.inT == null || state.outT == null || state.outT <= state.inT) return toast('set in and out points first', true);
   seek(state.inT);
@@ -377,6 +390,14 @@ $('inVal').onchange = e => { state.inT = +e.target.value; renderSelection(); };
 $('outVal').onchange = e => { state.outT = +e.target.value; renderSelection(); };
 $('exportBtn').onclick = exportRange;
 $('batchBtn').onclick = exportBatch;
+// markers pane: collapse to a thin strip, remembered across reloads
+(() => {
+  const layout = document.querySelector('.layout'), btn = $('markersToggle');
+  const apply = on => { layout.classList.toggle('markers-collapsed', on); btn.setAttribute('aria-expanded', String(!on)); btn.title = on ? 'expand markers' : 'collapse markers'; };
+  const toggle = () => { const on = !layout.classList.contains('markers-collapsed'); localStorage.setItem('markersCollapsed', on ? '1' : '0'); apply(on); };
+  btn.onclick = toggle; $('markersTab').onclick = toggle;
+  apply(localStorage.getItem('markersCollapsed') === '1');
+})();
 $('uCpuWrap').onclick = () => { localStorage.setItem('cpuPerCore', localStorage.getItem('cpuPerCore') === '1' ? '0' : '1'); refreshStatus(); };
 // on/off switch: off opens a menu of durations, on resumes at once
 (() => {
@@ -448,14 +469,14 @@ $('video').addEventListener('timeupdate', () => {
     if (e.ctrlKey || e.metaKey) setZoom(state.zoom * (e.deltaY < 0 ? 1.25 : 0.8), xToT(e.clientX));
     else { state.viewStart += (e.deltaY || e.deltaX) / 100 * viewLen() * 0.1; clampView(); renderTimeline(); }
   }, { passive: false });
-  $('zoomIn').onclick = () => setZoom(state.zoom * 1.5, currentT());
-  $('zoomOut').onclick = () => setZoom(state.zoom / 1.5, currentT());
+  $('zoomIn').onclick = () => setZoom(state.zoom * 1.5, currentT(), true);
+  $('zoomOut').onclick = () => setZoom(state.zoom / 1.5, currentT(), true);
   $('zoomFit').onclick = () => setZoom(1);
   window.transport = { nudge, toggle, jumpMarker };
 })();
 // drag the in/out handles
 (() => {
-  let drag = null, grabOffset = 0;
+  let drag = null, grabOffset = 0, dragged = false;
   document.querySelectorAll('.tl-sel .handle').forEach(h => h.addEventListener('mousedown', e => { e.stopPropagation(); e.preventDefault(); drag = h.dataset.h; }));
   $('tlSel').addEventListener('mousedown', e => {
     if (e.target.classList.contains('handle')) return;
@@ -464,6 +485,7 @@ $('video').addEventListener('timeupdate', () => {
   });
   window.addEventListener('mousemove', e => {
     if (!drag) return;
+    dragged = true;
     const t = Math.min(state.total, Math.max(0, xToT(e.clientX)));
     if (drag === 'in') state.inT = Math.min(t, state.outT ?? t);
     else if (drag === 'out') state.outT = Math.max(t, state.inT ?? t);
@@ -475,6 +497,8 @@ $('video').addEventListener('timeupdate', () => {
     renderSelection();
   });
   window.addEventListener('mouseup', () => { drag = null; $('tlSel').classList.remove('dragging'); });
+  // the click that follows a drag lands on the timeline, not the handle: swallow it
+  $('timeline').addEventListener('click', e => { if (dragged) { dragged = false; e.stopImmediatePropagation(); e.preventDefault(); } }, true);
   $('tlSel').addEventListener('click', e => e.stopPropagation());
 })();
 document.addEventListener('keydown', e => {
@@ -489,16 +513,17 @@ document.addEventListener('keydown', e => {
     case 'ArrowDown': e.preventDefault(); v.volume = Math.max(0, v.volume - 0.05); break;
     case '[': jumpMarker(-1); break; case ']': jumpMarker(1); break;
     case 'f': $('tFull').click(); break;
-    case '+': case '=': setZoom(state.zoom * 1.5, currentT()); break;
-    case '-': setZoom(state.zoom / 1.5, currentT()); break;
+    case '+': case '=': setZoom(state.zoom * 1.5, currentT(), true); break;
+    case '-': setZoom(state.zoom / 1.5, currentT(), true); break;
     case '0': setZoom(1); break;
     case 'j': nudge(-10); break; case 'l': nudge(10); break;
     case ',': nudge(-1 / 60); break; case '.': nudge(1 / 60); break;
     case 'i': $('inBtn').click(); break; case 'o': $('outBtn').click(); break;
-    case 'I': $('goIn').click(); break; case 'O': $('goOut').click(); break;
+    case 'I': $('goIn').click(); break;
+    case 'Escape': if (!exportPop.hidden) showExportPop(false); break;
     case 'p': playRange(); break;
     case 'm': $('markBtn').click(); break;
-    case 'e': exportRange(); break;
+    case 'e': if (exportPop.hidden) showExportPop(true); else exportRange(); break;
   }
 });
 

@@ -23,22 +23,24 @@ dropped; markers and clips remain), starred, expiring.
 - Timeline sessions play through hls.js, including the live one, a few seconds behind. Buffer
   sessions show their clips as bands on the bar; clicking inside a band plays that clip at the right
   offset. Hatched areas have no footage.
-- Transport bar: previous marker, back 10 s, play/pause, forward 10 s, next marker, clock, mute,
-  volume, fullscreen.
+- Transport bar: previous marker, back 10 s, play/pause, forward 10 s, next marker, clock, then the
+  range tools (set in, set out, jump to in, play range, the current range, and the save icon that
+  opens the export panel), mute, volume, fullscreen.
 - The bar: ruler, markers colour-coded by type, playhead, window (purged part hatched). Click to
-  seek. Ctrl+wheel zooms around the cursor, wheel pans, `+`/`-`/`0` from the keyboard. The view
+  seek. Ctrl+wheel zooms around the mouse, wheel pans; the zoom buttons and `+`/`-`/`0` zoom centred on the playhead. The view
   follows the playhead while playing.
-- **In/out**: *Set in* takes the timeline cursor and sets out to in + the `len` box (20 s default);
-  *Set out* the other way round. Drag the handles or the whole range. `▶ range` plays in to out and
-  pauses at out; `⇤`/`⇥` jump to in/out.
-- **Export range** writes a clip (stream copy, or frame-exact re-encode with the box ticked).
-  **Around marker** (✂ on a marker) uses the before/after boxes. **Export all** does every marker
-  of one type.
+- **In/out**: *set in* takes the playhead and sets out to in + the `len` box (30 s default);
+  *set out* the other way round. Drag the handles or the whole range. *Play range* plays in to out
+  and pauses at out; *jump to in* seeks to in.
+- **Export panel** (save icon, or `E`): the in/out numbers, `len`, a clip label, and *Export range*,
+  which writes a clip (stream copy, or frame-exact re-encode with the box ticked). Its lower row is
+  **around markers**: the before/after boxes used by ✂ on a marker, and *Export all* for every marker
+  of one type. Escape or a click outside closes the panel.
 - Markers pane: chips per type with counts, star toggle, click to seek. In a live buffer session a
   mark whose clip is not written yet reads "clip pending".
 
 Keys: space, ←/→ 5 s, shift+←/→ 30 s, J/L 10 s, `,`/`.` one frame, `[`/`]` markers, I/O set
-in/out, shift+I/O jump, P play range, E export, M mark, F fullscreen, +/−/0 zoom.
+in/out, shift+I jump to in, P play range, E export panel / export, M mark, F fullscreen, +/−/0 zoom.
 
 ## Settings
 
