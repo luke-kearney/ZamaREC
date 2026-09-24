@@ -3,8 +3,8 @@ namespace Kairec.Core.Config;
 public static class DefaultConfig
 {
     public const string Toml = """
-        # Kairec configuration. Restart the daemon after editing:
-        #   systemctl --user restart kairec
+        # Kairec configuration. After editing by hand run:
+        #   kairec reload      (or use Settings in the web UI)
 
         [storage]
         root = "~/Videos/kairec"          # sessions/ and clips/ live under here
