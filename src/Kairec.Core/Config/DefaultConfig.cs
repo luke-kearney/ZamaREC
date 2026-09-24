@@ -11,12 +11,10 @@ public static class DefaultConfig
 
         [capture]
         monitor = "DP-1"                  # gpu-screen-recorder --list-monitors
-        fps = 60
-        codec = "h264"                    # h264 | hevc | av1. h264 plays in every browser.
-        bitrate_kbps = 20000              # constant bitrate; 20000 is ~9 GB per hour
-        keyframe_seconds = 1.0            # clips are cut on keyframes
+        quality = "high"                  # default preset (see [[quality]]); profiles may pick another
         audio = ["default_output"]        # add "default_input" to record the microphone
         cursor = false
+        # fps / codec / bitrate_kbps / keyframe_seconds may still be set here; presets fall back to them.
 
         # Two capture modes, chosen per profile:
         #   timeline  a rolling window of the last N minutes on disk. Scrub and export from anywhere
@@ -68,19 +66,23 @@ public static class DefaultConfig
         [[quality]]
         name = "low"
         fps = 30
+        codec = "h264"
         bitrate_kbps = 6000
         scale = "1280x720"
         [[quality]]
         name = "medium"
         fps = 60
+        codec = "h264"
         bitrate_kbps = 12000
         [[quality]]
         name = "high"
         fps = 60
-        bitrate_kbps = 20000
+        codec = "h264"                    # h264 plays in every browser; hevc/av1 are smaller but Firefox will not play them
+        bitrate_kbps = 20000              # ~9 GB per hour
         [[quality]]
         name = "ultra"
         fps = 60
+        codec = "h264"
         bitrate_kbps = 35000
 
         [[profiles]]
@@ -88,7 +90,6 @@ public static class DefaultConfig
         match = "^cs2$"                   # regex on the process name
         mode = "timeline"
         events = "cs2-gsi"
-        quality = "high"
         timeline.window_minutes = 120
 
         [[profiles]]

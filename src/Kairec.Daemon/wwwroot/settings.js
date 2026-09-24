@@ -17,17 +17,22 @@
     const audioKnown = new Set(meta.audioDevices.map(a => a.id));
     const audioExtra = c.capture.audio.filter(a => !audioKnown.has(a));
 
-    let h = `<div class="settings-cols"><div class="col left"><div class="card"><h3>Capture</h3><div class="help">Applies to every profile. The recorder always uses the GPU encoder.</div><div class="fields">
-      ${field('monitor', sel('capture.monitor', c.capture.monitor, monitors))}
-      ${field('fps', inp('capture.fps', c.capture.fps, 'number', 'min="10" max="240"'))}
-      ${field('codec', sel('capture.codec', c.capture.codec, meta.codecs.map(x => ({ v: x, l: x + (x === 'h264' ? ' (plays in every browser)' : '') }))))}
-      ${field('bitrate kbps', inp('capture.bitrateKbps', c.capture.bitrateKbps, 'number', 'min="1000" step="500"'))}
-      ${field('keyframe seconds', inp('capture.keyframeSeconds', c.capture.keyframeSeconds, 'number', 'min="0.5" step="0.5"'))}
+    const presetOpts = (c.quality || []).map(q => ({ v: q.name, l: `${q.name} · ${q.fps ?? c.capture.fps} fps · ${q.bitrateKbps ?? c.capture.bitrateKbps} kbps${q.scale ? ' · ' + q.scale : ''}` }));
+    const audioGroup = a => a.id.startsWith('default_') ? 'defaults' : a.id.startsWith('app') ? 'apps' : a.id.includes('.monitor') || a.id.includes('sink') ? 'what you hear (outputs)' : 'microphones and inputs';
+    const groups = ['defaults', 'what you hear (outputs)', 'microphones and inputs', 'apps'];
+    const audioHtml = groups.map(g => {
+      const devs = meta.audioDevices.filter(a => audioGroup(a) === g);
+      if (!devs.length) return '';
+      return `<div class="agroup"><div class="alabel">${g}</div><div class="achips">${devs.map(a => `<button type="button" class="achip ${c.capture.audio.includes(a.id) ? 'on' : ''}" data-audio="${a.id}" title="${a.id}"><span class="dot"></span>${a.id === 'default_output' ? 'Default output' : a.id === 'default_input' ? 'Default input (mic)' : a.description}</button>`).join('')}</div></div>`;
+    }).join('');
+    let h = `<div class="settings-cols"><div class="col left"><div class="card"><h3>Capture</h3><div class="help">Applies to every profile. Encoder settings live in the presets below; the recorder always uses the GPU encoder.</div><div class="fields">
+      ${field('monitor', sel('capture.monitor', c.capture.monitor, monitors), false, 'the screen the game runs on')}
+      ${field('default quality preset', sel('capture.quality', c.capture.quality ?? '', [{ v: '', l: '(built-in defaults: 60 fps h264 20000 kbps)' }, ...presetOpts]), false, 'used by every profile that does not pick its own')}
       ${field('show cursor', chk('capture.cursor', c.capture.cursor))}
-      <div class="field wide"><span>audio sources</span><div class="audio-list">
-        ${meta.audioDevices.map(a => `<label><input type="checkbox" data-audio="${a.id}" ${c.capture.audio.includes(a.id) ? 'checked' : ''}> ${a.description} <code>${a.id}</code></label>`).join('')}
+      <div class="field wide"><span>audio sources</span><small class="hint">pick what goes into the recording. "Default output" is the game audio; add the mic if you want your voice</small>
+        ${audioHtml}
         <label class="other"><span class="muted">other, comma separated (e.g. app:cs2)</span><input type="text" id="audioExtra" value="${audioExtra.join(', ')}"></label>
-      </div></div>
+      </div>
     </div></div>`;
 
     h += `<div class="card"><h3>Defaults</h3><div class="help">Used by every profile unless the profile overrides the value.</div><div class="fields">
@@ -55,9 +60,9 @@
     </div></div>`;
 
     h += `<div class="card"><h3>Quality presets <span class="spacer"></span><button class="btn small" id="addQuality">+ Add preset</button></h3>
-      <div class="help">Encoder settings a profile can pick. Blank fields use the capture values above. Scale limits the output size, e.g. 1280x720.</div>
+      <div class="help">Encoder settings. Blank fields mean 60 fps, h264, 20000 kbps, 1 s keyframes. Scale limits the output size, e.g. 1280x720. h264 plays in every browser.</div>
       <div class="qgrid"><div class="qh">name</div><div class="qh">fps</div><div class="qh">codec</div><div class="qh">bitrate kbps</div><div class="qh">keyframe s</div><div class="qh">scale</div><div class="qh">≈ GB/h</div><div class="qh"></div>
-      ${(c.quality || []).map((q, i) => `<input type="text" data-path="quality.${i}.name" value="${q.name ?? ''}"><input type="number" data-path="quality.${i}.fps" value="${q.fps ?? ''}" placeholder="${c.capture.fps}"><select data-path="quality.${i}.codec"><option value="" ${!q.codec ? 'selected' : ''}>(capture)</option>${meta.codecs.map(x => `<option ${q.codec === x ? 'selected' : ''}>${x}</option>`).join('')}</select><input type="number" data-path="quality.${i}.bitrateKbps" value="${q.bitrateKbps ?? ''}" placeholder="${c.capture.bitrateKbps}" step="500"><input type="number" data-path="quality.${i}.keyframeSeconds" value="${q.keyframeSeconds ?? ''}" placeholder="${c.capture.keyframeSeconds}" step="0.5"><input type="text" data-path="quality.${i}.scale" value="${q.scale ?? ''}" placeholder="native"><span class="mono muted qrate" data-qrate="${i}"></span><button class="tiny" data-delq="${i}" title="remove preset">✕</button>`).join('')}
+      ${(c.quality || []).map((q, i) => `<input type="text" data-path="quality.${i}.name" value="${q.name ?? ''}"><input type="number" data-path="quality.${i}.fps" value="${q.fps ?? ''}" placeholder="60"><select data-path="quality.${i}.codec"><option value="" ${!q.codec ? 'selected' : ''}>(capture)</option>${meta.codecs.map(x => `<option ${q.codec === x ? 'selected' : ''}>${x}</option>`).join('')}</select><input type="number" data-path="quality.${i}.bitrateKbps" value="${q.bitrateKbps ?? ''}" placeholder="20000" step="500"><input type="number" data-path="quality.${i}.keyframeSeconds" value="${q.keyframeSeconds ?? ''}" placeholder="1" step="0.5"><input type="text" data-path="quality.${i}.scale" value="${q.scale ?? ''}" placeholder="native"><span class="mono muted qrate" data-qrate="${i}"></span><button class="tiny" data-delq="${i}" title="remove preset">✕</button>`).join('')}
       </div></div>`;
     h += `</div><div class="col right">`;
     h += `<div class="card"><h3>Profiles <span class="spacer"></span><button class="btn small" id="addProfile">+ Add profile</button></h3>
@@ -111,6 +116,7 @@
     });
     applyModes();
     document.querySelectorAll('.profile [data-path$=".mode"]').forEach(sel => sel.addEventListener('change', applyModes));
+    document.querySelectorAll('.achip').forEach(b => b.onclick = () => { b.classList.toggle('on'); updateFootprints(); });
     $('addQuality').onclick = () => { collect(); (cfg.quality ||= []).push({ name: '', fps: null, codec: null, bitrateKbps: null, keyframeSeconds: null, scale: null }); render(); };
     document.querySelectorAll('[data-delq]').forEach(b => b.onclick = () => { collect(); cfg.quality.splice(+b.dataset.delq, 1); render(); });
     $('addProfile').onclick = () => { collect(); openProfiles.add(`#${cfg.profiles.length}`); cfg.profiles.push({ name: '', match: '', matchCmdline: null, mode: 'timeline', events: 'none', fps: null, timeline: null, buffer: null, clips: null, retention: null }); render(); };
@@ -155,13 +161,14 @@
   function updateFootprints() {
     const val = path => { const el = document.querySelector(`#cfgForm [data-path="${path}"]`); return el ? (el.type === 'checkbox' ? el.checked : el.value) : ''; };
     const numv = (path, fallback) => { const v = val(path); return v === '' || v == null ? fallback : +v; };
-    const capKbps = numv('capture.bitrateKbps', cfg.capture.bitrateKbps);
+    const presetKbps = name => { const qi = (cfg.quality || []).findIndex(q => q.name === name); return qi >= 0 ? numv(`quality.${qi}.bitrateKbps`, cfg.capture.bitrateKbps) : null; };
+    const capKbps = presetKbps(val('capture.quality')) ?? cfg.capture.bitrateKbps;
     document.querySelectorAll('[data-qrate]').forEach(el => { const k = numv(`quality.${el.dataset.qrate}.bitrateKbps`, capKbps); el.textContent = (k * 450 / 1e6).toFixed(1); });
     document.querySelectorAll('.footprint').forEach(el => {
       const i = el.dataset.fp, P = `profiles.${i}.`;
       const mode = val(P + 'mode');
       const qn = val(P + 'quality'); let kbps = capKbps;
-      if (qn) { const qi = (cfg.quality || []).findIndex(q => q.name === qn); if (qi >= 0) kbps = numv(`quality.${qi}.bitrateKbps`, capKbps); }
+      if (qn) kbps = presetKbps(qn) ?? capKbps;
       const perHour = kbps * 1000 / 8 * 3600;
       let need = 0, where = '', note = '', avail = 0, ok = true;
       if (mode === 'buffer') {
@@ -195,7 +202,7 @@
       if (path.endsWith('eventClips')) v = (v || '').split(',').map(x => x.trim()).filter(Boolean);
       setPath(cfg, path, v);
     });
-    const audio = [...document.querySelectorAll('#cfgForm [data-audio]')].filter(x => x.checked).map(x => x.dataset.audio);
+    const audio = [...document.querySelectorAll('#cfgForm .achip.on')].map(x => x.dataset.audio);
     ($('audioExtra').value || '').split(',').map(s => s.trim()).filter(Boolean).forEach(a => audio.push(a));
     cfg.capture.audio = audio;
     if (cfg.quality) { for (const q of cfg.quality) for (const k of Object.keys(q)) if (q[k] === '') q[k] = null; cfg.quality = cfg.quality.filter(q => q.name); }

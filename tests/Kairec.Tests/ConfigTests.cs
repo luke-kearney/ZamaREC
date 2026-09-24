@@ -19,7 +19,7 @@ public class ConfigTests
         Assert.Equal(120, cs2.WindowMinutes);
         Assert.Equal(5, cs2.SegmentSeconds);
         Assert.Equal("disk", cs2.TimelineStorage);
-        Assert.Equal("high", cs2.QualityName);
+        Assert.Equal("high", cs2.QualityName);   // via capture.quality
         Assert.Equal(20000, cs2.BitrateKbps);
         Assert.Equal(4, cfg.Quality.Count);
         Assert.Equal(30, cs2.SaveSeconds);

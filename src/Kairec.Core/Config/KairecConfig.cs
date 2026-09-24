@@ -43,7 +43,7 @@ public sealed class KairecConfig
     /// <summary>Effective settings for a profile: profile overrides on top of the global defaults.</summary>
     public EffectiveProfile Effective(ProfileConfig p)
     {
-        var q = FindQuality(p.Quality);
+        var q = FindQuality(p.Quality) ?? FindQuality(Capture.Quality);
         return new()
         {
         Profile = p,
@@ -144,6 +144,8 @@ public sealed class CaptureConfig
 {
     /// <summary>Monitor name as printed by `gpu-screen-recorder --list-monitors`, or "screen" for the first one.</summary>
     public string Monitor { get; set; } = "screen";
+    /// <summary>Quality preset used by profiles that do not pick their own. Empty = the raw fps/codec/bitrate values below.</summary>
+    public string Quality { get; set; } = "high";
     public int Fps { get; set; } = 60;
     /// <summary>h264 | hevc | av1. h264 is the only one every browser plays.</summary>
     public string Codec { get; set; } = "h264";
@@ -322,6 +324,8 @@ public static class ConfigLoader
             if (string.IsNullOrWhiteSpace(p.Name)) throw new InvalidOperationException("Every [[profiles]] entry needs a name");
             if (!names.Add(p.Name)) throw new InvalidOperationException($"Duplicate profile name '{p.Name}'");
             if (p.Match is null && p.MatchCmdline is null) throw new InvalidOperationException($"Profile '{p.Name}' needs match or match_cmdline");
+            if (!string.IsNullOrEmpty(cfg.Capture.Quality) && cfg.FindQuality(cfg.Capture.Quality) is null)
+                throw new InvalidOperationException($"capture.quality: unknown preset '{cfg.Capture.Quality}' (known: {string.Join(", ", cfg.Quality.Select(q => q.Name))})");
             if (!string.IsNullOrEmpty(p.Quality) && cfg.FindQuality(p.Quality) is null)
                 throw new InvalidOperationException($"Profile '{p.Name}': unknown quality preset '{p.Quality}' (known: {string.Join(", ", cfg.Quality.Select(q => q.Name))})");
             var e = cfg.Effective(p);

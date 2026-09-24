@@ -79,7 +79,7 @@ kairec top                        live view until Ctrl+C: state, CPU/RAM of the 
 ## Quality presets
 
 `[[quality]]` entries bundle fps, codec, bitrate, keyframe interval and an optional output size
-limit. A profile picks one with `quality = "high"`; blank means the `[capture]` values. Four ship by
+limit. `capture.quality` names the default preset; a profile can pick another with `quality = "..."`. Four ship by
 default: low (720p30, 6 Mbps), medium (1080p60, 12 Mbps), high (20 Mbps), ultra (35 Mbps). Edit or
 add your own in Settings, which also shows each preset's GB per hour.
 
