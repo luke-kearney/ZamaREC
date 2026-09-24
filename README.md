@@ -1,146 +1,87 @@
 # kairec
 
-*kairec*, from *kairos* (καιρός), the opportune moment. A Linux session recorder for games, built around
-[gpu-screen-recorder](https://git.dec05eba.com/gpu-screen-recorder/): it records your play
-sessions on the GPU encoder, drops markers on game events and hotkeys, and lets you cut clips
-around them without re-encoding.
+*kairec*, from *kairos* (καιρός): the opportune moment.
 
-Designed for a KDE Plasma Wayland desktop with an Nvidia card, and for people who do not want
-a recorder that polls the GPU, pops notifications or steals focus.
+A Linux game session recorder with a marker timeline and clip export, built for people who want
+what Steam's game recording does, without Steam, without an overlay, and without anything that
+polls the GPU or steals focus from the game.
 
-## Modes (per game profile)
+- Records automatically when a profiled game starts, on the GPU encoder, via
+  [gpu-screen-recorder](https://git.dec05eba.com/gpu-screen-recorder/).
+- **Timeline mode** keeps a rolling window of the last N minutes you can scrub through any time,
+  even mid-session. **Buffer mode** keeps a ring buffer in RAM and writes nothing until you act.
+- Markers from a hotkey, the tray, the web UI, or CS2 itself (kills with the round count, deaths,
+  round results, MVPs, map changes) through Valve's Game State Integration.
+- Clips around markers and events, saves of the last N seconds, and range exports, all as stream
+  copies with no re-encode, or frame-exact on nvenc if you ask.
+- A web UI with a timeline, a settings page, stats and a log. A tray icon. A CLI.
+- No GPU/driver polling, no popups, no windows opened on their own. Feedback is sound only.
 
-| mode       | what happens                                                                                     |
-|------------|--------------------------------------------------------------------------------------------------|
-| `timeline` | a rolling window of the last N minutes on disk (default 2 h). Scrub and export from anywhere in the window, even mid-session. Older footage is deleted as you play, so disk use is bounded by the window, not by how long you play. |
-| `buffer`   | a ring buffer in RAM (or on disk). Nothing is written until you act. A mark dumps `mark_before_seconds` + `mark_after_seconds` around it into a clip; marks close together share one clip, and a mark whose before-window reaches back into the previous clip extends that clip instead of writing a second one. Mark clips expire after `mark_clip_expire_hours` unless starred. |
+Built and tested on CachyOS with KDE Plasma 6 on Wayland and an Nvidia card. Anything with
+systemd, PipeWire and a gpu-screen-recorder that works should be fine.
 
-A timeline can live in RAM instead: `timeline.storage = "ram"` puts the segments on tmpfs, so you
-get scrubbing with no disk writes. It needs window × bitrate of memory (60 min at 20 Mbps is 9 GB),
-the daemon refuses to start a session that would not fit, and the footage is dropped after
-`ram_keep_hours` or when the next session starts. Marks and clips are on disk as usual.
+## Quick start
 
-In timeline mode a mark can also write a clip around itself (`clips.mark_saves`), the same
-before/after window buffer mode uses. It is on by default for RAM timelines, so a marked moment is
-safe on disk even after the RAM footage is dropped, and off by default for disk timelines.
-
-`kairec save` works in both: it writes the last N seconds to a clip. Every clip carries its own
-markers so it can be opened in the timeline UI and cut down further.
-
-Timeline sessions are stored as 5-second MPEG-TS segments plus a playlist, so a crash loses at
-most a few seconds, and a "save" cuts across segments with a stream copy (no re-encode).
-
-## Install
-
-```
+```sh
+sudo pacman -S gpu-screen-recorder ffmpeg   # Arch / CachyOS; see docs for other distros
+git clone <this repo> && cd kairec
 ./install.sh
 ```
 
-Publishes the daemon to `~/.local/share/kairec/daemon`, the CLI to `~/.local/bin/kairec`,
-and enables the `kairec` systemd user service. The config is created at
-`~/.config/kairec/config.toml` on first start; edit it and `systemctl --user restart kairec`.
+`install.sh` publishes the daemon, the tray and the CLI under `~/.local`, installs the `kairec` and
+`kairec-tray` user services, and starts them. Then:
 
-Bind the hotkeys in *System Settings → Shortcuts → Custom Shortcuts → Command*:
+1. Open <http://127.0.0.1:3556>, go to **Settings**, check the monitor, and pick or adjust a profile.
+   The default config has a `cs2` profile in timeline mode and a `minecraft` profile in buffer mode.
+2. Bind two shortcuts in *System Settings → Keyboard → Shortcuts → Add New → Command*:
+   `~/.local/bin/kairec mark` and `~/.local/bin/kairec save`.
+3. Launch the game. You'll hear the start tone; the tray dot turns red. Press the mark key at a good
+   moment. Quit the game and open the session in the UI.
 
-- `~/.local/bin/kairec mark` – drop a marker
-- `~/.local/bin/kairec save` – save the last `save_seconds` from the buffer
+For CS2 events, restart CS2 once after installing so it loads the generated cfg file.
 
-## CLI
+## How it works, in one minute
 
-```
-kairec mark [label...]            drop a marker on the current session
-kairec save [--last 30s] [label]  save the last N seconds from the replay buffer
-kairec start [profile]            start a session manually
-kairec stop                       stop the current session
-kairec status                     show what the daemon is doing
-kairec log [-n 40] [kind]         recent events from the daemon's log
-kairec pause [session|2h|forever] turn auto recording off (stops the current session)
-kairec resume                     turn it back on; a running game is picked up at once
-kairec top                        live view until Ctrl+C: state, CPU/RAM of the daemon and
-                                  recorder, system load, storage and write rate (all from /proc)
-```
+Each **profile** is a game: a process name to watch for, a capture mode, a quality preset, and
+its own clip and retention settings.
 
-## Layout on disk
+- **Timeline mode** writes 5-second segments plus a playlist. Anything older than the window is
+  deleted as you play, so disk use is bounded by the window, not by how long you play. The whole
+  window is scrubbable in the UI while the game is running. With `timeline.storage = "ram"` the
+  segments live in tmpfs instead: no disk writes at all, at the cost of window × bitrate of memory.
+- **Buffer mode** is a RAM ring buffer. A mark writes a clip covering some minutes before and after
+  it; marks close together share one clip, and a mark shortly after a written clip extends it.
+- A **mark** is a timestamp on the session timeline, exact to the frame in timeline mode. Manual
+  marks come from the hotkey, tray or UI; automatic ones from CS2 events.
+- A **clip** is an MP4 in `~/Videos/kairec/clips/<profile>/` with a sidecar holding its own
+  markers, so it can be opened in the UI and cut down again.
+- **Retention** trims old and oversized sessions and clips per profile, never touching starred
+  clips, sessions with starred markers or clips, or the live session.
 
-```
-~/Videos/kairec/
-  sessions/2026-09-24_20-13-58_cs2_de_mirage/
-    live.m3u8                          playlist of the segments still in the window
-    live.m3u8.ts                       first-frame timestamp from the recorder
-    seg_000123.ts ...                  5 s segments
-    segments.json                      every segment ever seen, with its start offset
-    session.json                       profile, map, timings
-    markers.json                       markers with seconds-into-session
-  clips/cs2/
-    2026-09-24_20-20-08_clutch.mp4     from `kairec save`, a mark (buffer mode) or an export
-    2026-09-24_20-20-08_clutch.mp4.json  source, expiry, and the clip's own markers
-```
+## Documentation
 
-## Quality presets
+- [Configuration reference](docs/configuration.md): every key in `config.toml`, with defaults.
+- [Architecture](docs/architecture.md): components, data on disk, how timing and clips work.
+- [CLI](docs/cli.md): `kairec` commands and hotkey setup.
+- [Web UI](docs/web-ui.md): the timeline, editing, settings, stats and log.
+- [CS2 events](docs/cs2-gsi.md): what Game State Integration gives you and how it is used.
+- [HTTP API](docs/http-api.md): everything the UI talks to, for scripting.
+- [Troubleshooting](docs/troubleshooting.md): the things that go wrong and what they mean.
+- [Development](docs/development.md) and [CONTRIBUTING](CONTRIBUTING.md).
 
-`[[quality]]` entries bundle fps, codec, bitrate, keyframe interval and an optional output size
-limit. `capture.quality` names the default preset; a profile can pick another with `quality = "..."`. Four ship by
-default: low (720p30, 6 Mbps), medium (1080p60, 12 Mbps), high (20 Mbps), ultra (35 Mbps). Edit or
-add your own in Settings, which also shows each preset's GB per hour.
+## Requirements
 
-## CS2 events
-
-With `events = "cs2-gsi"` on a profile the daemon writes `gamestate_integration_kairec.cfg` into
-CS2's cfg folder (found through Steam's library list, or `gsi.cfg_dir`) and listens on
-`daemon.gsi_port`. CS2 reads the cfg at launch, so restart the game once after installing. Every
-kill (with the round count and headshot flag), death, round win or loss, MVP, and map start or end
-becomes a typed marker at the moment it arrived. Only payloads about *your* steamid count, so
-spectating never produces events. The map name is added to the session folder. `clips.event_clips`
-lists which events also write a clip, default a 2-kill round or better and an MVP.
-
-## Web UI
-
-Open <http://127.0.0.1:3556> in a browser (never opened automatically; nothing in kairec
-takes focus from a game). Sessions and clips on the left, player and timeline in the middle,
-markers on the right.
-
-- Timeline sessions play as HLS via hls.js, including a session that is still recording (a few
-  seconds behind). The greyed part of the bar is footage already purged from the window.
-- Click a marker or the bar to jump. `I`/`O` set the in/out points from the playhead,
-  `E` exports the range, `M` drops a marker, space pauses, arrows seek 5 s (shift: 30 s),
-  `,`/`.` step a frame.
-- "Clip around this marker" (✂) uses the before/after seconds; "Export all" does every marker
-  of one type. Exports are stream copies unless *frame-exact* is ticked, which re-encodes on nvenc.
-- A clip opens the same way and can be cut down again.
-- **Settings** (top right) edits the whole config: capture, defaults and profiles, with the
-  monitor and audio devices picked from what the recorder reports. Saves apply immediately, or
-  when the current session ends if one is running. A raw TOML editor sits behind the form.
-  `kairec reload` does the same for hand edits. Port changes still need a restart.
-
-## Retention
-
-A pass runs a minute after start and every ten minutes (`kairec retention` runs it now and lists
-what went). Per profile: mark clips past `mark_clip_expire_hours` go first, then anything older than
-`retention.max_days`, then, while sessions plus clips exceed `retention.max_gb`, the oldest
-unprotected item. Never deleted: starred clips, the live session, sessions with starred markers,
-and sessions whose clips are still on disk.
-
-## Tray icon
-
-`kairec-tray` is a StatusNotifierItem for Plasma (and anything else that speaks that protocol),
-installed as the `kairec-tray` user service. The dot is grey when idle, red while recording, amber
-when auto recording is off. Left click opens the web UI, middle click drops a marker, and the menu
-has the on/off durations, Mark, Save, Stop, Open web UI, Open clips folder. It talks to the daemon
-over the same socket as the CLI and never opens a window of its own. Plasma hides new tray icons
-until you promote them: right-click the tray → Configure System Tray → Entries.
-
-## Stats and log
-
-The UI has a **Stats** page (lifetime footage written to disk vs to RAM, clip bytes, counts, what the
-folders hold right now, and a per-session table) and a **Log** page (every session, mark, clip,
-export, purge and config change, filterable, live-tailing). The log is `~/.local/share/kairec/events.jsonl`,
-one JSON object per line; `kairec log [-n 40] [kind]` prints the tail from a terminal. Lifetime
-counters live in `stats.json` next to it, so they survive sessions being deleted.
+| what | why |
+|---|---|
+| Linux with systemd user sessions, PipeWire | services and audio capture |
+| gpu-screen-recorder 6.x | capture and GPU encoding (its `-ipc` and first-frame timestamp features) |
+| ffmpeg 6+ | clip export, probing; nvenc for frame-exact exports |
+| .NET 10 SDK | to build; the CLI is NativeAOT, so clang too |
+| a Wayland or X11 desktop with a StatusNotifier tray | for the tray icon, optional |
 
 ## Status
 
-- [x] phase a: daemon, profiles, timeline/buffer modes, auto start/stop, save, CLI, systemd
-- [x] phase b: CS2 game state integration markers (kills with count/HS, death, round result, MVP, map)
-- [~] phase c: export exists in the API/UI; CLI `export` command still to do
-- [x] phase d: web timeline (sessions, clips, live playback, markers, range/marker/batch export)
-- [x] phase e: retention (age, size cap, mark-clip expiry, starred/protected)
+Working: daemon, both capture modes, RAM timelines, hotkeys, CS2 events, web UI with timeline,
+settings, stats and log, tray icon, retention, quality presets. Still on the list: a CLI export
+command, real-match GSI fixtures, marker editing in the UI, and a licence and CI for a public
+release.

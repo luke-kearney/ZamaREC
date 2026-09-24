@@ -1,0 +1,104 @@
+# Architecture
+
+## Components
+
+```
+ game process ──▶ GameWatcherService ──▶ RecordingCoordinator ──▶ gpu-screen-recorder (child)
+                     (/proc scan)              │  state machine        │ KMS capture, NVENC
+                                               │                       ▼
+ kairec CLI / tray ──▶ ControlSocketServer ────┤              segments / RAM ring
+   (Unix socket)                               │
+ CS2 ──▶ POST /gsi ──▶ GsiService ─────────────┤
+                                               ▼
+ browser ──▶ Kestrel: static UI + /api ──▶ SessionCatalog, ClipExporter (ffmpeg), RetentionService
+```
+
+| project | role |
+|---|---|
+| `Kairec.Protocol` | request/response types for the control socket. No dependencies, AOT-safe |
+| `Kairec.Core` | config (TOML), sessions and markers, segment index, recorder wrapper and its IPC, process watcher, clip exporter, GSI parser and detector, telemetry, sounds |
+| `Kairec.Daemon` | the service: coordinator, watcher, socket, web API, GSI endpoint, retention, pause control, config hot reload, static web UI |
+| `Kairec.Cli` | `kairec`, NativeAOT so a hotkey costs milliseconds |
+| `Kairec.Tray` | StatusNotifierItem and dbusmenu over D-Bus |
+| `Kairec.Tests` | xunit: config, segment index, GSI detector over fixture payloads |
+
+The daemon runs as the `kairec` systemd user service, the tray as `kairec-tray`.
+
+## Capture
+
+The recorder is spawned per session with flags built in `GsrArguments.cs`, verified against
+gpu-screen-recorder 6.1's man page. It is driven over its `-ipc` JSON socket (`stop`,
+`save-replay`, `start/stop-replay-recording`). `-write-first-frame-ts` makes it write a file with
+the monotonic and wall-clock time of the first encoded frame; that is what makes marker times
+exact.
+
+- **Timeline mode** asks for HLS output: `-o live.m3u8` with `hls_time=<segment_seconds>`,
+  `hls_list_size=<window/segment>` and `delete_segments`, so ffmpeg's muxer prunes the window.
+  The daemon re-reads the playlist as it changes and keeps `segments.json`, an index of every
+  segment ever seen with its start offset from the first frame. That index survives the window
+  sliding and is what maps a marker time to a file and an offset.
+- **Buffer mode** asks for a replay buffer (`-r <seconds> -replay-storage ram|disk`). `save-replay`
+  dumps the last N seconds to an MP4.
+- **RAM timelines** are ordinary timelines whose media directory is under tmpfs. Metadata stays in
+  the session folder on disk. The coordinator refuses to start if window × bitrate exceeds the
+  tmpfs free space, and drops the footage after `ram_keep_hours` or when the next session starts.
+
+Nothing polls the GPU. The only periodic work while idle is a `/proc` directory scan once a second.
+
+## Timing
+
+Every marker records the monotonic clock at the moment it was requested, before any lock or I/O.
+Its position on the timeline is `t_mono - first_frame_mono`. In buffer mode there is no first-frame
+stamp (nothing is written until a save), so the session origin is the recorder spawn, and a clip's
+markers are placed as `duration - (save_time - mark_time)`, accurate to a few hundred milliseconds.
+
+The recorder writes a segment file only when it completes, so "save the last 30 s" waits for the
+segment covering "now" to close, at most `segment_seconds`.
+
+## Clips
+
+Everything in `clips/<profile>/` is an MP4 with a `.json` sidecar (`ClipInfo`): source (`mark`,
+`save`, `export`), the session and offset it came from, an expiry for mark clips, a starred flag,
+and its own marker list. The web UI opens a clip like a session and can cut it again.
+
+Mark clips: a mark schedules a job due `mark_after_seconds` later covering `[first mark - before,
+last mark + after]`. Marks arriving while a job is pending join it. A mark whose before-window
+reaches back into the last written clip extends that clip (both marks, one file, old file deleted)
+as long as the buffer or window still holds the earlier footage.
+
+Exports from a timeline concatenate segments with ffmpeg's concat demuxer. The demuxer cannot
+input-seek, so `-ss` is an output option, snapped down to a keyframe so the copy starts cleanly; the
+clip may begin up to one keyframe interval early. Frame-exact exports re-encode with `h264_nvenc`.
+
+## Data on disk
+
+```
+~/Videos/kairec/
+  sessions/<date>_<time>_<profile>[_<map>]/
+    session.json      profile, mode, timings, first-frame stamp, media_dir for RAM sessions
+    markers.json      markers with t_video (seconds into the session)
+    segments.json     the segment index (timeline mode)
+    live.m3u8, live.m3u8.ts, seg_NNNNNN.ts   (timeline mode, disk storage)
+    gsi.jsonl         raw CS2 payloads (if gsi.capture_raw)
+  clips/<profile>/<date>_<time>[_label].mp4 (+ .json sidecar)
+~/.local/share/kairec/
+  events.jsonl      the event log     stats.json   lifetime counters
+  gsi-token         the GSI shared secret          pause.json   pause state
+  sounds/           generated tones
+~/.config/kairec/config.toml
+$XDG_RUNTIME_DIR/kairec.sock, kairec-gsr.sock
+```
+
+## Control paths
+
+The CLI and tray talk newline-delimited JSON over `$XDG_RUNTIME_DIR/kairec.sock`
+(`KAIREC_SOCKET` overrides it). The web UI and any script use the HTTP API on `daemon.ui_port`.
+CS2 posts to `/gsi` on `daemon.gsi_port` with a token from the generated cfg.
+
+## Constraints the design keeps
+
+- No periodic GPU, NVML or driver queries anywhere. The header's CPU/RAM figures and `kairec top`
+  read `/proc` only.
+- Nothing opens a window or takes focus. The tray and UI only launch a browser on a click.
+- The GPU encoder is the only encoder; CPU fallback is disabled.
+- Hotkeys are the desktop's own global shortcuts running the CLI, not key grabbing.
