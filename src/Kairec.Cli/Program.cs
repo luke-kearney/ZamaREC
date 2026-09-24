@@ -56,7 +56,7 @@ switch (req.Cmd)
     }
     case "resume" or "on":
         req.Cmd = "resume"; break;
-    case "stop" or "reload" or "config":
+    case "stop" or "reload" or "config" or "retention":
         break;
     default:
         Console.Error.WriteLine($"unknown command '{req.Cmd}'");
@@ -100,6 +100,7 @@ static int Usage(int code = 0)
           kairec resume                     turn it back on
           kairec top                        live view: state, CPU/RAM of daemon + recorder, storage (Ctrl+C)
           kairec log [-n 40] [kind]         recent events (session, mark, clip, export, purge, config, error)
+          kairec retention                  run the retention pass now and list what it removed
           kairec reload                     re-read the config file after editing it by hand
           kairec config                     print the config file path
         """);

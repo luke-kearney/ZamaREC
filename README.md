@@ -13,7 +13,7 @@ a recorder that polls the GPU, pops notifications or steals focus.
 | mode       | what happens                                                                                     |
 |------------|--------------------------------------------------------------------------------------------------|
 | `timeline` | a rolling window of the last N minutes on disk (default 2 h). Scrub and export from anywhere in the window, even mid-session. Older footage is deleted as you play, so disk use is bounded by the window, not by how long you play. |
-| `buffer`   | a ring buffer in RAM (or on disk). Nothing is written until you act. A mark dumps `mark_before_seconds` + `mark_after_seconds` around it into a clip; marks close together share one clip. Mark clips expire after `mark_clip_expire_hours` unless starred. |
+| `buffer`   | a ring buffer in RAM (or on disk). Nothing is written until you act. A mark dumps `mark_before_seconds` + `mark_after_seconds` around it into a clip; marks close together share one clip, and a mark whose before-window reaches back into the previous clip extends that clip instead of writing a second one. Mark clips expire after `mark_clip_expire_hours` unless starred. |
 
 A timeline can live in RAM instead: `timeline.storage = "ram"` puts the segments on tmpfs, so you
 get scrubbing with no disk writes. It needs window × bitrate of memory (60 min at 20 Mbps is 9 GB),
@@ -105,6 +105,14 @@ markers on the right.
   when the current session ends if one is running. A raw TOML editor sits behind the form.
   `kairec reload` does the same for hand edits. Port changes still need a restart.
 
+## Retention
+
+A pass runs a minute after start and every ten minutes (`kairec retention` runs it now and lists
+what went). Per profile: mark clips past `mark_clip_expire_hours` go first, then anything older than
+`retention.max_days`, then, while sessions plus clips exceed `retention.max_gb`, the oldest
+unprotected item. Never deleted: starred clips, the live session, sessions with starred markers,
+and sessions whose clips are still on disk.
+
 ## Tray icon
 
 `kairec-tray` is a StatusNotifierItem for Plasma (and anything else that speaks that protocol),
@@ -128,4 +136,4 @@ counters live in `stats.json` next to it, so they survive sessions being deleted
 - [x] phase b: CS2 game state integration markers (kills with count/HS, death, round result, MVP, map)
 - [~] phase c: export exists in the API/UI; CLI `export` command still to do
 - [x] phase d: web timeline (sessions, clips, live playback, markers, range/marker/batch export)
-- [ ] phase e: retention (clip caps, mark-clip expiry, starred), polish
+- [x] phase e: retention (age, size cap, mark-clip expiry, starred/protected)

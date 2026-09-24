@@ -13,11 +13,12 @@ public sealed class ControlSocketServer : BackgroundService
     private readonly ConfigService _configService;
     private readonly GsiService _gsi;
     private readonly PauseControl _pause;
+    private readonly RetentionService _retention;
     private readonly ILogger<ControlSocketServer> _log;
 
-    public ControlSocketServer(RecordingCoordinator rec, Core.Config.KairecConfig cfg, ConfigService configService, GsiService gsi, PauseControl pause, ILogger<ControlSocketServer> log)
+    public ControlSocketServer(RecordingCoordinator rec, Core.Config.KairecConfig cfg, ConfigService configService, GsiService gsi, PauseControl pause, RetentionService retention, ILogger<ControlSocketServer> log)
     {
-        _rec = rec; _cfg = cfg; _configService = configService; _gsi = gsi; _pause = pause; _log = log;
+        _rec = rec; _cfg = cfg; _configService = configService; _gsi = gsi; _pause = pause; _retention = retention; _log = log;
     }
 
     protected override async Task ExecuteAsync(CancellationToken ct)
@@ -86,6 +87,12 @@ public sealed class ControlSocketServer : BackgroundService
             case "resume":
                 _pause.Resume();
                 return new ControlResponse { Ok = true, Message = "recording on; a running game will be picked up within a second" };
+            case "retention":
+            {
+                var r = _retention.RunNow();
+                var msg = $"removed {r.ClipsDeleted} clips and {r.SessionsDeleted} sessions, {r.BytesFreed / 1e9:0.00} GB freed" + (r.Details.Count > 0 ? "\n  " + string.Join("\n  ", r.Details) : "");
+                return new ControlResponse { Ok = true, Message = msg };
+            }
             case "reload":
             {
                 try

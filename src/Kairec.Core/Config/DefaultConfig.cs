@@ -48,10 +48,11 @@ public static class DefaultConfig
         cfg_dir = ""                      # CS2's csgo/cfg folder; empty = find it via Steam. CS2 reads the cfg at launch.
         capture_raw = true                # keep every payload in the session folder (gsi.jsonl)
 
-        [retention]                       # applies to clips; profiles override under retention.*
-        max_gb = 100
-        max_days = 30
-        # Starred clips are never deleted.
+        [retention]                       # per profile, sessions + clips; profiles override under retention.*
+        max_gb = 100                      # over this, the oldest unprotected item goes first
+        max_days = 30                     # older than this goes. 0 = no limit
+        # Never deleted: starred clips, the live session, sessions with starred markers or with clips on disk.
+        # Mark clips additionally expire after clips.mark_clip_expire_hours.
 
         [feedback]
         sound = true                      # short tone on mark/save. Never a popup, never focus.

@@ -31,6 +31,8 @@ builder.Services.AddSingleton<PauseControl>();
 builder.Services.AddSingleton<SessionCatalog>();
 builder.Services.AddHostedService<GameWatcherService>();
 builder.Services.AddHostedService<ControlSocketServer>();
+builder.Services.AddSingleton<RetentionService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<RetentionService>());
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase);
 
 var app = builder.Build();

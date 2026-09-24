@@ -31,8 +31,10 @@ public sealed class RecordingCoordinator : IAsyncDisposable
         public required string Trigger { get; init; }
         public int? GamePid { get; init; }
         public SegmentIndex? Segments { get; init; }
-        /// <summary>Buffer mode: marks waiting for their "after" time before the buffer is dumped.</summary>
+        /// <summary>Marks waiting for their "after" time before the clip is written.</summary>
         public MarkJob? Pending { get; set; }
+        /// <summary>The most recent mark clip written, so a mark shortly after can extend it instead of overlapping it.</summary>
+        public WrittenClip? LastMarkClip { get; set; }
     }
 
     private sealed class MarkJob
@@ -41,7 +43,11 @@ public sealed class RecordingCoordinator : IAsyncDisposable
         public long LastMarkMonoUs;
         public long DueMonoUs;
         public List<Marker> Marks = new();
+        /// <summary>A clip already on disk that this job supersedes (its marks are included, its file is deleted on write).</summary>
+        public WrittenClip? Replaces;
     }
+
+    private sealed record WrittenClip(string Path, long FirstMarkMonoUs, long StartMonoUs, long EndMonoUs, List<Marker> Marks);
 
     private readonly ConfigService _configService;
     private readonly EventLog _events;
@@ -255,7 +261,25 @@ public sealed class RecordingCoordinator : IAsyncDisposable
             var capacity = p.Mode == CaptureMode.Buffer ? p.BufferMinutes * 60 : (p.WindowMinutes > 0 ? p.WindowMinutes * 60 : int.MaxValue);
             if (span > capacity) { await FlushMarkJobAsync(a, "buffer full", ct); job = null; }
         }
-        if (job is null) { job = new MarkJob { FirstMarkMonoUs = tMono }; a.Pending = job; }
+        if (job is null)
+        {
+            job = new MarkJob { FirstMarkMonoUs = tMono };
+            // Does this mark's before-window reach back into the clip we just wrote? Then grow that clip instead
+            // of writing a second, overlapping one, provided the footage it started with is still available.
+            if (a.LastMarkClip is { } prev && tMono - (long)p.MarkBeforeSeconds * 1_000_000 <= prev.EndMonoUs)
+            {
+                var holdSeconds = (tMono - prev.StartMonoUs) / 1e6 + p.MarkAfterSeconds;
+                var stillHave = p.Mode == CaptureMode.Buffer ? holdSeconds <= p.BufferMinutes * 60 : (p.WindowMinutes <= 0 || holdSeconds <= p.WindowMinutes * 60);
+                if (stillHave)
+                {
+                    job.FirstMarkMonoUs = prev.FirstMarkMonoUs;
+                    job.Marks.AddRange(prev.Marks);
+                    job.Replaces = prev;
+                    _log.LogInformation("mark overlaps the previous clip {file}; it will be extended", Path.GetFileName(prev.Path));
+                }
+            }
+            a.Pending = job;
+        }
         job.LastMarkMonoUs = tMono;
         job.DueMonoUs = tMono + (long)p.MarkAfterSeconds * 1_000_000;
         job.Marks.Add(m);
@@ -387,6 +411,18 @@ public sealed class RecordingCoordinator : IAsyncDisposable
             var first = a.Session.ToVideoTime(job.FirstMarkMonoUs) ?? end;
             r = await ExportFromTimelineAsync(a, Math.Max(0, first - p.MarkBeforeSeconds), end, label, "mark", job, now, ct);
         }
+        if (r.Ok && _lastWritten is { } written)
+        {
+            a.LastMarkClip = new WrittenClip(written, job.FirstMarkMonoUs, job.FirstMarkMonoUs - (long)p.MarkBeforeSeconds * 1_000_000, now, job.Marks.ToList());
+            if (job.Replaces is { } old && old.Path != written)
+            {
+                try { File.Delete(old.Path); File.Delete(old.Path + ".json"); } catch (Exception ex) { _log.LogDebug(ex, "replace"); }
+                a.Session.Info.Clips.Remove(Path.GetFileName(old.Path));
+                a.Session.Save();
+                _events.Write("clip", $"clip extended: {Path.GetFileName(old.Path)} replaced by {Path.GetFileName(written)}", a.Profile.Name, a.Session.Info.Id, Path.GetFileName(written));
+            }
+        }
+        _lastWritten = null;
         // Clip written in the background: silent. You already heard the mark itself if you pressed it.
     }
 
@@ -495,8 +531,11 @@ public sealed class RecordingCoordinator : IAsyncDisposable
         return s;
     }
 
+    private string? _lastWritten;
+
     private void RecordClip(string source, string path, double? duration, Active a)
     {
+        _lastWritten = path;
         long bytes = 0; try { bytes = new FileInfo(path).Length; } catch { }
         _stats.Update(c => { c.Clips++; c.ClipBytes += bytes; if (source == "save") c.Saves++; });
         _events.Write("clip", $"{(source == "mark" ? "mark clip" : source == "save" ? "save" : "export")} written: {duration ?? 0:0.0}s, {bytes / 1e6:0.0} MB", a.Profile.Name, a.Session.Info.Id, Path.GetFileName(path), bytes, duration);

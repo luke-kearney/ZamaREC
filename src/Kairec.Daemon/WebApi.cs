@@ -42,6 +42,8 @@ public static class WebApi
         });
         api.MapPost("/resume", (PauseControl pause) => { pause.Resume(); return Results.Ok(new { Ok = true, Message = "recording on" }); });
 
+        api.MapPost("/retention/run", (RetentionService ret) => Results.Ok(ret.RunNow()));
+
         api.MapPost("/ram/clear", (RecordingCoordinator rec) => { var (n, bytes) = rec.ClearRam(); return Results.Ok(new { Sessions = n, Bytes = bytes }); });
 
         // CS2 posts its game state here (see gamestate_integration_kairec.cfg). Timestamped on arrival.
