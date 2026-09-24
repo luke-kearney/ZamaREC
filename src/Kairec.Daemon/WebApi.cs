@@ -138,13 +138,25 @@ public static class WebApi
 
         // ------------------------------------------------------------ game presets and banners
 
-        api.MapGet("/presets", () => Results.Ok(GamePresets.All.Select(g => new { g.Id, g.Name, g.Match, g.MatchCmdline, g.Events, g.Mode, HasBanner = g.BannerUrl is not null })));
+        api.MapGet("/presets", () => Results.Ok(GamePresets.All.Select(g => new { g.Id, g.Name, g.Match, g.MatchCmdline, g.Events, g.Mode, g.SteamAppId, g.BannerUrl })));
 
-        api.MapGet("/banners/{id}", async (string id, BannerService banners, CancellationToken ct) =>
+        // banners are per profile: uploaded image > profile banner_url > steam_app_id (own or preset's) > Steam search by name
+        api.MapGet("/banners/{profile}", async (string profile, BannerService banners, CancellationToken ct) =>
         {
-            var path = await banners.PathAsync(id, ct);
-            return path is null ? Results.NotFound() : Results.File(path, "image/jpeg");
+            var path = await banners.PathAsync(profile, ct);
+            if (path is null) return Results.NotFound();
+            var type = Path.GetExtension(path).ToLowerInvariant() switch { ".png" => "image/png", ".webp" => "image/webp", _ => "image/jpeg" };
+            return Results.File(path, type, lastModified: File.GetLastWriteTimeUtc(path));
         });
+        api.MapGet("/banners/{profile}/source", (string profile, BannerService banners) => Results.Ok(new { Source = banners.Source(profile), Custom = banners.CustomPath(profile) is not null }));
+        api.MapPut("/banners/{profile}", async (string profile, HttpRequest req, BannerService banners, CancellationToken ct) =>
+        {
+            if (req.ContentLength is > 8_000_000) return Results.BadRequest(new { Error = "image larger than 8 MB" });
+            try { await banners.SaveCustomAsync(profile, req.Body, req.ContentType ?? "", ct); return Results.Ok(new { Ok = true }); }
+            catch (InvalidOperationException ex) { return Results.BadRequest(new { Error = ex.Message }); }
+        });
+        api.MapDelete("/banners/{profile}", (string profile, BannerService banners) => Results.Ok(new { Removed = banners.RemoveCustom(profile) }));
+        api.MapPost("/banners/{profile}/research", (string profile, BannerService banners) => { banners.ForgetSearch(profile); return Results.Ok(new { Ok = true }); });
 
         api.MapGet("/sessions", (SessionCatalog cat, RecordingCoordinator rec, KairecConfig cfg) =>
             Results.Ok(cat.Sessions().Select(s => new

@@ -35,6 +35,10 @@ header { display: flex; align-items: center; gap: 16px; height: 56px; padding: 0
 .menu button { text-align: left; background: transparent; border: 0; padding: 7px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; }
 .menu button:hover { background: var(--panel2); }
 .menu.right { left: auto; right: 0; }
+.banner-row { display: flex; align-items: center; gap: 10px; }
+.banner-preview { width: 138px; height: 46px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line2); background: var(--bg2); }
+.banner-preview[hidden] { display: none; }
+.banner-src { font-size: 12px; }
 .menu button .sub { display: block; color: var(--dim); font-size: 11px; margin-top: 1px; }
 .menu-note { font-size: 11px; color: var(--dim); padding: 6px 10px 4px; }
 .status.paused { background: #2a2214; color: #f2c66d; border-color: #4a3a12; }

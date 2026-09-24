@@ -16,8 +16,10 @@ daemon; the only library is hls.js for timeline playback.
 ## Sessions and clips
 
 Left column, filterable by profile. A card shows its game's banner behind it, dimmed; grey once
-the footage is gone. Banners come from built-in game presets and are fetched once by the daemon
-into `<root>/banners`, so the page never contacts the internet. Badges: LIVE, RAM (segments in tmpfs), gone (RAM footage
+the footage is gone. A banner is, in order: an image uploaded for the profile in Settings, the
+profile's `banner_url`, Steam's header art for its `steam_app_id` (own or the preset's), or the
+first hit of a Steam store search for the profile name. The daemon fetches each once into
+`<root>/banners`, so the page never contacts the internet. Badges: LIVE, RAM (segments in tmpfs), gone (RAM footage
 dropped; markers and clips remain), starred, expiring.
 
 ## Player and timeline

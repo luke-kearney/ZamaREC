@@ -77,8 +77,10 @@ public class GamePresetTests
     public void Game_key_round_trips_through_toml()
     {
         var cfg = Kairec.Core.Config.ConfigLoader.Parse(Kairec.Core.Config.DefaultConfig.Toml);
-        cfg.Profiles[0].Game = "cs2";
+        cfg.Profiles[0].Game = "cs2"; cfg.Profiles[0].SteamAppId = 730; cfg.Profiles[1].BannerUrl = "https://example.org/mc.jpg";
         var back = Kairec.Core.Config.ConfigLoader.Parse(Kairec.Core.Config.ConfigLoader.Serialize(cfg));
         Xunit.Assert.Equal("cs2", back.Profiles[0].Game);
+        Xunit.Assert.Equal(730, back.Profiles[0].SteamAppId);
+        Xunit.Assert.Equal("https://example.org/mc.jpg", back.Profiles[1].BannerUrl);
     }
 }

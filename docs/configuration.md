@@ -106,7 +106,9 @@ runs one now.
 | key | default | meaning |
 |---|---|---|
 | `name` | | used for the session folder and the clips subfolder |
-| `game` | | id of a built-in game preset (`cs2`, `minecraft`, `black-ops-3`): display name and sidebar banner. A profile whose name equals a preset id or name resolves without it |
+| `game` | | id of a built-in game preset (`cs2`, `minecraft`, `black-ops-3`): supplies the banner when nothing else does. A profile whose name equals a preset id or name resolves without it |
+| `steam_app_id` | | the sidebar banner is Steam's header art for this app. Blank: the daemon searches the Steam store for the profile name once and takes the first hit |
+| `banner_url` | | any image URL as the banner, for games not on Steam. An image uploaded on the settings page beats every other source |
 | `match` | | regex against the process name (`/proc/PID/comm`, 15 chars max). Recording starts when it appears and stops when it exits |
 | `match_cmdline` | | regex against the full command line, for games whose process is `java` or similar |
 | `mode` | `"timeline"` | `timeline` or `buffer` |

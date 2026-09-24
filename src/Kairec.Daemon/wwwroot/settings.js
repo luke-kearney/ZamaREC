@@ -76,7 +76,10 @@
       h += `<div class="card profile ${open ? 'open' : 'closed'}" data-profile="${i}"><h3 class="ph" data-toggle="${p.name || `#${i}`}"><span class="chev">${open ? '▾' : '▸'}</span><span class="name">${p.name || 'new profile'}</span><span class="badge">${p.mode}</span><span class="badge">${st}</span><span class="muted sum">${len} · ${p.quality ? p.quality + ' · ' : ''}${p.events === 'none' ? 'manual markers' : p.events} · ${p.match || p.matchCmdline || 'no match yet'}</span><span class="spacer"></span><button class="btn small danger" data-del="${i}">Delete</button></h3>
         <div class="body"><div class="fields">
           ${field('name', inp(P + 'name', p.name), false, 'used for the session folder and the clips subfolder')}
-          ${field('game', sel(P + 'game', p.game ?? '', [{ v: '', l: '(none)' }, ...(meta.presets || []).map(g => ({ v: g.id, l: g.name }))]), false, 'known game: gives the sidebar its banner. A profile named like a preset is matched automatically')}
+          ${field('game preset', sel(P + 'game', p.game ?? '', [{ v: '', l: '(none)' }, ...(meta.presets || []).map(g => ({ v: g.id, l: g.name }))]), false, 'a built-in game: supplies the banner when nothing below is set. A profile named like a preset is matched automatically')}
+          ${field('steam app id', inp(P + 'steamAppId', p.steamAppId, 'number', 'placeholder="730"'), false, 'the banner is Steam\'s header art for this app. Blank: kairec searches the Steam store for the profile name once and uses the first hit')}
+          ${field('banner URL', inp(P + 'bannerUrl', p.bannerUrl, 'text', 'placeholder="https://…/image.jpg"'), false, 'any image on the web, for games that are not on Steam. Fetched once and cached')}
+          <label class="field wide banner-field"><span>banner</span><div class="banner-row"><img class="banner-preview" data-banner="${i}" alt=""><span class="muted banner-src" data-bsrc="${i}"></span><span class="spacer"></span><button type="button" class="btn small" data-bupload="${i}">Upload image…</button><button type="button" class="btn small" data-bremove="${i}" hidden>Remove upload</button></div><small class="hint">an uploaded JPEG, PNG or WebP beats every other source. Shown behind this profile's cards in the sidebar</small></label>
           ${field('mode', sel(P + 'mode', p.mode, [{ v: 'timeline', l: 'timeline (rolling window on disk)' }, { v: 'buffer', l: 'buffer (RAM ring buffer)' }]), false, 'timeline: scrub the last N minutes any time. buffer: nothing is written until you mark or save')}
           ${field('events', sel(P + 'events', p.events, [{ v: 'none', l: 'none (manual markers only)' }, { v: 'cs2-gsi', l: 'cs2-gsi (CS2 game state)' }]), false, 'cs2-gsi adds kill, death, round and MVP markers from the game itself')}
           ${field('quality preset', sel(P + 'quality', p.quality ?? '', [{ v: '', l: '(capture defaults)' }, ...(c.quality || []).map(q => ({ v: q.name, l: q.name + (q.bitrateKbps ? ` · ${q.bitrateKbps} kbps` : '') + (q.fps ? ` · ${q.fps} fps` : '') }))]), false, 'fps, codec, bitrate and size for this game; presets are defined on the left')}
@@ -128,9 +131,36 @@
       const g = (meta.presets || []).find(x => x.id === b.dataset.preset);
       collect(); openProfiles.add(`#${cfg.profiles.length}`);
       cfg.profiles.push(g
-        ? { name: g.name, game: g.id, match: g.match, matchCmdline: g.matchCmdline, mode: g.mode, events: g.events, fps: null, timeline: null, buffer: null, clips: null, retention: null }
-        : { name: '', game: null, match: '', matchCmdline: null, mode: 'timeline', events: 'none', fps: null, timeline: null, buffer: null, clips: null, retention: null });
+        ? { name: g.name, game: g.id, steamAppId: g.steamAppId, bannerUrl: g.bannerUrl, match: g.match, matchCmdline: g.matchCmdline, mode: g.mode, events: g.events, fps: null, timeline: null, buffer: null, clips: null, retention: null }
+        : { name: '', game: null, steamAppId: null, bannerUrl: null, match: '', matchCmdline: null, mode: 'timeline', events: 'none', fps: null, timeline: null, buffer: null, clips: null, retention: null });
       render();
+    });
+    // banner previews, uploads and removals: keyed by the profile's saved name
+    const bannerFor = i => { const p = cfg.profiles[i]; return p && p.name ? p.name : null; };
+    const refreshBanner = async i => {
+      const name = bannerFor(i); const img = document.querySelector(`[data-banner="${i}"]`), src = document.querySelector(`[data-bsrc="${i}"]`), rm = document.querySelector(`[data-bremove="${i}"]`);
+      if (!img) return;
+      if (!name) { img.hidden = true; src.textContent = 'save the profile with a name first'; rm.hidden = true; return; }
+      img.hidden = false; img.src = `/api/banners/${encodeURIComponent(name)}?v=${Date.now()}`;
+      img.onerror = () => { img.hidden = true; };
+      try { const d = await (await fetch(`/api/banners/${encodeURIComponent(name)}/source`)).json(); src.textContent = 'source: ' + d.source; rm.hidden = !d.custom; } catch { src.textContent = ''; }
+    };
+    cfg.profiles.forEach((_, i) => refreshBanner(i));
+    document.querySelectorAll('[data-bupload]').forEach(b => b.onclick = () => {
+      const i = +b.dataset.bupload; const name = bannerFor(i); if (!name) return window.toast('give the profile a name and save first', true);
+      const pick = document.createElement('input'); pick.type = 'file'; pick.accept = 'image/jpeg,image/png,image/webp';
+      pick.onchange = async () => {
+        const f = pick.files[0]; if (!f) return;
+        const r = await fetch(`/api/banners/${encodeURIComponent(name)}`, { method: 'PUT', headers: { 'content-type': f.type }, body: f });
+        if (!r.ok) { const d = await r.json().catch(() => ({})); return window.toast('not uploaded: ' + (d.error || r.status), true); }
+        window.toast('banner uploaded'); refreshBanner(i); if (window.bannersChanged) window.bannersChanged();
+      };
+      pick.click();
+    });
+    document.querySelectorAll('[data-bremove]').forEach(b => b.onclick = async () => {
+      const i = +b.dataset.bremove; const name = bannerFor(i); if (!name) return;
+      await fetch(`/api/banners/${encodeURIComponent(name)}`, { method: 'DELETE' });
+      window.toast('upload removed'); refreshBanner(i); if (window.bannersChanged) window.bannersChanged();
     });
     document.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { collect(); cfg.profiles.splice(+b.dataset.del, 1); render(); });
     $('cfgText').value = meta.text; $('cfgPath').textContent = meta.path;
@@ -221,6 +251,7 @@
     for (const p of cfg.profiles) {
       if (p.quality === '') p.quality = null;
       if (p.game === '') p.game = null;
+      if (p.bannerUrl === '') p.bannerUrl = null;
       for (const g of ['timeline', 'buffer', 'clips', 'retention']) {
         if (p[g] && Object.values(p[g]).every(v => v == null || v === '')) p[g] = null;
         else if (p[g]) for (const k of Object.keys(p[g])) if (p[g][k] === '') p[g][k] = null;

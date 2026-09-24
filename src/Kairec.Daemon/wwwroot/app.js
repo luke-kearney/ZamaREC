@@ -78,15 +78,18 @@ async function refreshList() {
 }
 // game banner behind a sidebar card; the daemon caches the image, the page only ever asks the daemon
 const noBanner = new Set();
-function banner(el, game) {
-  if (!game || noBanner.has(game)) return false;
-  el.classList.add('has-banner'); el.style.setProperty('--banner', `url(/api/banners/${encodeURIComponent(game)})`);
+let bannerVersion = 0;
+window.bannersChanged = () => { bannerVersion++; noBanner.clear(); banner.checked = new Set(); renderList(); };
+function bannerUrl(profile) { return `/api/banners/${encodeURIComponent(profile)}${bannerVersion ? '?v=' + bannerVersion : ''}`; }
+function banner(el, profile) {
+  if (!profile || noBanner.has(profile)) return false;
+  el.classList.add('has-banner'); el.style.setProperty('--banner', `url(${bannerUrl(profile)})`);
   if (!banner.checked) banner.checked = new Set();
-  if (!banner.checked.has(game)) {
-    banner.checked.add(game);
+  if (!banner.checked.has(profile)) {
+    banner.checked.add(profile);
     const probe = new Image();
-    probe.onerror = () => { noBanner.add(game); renderList(); };   // no banner after all: fall back to badges
-    probe.src = `/api/banners/${encodeURIComponent(game)}`;
+    probe.onerror = () => { noBanner.add(profile); renderList(); };   // no banner after all: fall back to badges
+    probe.src = bannerUrl(profile);
   }
   return true;
 }
@@ -96,7 +99,7 @@ function renderList() {
     for (const s of state.sessions.filter(s => !state.profile || s.profile === state.profile)) {
       const d = document.createElement('div');
       d.className = 'item' + (state.current && state.current.kind === 'session' && state.current.id === s.id ? ' active' : '') + (s.footageGone ? ' gone' : '');
-      const hasBanner = banner(d, s.game);   // the banner already says which game, and greyscale says the footage is gone
+      const hasBanner = banner(d, s.profile);   // the banner already says which game, and greyscale says the footage is gone
       d.innerHTML = `<div class="l1"><span>${fmtDate(s.startedAt)}</span><span class="r">${s.live ? '<span class="badge live">LIVE</span>' : ''}${s.ram && !(hasBanner && s.footageGone) ? `<span class="badge ${s.footageGone ? 'gone' : 'ram'}" title="${s.footageGone ? 'RAM footage has been dropped' : 'segments live in RAM'}">${s.footageGone ? 'gone' : 'RAM'}</span>` : ''}${hasBanner ? '' : `<span class="badge">${s.profile}</span>`}</span></div>
         <div class="l2"><span>${s.map || s.mode}</span>${s.durationSeconds != null ? `<span class="mono">${fmt(s.durationSeconds)}</span>` : ''}<span>${s.markerCount} marker${s.markerCount === 1 ? '' : 's'}</span><span>${s.clipCount} clip${s.clipCount === 1 ? '' : 's'}</span></div>`;
       d.onclick = () => { if (window.closePages) window.closePages(); loadSession(s.id); };
@@ -107,7 +110,7 @@ function renderList() {
     for (const c of state.clips.filter(c => !state.profile || c.profile === state.profile)) {
       const d = document.createElement('div');
       d.className = 'item' + (state.current && state.current.kind === 'clip' && state.current.id === c.profile + '/' + c.file ? ' active' : '');
-      const hasBanner = banner(d, c.game);
+      const hasBanner = banner(d, c.profile);
       const exp = c.expiresAt ? `<span class="badge exp" title="expires ${fmtDate(c.expiresAt)}">⌛</span>` : '';
       d.innerHTML = `<div class="l1"><span>${c.label || c.file.replace('.mp4', '')}</span><span class="r">${c.starred ? '<span class="badge star">★</span>' : ''}${exp}${hasBanner ? '' : `<span class="badge">${c.profile}</span>`}</span></div>
         <div class="l2"><span>${fmtDate(c.createdAt)}</span><span class="mono">${fmt(c.durationSeconds)}</span><span>${gb(c.bytes)}</span><span>${c.source}</span></div>`;

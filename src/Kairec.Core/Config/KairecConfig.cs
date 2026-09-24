@@ -230,6 +230,10 @@ public sealed class ProfileConfig
     public string Name { get; set; } = "";
     /// <summary>Id of a GamePresets entry: display name and banner. Optional; a profile named like a preset resolves too.</summary>
     public string? Game { get; set; }
+    /// <summary>Steam app id: the banner is Steam's header art for it. Found by a store search on the name when unset.</summary>
+    public int? SteamAppId { get; set; }
+    /// <summary>Any image URL to use as the banner instead; an uploaded image beats both.</summary>
+    public string? BannerUrl { get; set; }
     /// <summary>Regex against the process name (/proc/PID/comm, max 15 chars).</summary>
     public string? Match { get; set; }
     /// <summary>Regex against the full command line. Needed for Java games like Minecraft.</summary>
