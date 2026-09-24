@@ -73,7 +73,8 @@ Named encoder presets. Four ship by default: `low` (720p30, 6000 kbps), `medium`
 | `max_gb` | `100` | per profile, sessions plus clips. Over this, the oldest unprotected item goes first |
 | `max_days` | `30` | older sessions and clips are deleted. `0` = no limit |
 
-Never deleted: starred clips, the live session, sessions with starred markers, sessions whose
+Always deleted, regardless of the caps: a finished session with no footage left, no markers and
+no clips. Never deleted: starred clips, the live session, sessions with starred markers, sessions whose
 clips are still on disk. A pass runs a minute after start and every ten minutes; `kairec retention`
 runs one now.
 

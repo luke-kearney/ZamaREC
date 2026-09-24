@@ -7,6 +7,7 @@ namespace Kairec.Daemon;
 
 /// <summary>
 /// Keeps the recordings folder within bounds. Runs a minute after start and every ten minutes:
+///   0. empty sessions go: finished, footage gone (or never written), no markers, no clips;
 ///   1. mark clips past their expires_at go, unless starred;
 ///   2. clips and finished sessions older than retention.max_days go, unless protected;
 ///   3. while a profile's sessions + clips exceed retention.max_gb, the oldest unprotected item goes.
@@ -38,7 +39,16 @@ public sealed class RetentionService : BackgroundService
         }
     }
 
-    private sealed record Item(string Kind, string Profile, string Path, DateTimeOffset Date, long Bytes, bool Protected, string Why);
+    private sealed record Item(string Kind, string Profile, string Path, DateTimeOffset Date, long Bytes, bool Protected, string Why, bool Empty = false);
+
+    /// <summary>A finished session with nothing left to show: no footage, no markers, no clips.</summary>
+    private static bool IsEmpty(SessionStore store, bool hasClips)
+    {
+        if (hasClips || store.Markers.Count > 0) return false;
+        if (store.Info.FootageGone || store.Info.Mode == "buffer") return true;   // buffer sessions never keep footage of their own
+        var media = store.MediaDir ?? store.Dir;
+        return !Directory.Exists(media) || !Directory.EnumerateFiles(media, "*.ts").Any();
+    }
 
     public Result RunNow()
     {
@@ -66,7 +76,7 @@ public sealed class RetentionService : BackgroundService
                 var starred = store.Markers.Any(m => m.Starred);
                 var hasClips = clipsBySession.ContainsKey(s.Id);
                 var prot = starred || hasClips;
-                items.Add(new Item("session", s.Info.Profile, s.Dir, s.Info.EndedAt ?? s.Info.StartedAt, bytes, prot, starred ? "starred markers" : hasClips ? "has clips" : ""));
+                items.Add(new Item("session", s.Info.Profile, s.Dir, s.Info.EndedAt ?? s.Info.StartedAt, bytes, prot, starred ? "starred markers" : hasClips ? "has clips" : "", Empty: IsEmpty(store, hasClips)));
             }
 
             void Delete(Item it, string reason)
@@ -86,6 +96,10 @@ public sealed class RetentionService : BackgroundService
                 }
                 catch (Exception ex) { _log.LogWarning(ex, "could not remove {path}", it.Path); }
             }
+
+            // ---- 0. empty sessions: nothing to watch, nothing marked, nothing saved
+            foreach (var it in items.Where(i => i.Kind == "session" && i.Empty && !i.Protected).ToList())
+            { Delete(it, "empty: no footage, markers or clips"); items.Remove(it); }
 
             // ---- 1. expired mark clips
             foreach (var c in _cat.Clips())
