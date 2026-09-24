@@ -7,7 +7,7 @@
   const field = (label, html, wide, hint, mode) => `<label class="field${wide ? ' wide' : ''}"${mode ? ` data-mode="${mode}"` : ''}><span>${label}</span>${html}${hint ? `<small class="hint">${hint}</small>` : ''}</label>`;
   const inp = (path, val, type = 'text', extra = '') => `<input type="${type}" data-path="${path}" value="${val ?? ''}" ${extra}>`;
   const sel = (path, val, opts) => `<select data-path="${path}">${opts.map(o => `<option value="${o.v ?? o}" ${(o.v ?? o) === val ? 'selected' : ''}>${o.l ?? o}</option>`).join('')}</select>`;
-  const chk = (path, val) => `<input type="checkbox" data-path="${path}" ${val ? 'checked' : ''}>`;
+  const chk = (path, val) => `<span class="toggle"><input type="checkbox" data-path="${path}" ${val ? 'checked' : ''}><span class="track"><span class="knob"></span></span></span>`;
 
   function render() {
     const c = cfg;
@@ -28,7 +28,7 @@
     let h = `<div class="settings-cols"><div class="col left"><div class="card"><h3>Capture</h3><div class="help">Applies to every profile. Encoder settings live in the presets below; the recorder always uses the GPU encoder.</div><div class="fields">
       ${field('monitor', sel('capture.monitor', c.capture.monitor, monitors), false, 'the screen the game runs on')}
       ${field('default quality preset', sel('capture.quality', c.capture.quality ?? '', [{ v: '', l: '(built-in defaults: 60 fps h264 20000 kbps)' }, ...presetOpts]), false, 'used by every profile that does not pick its own')}
-      ${field('show cursor', chk('capture.cursor', c.capture.cursor))}
+      ${field('show cursor', chk('capture.cursor', c.capture.cursor), false, 'draw the mouse pointer into the recording')}
       <div class="field wide"><span>audio sources</span><small class="hint">pick what goes into the recording. "Default output" is the game audio; add the mic if you want your voice</small>
         ${audioHtml}
         <label class="other"><span class="muted">other, comma separated (e.g. app:cs2)</span><input type="text" id="audioExtra" value="${audioExtra.join(', ')}"></label>
@@ -51,7 +51,7 @@
       ${field('timeline: write a clip around each mark', sel('clips.markSaves', c.clips.markSaves == null ? '' : String(c.clips.markSaves), [{ v: '', l: 'auto (on for RAM timelines)' }, { v: 'true', l: 'on' }, { v: 'false', l: 'off' }]))}
       ${field('retention max GB', inp('retention.maxGb', c.retention.maxGb, 'number', 'min="0" step="1"'))}
       ${field('retention max days', inp('retention.maxDays', c.retention.maxDays, 'number', 'min="0"'))}
-      ${field('sound feedback', chk('feedback.sound', c.feedback.sound))}
+      ${field('sound feedback', chk('feedback.sound', c.feedback.sound), false, 'a short tone on mark, save, start and stop; never a popup')}
       ${field('sound volume', inp('feedback.volume', c.feedback.volume, 'number', 'min="0" max="1" step="0.1"'))}
       ${field('storage root', inp('storage.root', c.storage.root))}
       ${field('UI port (restart needed)', inp('daemon.uiPort', c.daemon.uiPort, 'number'))}
