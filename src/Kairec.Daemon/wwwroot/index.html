@@ -47,14 +47,18 @@
 </header>
 
 <div class="layout">
-  <aside>
+  <aside id="aside">
     <div class="tabs">
       <div class="seg">
         <button class="tab active" data-tab="sessions">Sessions</button>
         <button class="tab" data-tab="clips">Clips</button>
       </div>
       <select id="profileFilter" class="sel" title="profile"><option value="">all profiles</option></select>
+      <button class="tbtn collapse" id="asideToggle" title="collapse sidebar" aria-expanded="true">
+        <svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>
+      </button>
     </div>
+    <div class="pane-tab" id="asideTab" title="expand sidebar"><span id="asideTabLabel">Sessions</span></div>
     <div id="list" class="list"></div>
   </aside>
 

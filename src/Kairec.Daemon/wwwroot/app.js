@@ -359,7 +359,7 @@ async function exportBatch() {
 }
 
 // ------------------------------------------------------------------ wiring
-document.querySelectorAll('.tab').forEach(b => b.onclick = () => { document.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x === b)); state.tab = b.dataset.tab; refreshList(); });
+document.querySelectorAll('.tab').forEach(b => b.onclick = () => { document.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x === b)); state.tab = b.dataset.tab; $('asideTabLabel').textContent = b.textContent; refreshList(); });
 $('profileFilter').onchange = e => { state.profile = e.target.value; renderList(); };
 $('typeFilter').onchange = e => { state.typeFilter = e.target.value; renderTimeline(); renderMarkers(); };
 const rangeLen = () => Math.max(1, +$('rangeLen').value || 30);
@@ -399,13 +399,22 @@ $('inVal').onchange = e => { state.inT = +e.target.value; renderSelection(); };
 $('outVal').onchange = e => { state.outT = +e.target.value; renderSelection(); };
 $('exportBtn').onclick = exportRange;
 $('batchBtn').onclick = exportBatch;
-// markers pane: collapse to a thin strip, remembered across reloads
+// side panes collapse to thin strips, remembered across reloads. Hovering the collapsed sidebar
+// floats it over the content (a "peek") until the mouse leaves; clicking its strip pins it open.
 (() => {
-  const layout = document.querySelector('.layout'), btn = $('markersToggle');
-  const apply = on => { layout.classList.toggle('markers-collapsed', on); btn.setAttribute('aria-expanded', String(!on)); btn.title = on ? 'expand markers' : 'collapse markers'; };
-  const toggle = () => { const on = !layout.classList.contains('markers-collapsed'); localStorage.setItem('markersCollapsed', on ? '1' : '0'); apply(on); };
-  btn.onclick = toggle; $('markersTab').onclick = toggle;
-  apply(localStorage.getItem('markersCollapsed') === '1');
+  const layout = document.querySelector('.layout');
+  const mkBtn = $('markersToggle'), asBtn = $('asideToggle'), aside = $('aside');
+  const apply = (cls, btn, on, what) => { layout.classList.toggle(cls, on); btn.setAttribute('aria-expanded', String(!on)); btn.title = (on ? 'expand ' : 'collapse ') + what; };
+  const toggle = (cls, btn, key, what) => () => { const on = !layout.classList.contains(cls); localStorage.setItem(key, on ? '1' : '0'); apply(cls, btn, on, what); aside.classList.remove('peek'); };
+  const tMarkers = toggle('markers-collapsed', mkBtn, 'markersCollapsed', 'markers');
+  const tAside = toggle('aside-collapsed', asBtn, 'asideCollapsed', 'sidebar');
+  mkBtn.onclick = tMarkers; $('markersTab').onclick = tMarkers;
+  asBtn.onclick = tAside; $('asideTab').onclick = tAside;
+  let peekTimer;
+  aside.addEventListener('mouseenter', () => { if (!layout.classList.contains('aside-collapsed')) return; peekTimer = setTimeout(() => aside.classList.add('peek'), 120); });
+  aside.addEventListener('mouseleave', () => { clearTimeout(peekTimer); aside.classList.remove('peek'); });
+  apply('markers-collapsed', mkBtn, localStorage.getItem('markersCollapsed') === '1', 'markers');
+  apply('aside-collapsed', asBtn, localStorage.getItem('asideCollapsed') === '1', 'sidebar');
 })();
 $('uCpuWrap').onclick = () => { localStorage.setItem('cpuPerCore', localStorage.getItem('cpuPerCore') === '1' ? '0' : '1'); refreshStatus(); };
 // on/off switch: off opens a menu of durations, on resumes at once
