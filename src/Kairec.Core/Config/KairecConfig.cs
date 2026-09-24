@@ -42,6 +42,8 @@ public sealed class KairecConfig
         Fps = p.Fps ?? Capture.Fps,
         WindowMinutes = p.Timeline?.WindowMinutes ?? Timeline.WindowMinutes,
         SegmentSeconds = p.Timeline?.SegmentSeconds ?? Timeline.SegmentSeconds,
+        TimelineStorage = p.Timeline?.Storage ?? Timeline.Storage,
+        RamKeepHours = p.Timeline?.RamKeepHours ?? Timeline.RamKeepHours,
         BufferMinutes = p.Buffer?.Minutes ?? Buffer.Minutes,
         BufferStorage = p.Buffer?.Storage ?? Buffer.Storage,
         SaveSeconds = p.Clips?.SaveSeconds ?? Clips.SaveSeconds,
@@ -61,6 +63,10 @@ public sealed class EffectiveProfile
     public required int Fps { get; init; }
     public required int WindowMinutes { get; init; }
     public required int SegmentSeconds { get; init; }
+    public required string TimelineStorage { get; init; }
+    public required double RamKeepHours { get; init; }
+    /// <summary>Bytes the window needs at the configured bitrate (video only; audio adds a few percent).</summary>
+    public long WindowBytes(int bitrateKbps) => WindowMinutes <= 0 ? 0 : (long)WindowMinutes * 60 * bitrateKbps * 1000 / 8;
     public required int BufferMinutes { get; init; }
     public required string BufferStorage { get; init; }
     public required int SaveSeconds { get; init; }
@@ -97,6 +103,11 @@ public sealed class TimelineConfig
     /// <summary>0 keeps everything.</summary>
     public int WindowMinutes { get; set; } = 120;
     public int SegmentSeconds { get; set; } = 5;
+    /// <summary>disk | ram. RAM keeps the segments on tmpfs: scrubbable, no disk writes, gone after ram_keep_hours or a reboot.</summary>
+    public string Storage { get; set; } = "disk";
+    public string RamDir { get; set; } = "/dev/shm/kairec";
+    /// <summary>How long a finished RAM session's footage stays before it is dropped. It is also dropped when the next session starts.</summary>
+    public double RamKeepHours { get; set; } = 6;
 }
 
 /// <summary>Buffer mode: a ring buffer in RAM (or on disk). Nothing is written until you mark or save.</summary>
@@ -165,7 +176,7 @@ public sealed class ProfileConfig
     };
 }
 
-public sealed class ProfileTimelineOverride { public int? WindowMinutes { get; set; } public int? SegmentSeconds { get; set; } }
+public sealed class ProfileTimelineOverride { public int? WindowMinutes { get; set; } public int? SegmentSeconds { get; set; } public string? Storage { get; set; } public double? RamKeepHours { get; set; } }
 public sealed class ProfileBufferOverride { public int? Minutes { get; set; } public string? Storage { get; set; } }
 public sealed class ProfileClipOverride { public int? SaveSeconds { get; set; } public int? MarkBeforeSeconds { get; set; } public int? MarkAfterSeconds { get; set; } public int? MarkClipExpireHours { get; set; } }
 public sealed class ProfileRetentionOverride { public double? MaxGb { get; set; } public int? MaxDays { get; set; } }
@@ -239,6 +250,8 @@ public static class ConfigLoader
             if (p.Match is null && p.MatchCmdline is null) throw new InvalidOperationException($"Profile '{p.Name}' needs match or match_cmdline");
             var e = cfg.Effective(p);
             if (e.BufferStorage is not ("ram" or "disk")) throw new InvalidOperationException($"Profile '{p.Name}': buffer storage must be ram or disk");
+            if (e.TimelineStorage is not ("disk" or "ram")) throw new InvalidOperationException($"Profile '{p.Name}': timeline storage must be disk or ram");
+            if (e.TimelineStorage == "ram" && e.WindowMinutes <= 0) throw new InvalidOperationException($"Profile '{p.Name}': a RAM timeline needs a window (window_minutes > 0)");
             if (e.SegmentSeconds < 2) throw new InvalidOperationException($"Profile '{p.Name}': timeline segment_seconds must be at least 2");
             if (e.BufferMinutes < 1) throw new InvalidOperationException($"Profile '{p.Name}': buffer minutes must be at least 1");
         }

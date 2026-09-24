@@ -15,6 +15,11 @@ a recorder that polls the GPU, pops notifications or steals focus.
 | `timeline` | a rolling window of the last N minutes on disk (default 2 h). Scrub and export from anywhere in the window, even mid-session. Older footage is deleted as you play, so disk use is bounded by the window, not by how long you play. |
 | `buffer`   | a ring buffer in RAM (or on disk). Nothing is written until you act. A mark dumps `mark_before_seconds` + `mark_after_seconds` around it into a clip; marks close together share one clip. Mark clips expire after `mark_clip_expire_hours` unless starred. |
 
+A timeline can live in RAM instead: `timeline.storage = "ram"` puts the segments on tmpfs, so you
+get scrubbing with no disk writes. It needs window × bitrate of memory (60 min at 20 Mbps is 9 GB),
+the daemon refuses to start a session that would not fit, and the footage is dropped after
+`ram_keep_hours` or when the next session starts. Marks and clips are on disk as usual.
+
 `kairec save` works in both: it writes the last N seconds to a clip. Every clip carries its own
 markers so it can be opened in the timeline UI and cut down further.
 

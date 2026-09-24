@@ -10,6 +10,8 @@ public sealed class SessionStore
     private readonly MarkerFile _markers;
 
     public string Dir { get; private set; }
+    /// <summary>Directory holding the playlist and segments: the session dir, or tmpfs for RAM timelines.</summary>
+    public string MediaDir => Info.MediaDir ?? Dir;
     public SessionInfo Info { get; }
     public IReadOnlyList<Marker> Markers => _markers.Markers;
 
@@ -24,11 +26,19 @@ public sealed class SessionStore
         var id = $"{now:yyyy-MM-dd_HH-mm-ss}_{profile.Name}";
         var dir = Path.Combine(cfg.SessionsDir, id);
         Directory.CreateDirectory(dir);
+        var eff = cfg.Effective(profile);
+        string? mediaDir = null;
+        if (eff.Mode == CaptureMode.Timeline && eff.TimelineStorage == "ram")
+        {
+            mediaDir = Path.Combine(Paths.Expand(cfg.Timeline.RamDir), id);
+            Directory.CreateDirectory(mediaDir);
+        }
         var info = new SessionInfo
         {
             Id = id, Profile = profile.Name, Mode = profile.Mode.ToLowerInvariant(), Trigger = trigger,
             StartedAt = now, SpawnMonoUs = MonotonicClock.NowMicros(), GamePid = gamePid,
             Playlist = profile.CaptureMode == CaptureMode.Timeline ? Recording.GsrArguments.PlaylistName : null,
+            MediaDir = mediaDir,
         };
         // Buffer sessions never get a first-frame stamp (nothing is written until a save), so their
         // timeline origin is the recorder spawn. Clip offsets are computed against the same origin.
@@ -90,7 +100,7 @@ public sealed class SessionStore
     private string? FindTimestampFile()
     {
         // gpu-screen-recorder writes "<output>.ts" next to its output: live.m3u8.ts in timeline mode.
-        var p = Path.Combine(Dir, (Info.Playlist ?? "live.m3u8") + ".ts");
+        var p = Path.Combine(MediaDir, (Info.Playlist ?? "live.m3u8") + ".ts");
         return File.Exists(p) ? p : null;
     }
 
@@ -116,6 +126,14 @@ public sealed class SessionStore
     }
 
     /// <summary>Appends the map name to the directory once recording has stopped and the recorder has released the files.</summary>
+    /// <summary>Drops a RAM timeline's segments and records that the footage is gone.</summary>
+    public void DropMedia()
+    {
+        if (Info.MediaDir is null) return;
+        try { if (Directory.Exists(Info.MediaDir)) Directory.Delete(Info.MediaDir, recursive: true); } catch (IOException) { }
+        lock (_lock) { Info.FootageGone = true; SaveLocked(); }
+    }
+
     public void RenameForMap()
     {
         if (string.IsNullOrWhiteSpace(Info.Map)) return;

@@ -67,7 +67,7 @@ function renderList() {
     for (const s of state.sessions.filter(s => !state.profile || s.profile === state.profile)) {
       const d = document.createElement('div');
       d.className = 'item' + (state.current && state.current.kind === 'session' && state.current.id === s.id ? ' active' : '');
-      d.innerHTML = `<div class="l1"><span>${fmtDate(s.startedAt)}</span><span class="r">${s.live ? '<span class="badge live">LIVE</span>' : ''}<span class="badge">${s.profile}</span></span></div>
+      d.innerHTML = `<div class="l1"><span>${fmtDate(s.startedAt)}</span><span class="r">${s.live ? '<span class="badge live">LIVE</span>' : ''}${s.ram ? `<span class="badge ${s.footageGone ? 'gone' : 'ram'}" title="${s.footageGone ? 'RAM footage has been dropped' : 'segments live in RAM'}">${s.footageGone ? 'gone' : 'RAM'}</span>` : ''}<span class="badge">${s.profile}</span></span></div>
         <div class="l2"><span>${s.map || s.mode}</span>${s.durationSeconds != null ? `<span class="mono">${fmt(s.durationSeconds)}</span>` : ''}<span>${s.markerCount} marker${s.markerCount === 1 ? '' : 's'}</span><span>${s.clipCount} clip${s.clipCount === 1 ? '' : 's'}</span></div>`;
       d.onclick = () => loadSession(s.id);
       box.appendChild(d);
@@ -164,7 +164,7 @@ async function loadSession(id) {
   $('title').textContent = `${data.profile} · ${fmtDate(data.startedAt)}` + (data.map ? ` · ${data.map}` : '');
   const covered = state.coverage.reduce((a, c) => a + (c.end - c.start), 0);
   $('subtitle').textContent = data.mode === 'timeline'
-    ? `${fmt(data.recordedSeconds)} recorded · window ${fmt(data.windowStart)} – ${fmt(data.windowEnd)}` + (data.live ? ' · live' : '')
+    ? `${fmt(data.recordedSeconds)} recorded · window ${fmt(data.windowStart)} – ${fmt(data.windowEnd)}` + (data.ram ? ' · RAM' : '') + (data.footageGone ? ' · footage dropped, markers and clips kept' : '') + (data.live ? ' · live' : '')
     : `buffer mode · ${data.markers.length} marks · ${state.coverage.length} clips covering ${fmt(covered)}` + (data.live ? ' · live, nothing is written until a mark or save' : '');
   state.total = data.mode === 'timeline'
     ? Math.max(data.recordedSeconds, data.windowEnd)

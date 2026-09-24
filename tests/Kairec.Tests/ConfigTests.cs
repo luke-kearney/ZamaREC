@@ -18,6 +18,7 @@ public class ConfigTests
         Assert.Equal("cs2-gsi", cs2.Profile.Events);
         Assert.Equal(120, cs2.WindowMinutes);
         Assert.Equal(5, cs2.SegmentSeconds);
+        Assert.Equal("disk", cs2.TimelineStorage);
         Assert.Equal(30, cs2.SaveSeconds);
         Assert.Equal(100.0, cs2.MaxGb);
 

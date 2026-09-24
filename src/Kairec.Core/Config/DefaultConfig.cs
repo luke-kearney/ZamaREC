@@ -27,6 +27,9 @@ public static class DefaultConfig
         [timeline]                        # defaults; profiles override under timeline.*
         window_minutes = 120              # 0 = keep everything
         segment_seconds = 5                # a save waits for the current segment to finish, so keep this short
+        storage = "disk"                  # disk | ram. ram = segments on tmpfs (/dev/shm): scrubbable, no disk
+                                          # writes, needs window_minutes x bitrate of RAM (60 min @ 20000 = 9 GB)
+        ram_keep_hours = 6                # RAM footage is dropped after this, or when the next session starts
 
         [buffer]                          # defaults; profiles override under buffer.*
         minutes = 30                      # ~150 MB of RAM per minute at 20000 kbps

@@ -18,8 +18,12 @@ public sealed class SessionInfo
     /// <summary>Monotonic microseconds of the first encoded video frame, from the recorder's .ts file.</summary>
     [JsonPropertyName("first_frame_mono_us")] public long? FirstFrameMonoUs { get; set; }
     [JsonPropertyName("first_frame_realtime_us")] public long? FirstFrameRealtimeUs { get; set; }
-    /// <summary>Timeline mode: playlist file name relative to the session directory.</summary>
+    /// <summary>Timeline mode: playlist file name relative to the media directory.</summary>
     [JsonPropertyName("playlist")] public string? Playlist { get; set; }
+    /// <summary>Where the segments live when not in the session directory (RAM timelines: a tmpfs path).</summary>
+    [JsonPropertyName("media_dir")] public string? MediaDir { get; set; }
+    /// <summary>Set once a RAM timeline's segments have been dropped.</summary>
+    [JsonPropertyName("footage_gone")] public bool FootageGone { get; set; }
     /// <summary>Timeline mode: total seconds recorded (including footage already purged from the window).</summary>
     [JsonPropertyName("duration_seconds")] public double? DurationSeconds { get; set; }
     [JsonPropertyName("game_pid")] public int? GamePid { get; set; }

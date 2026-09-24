@@ -12,12 +12,13 @@ public sealed class SegmentIndex
 {
     private readonly object _lock = new();
     private readonly string _dir;
+    private readonly string _media;
     private readonly SegmentFile _file;
     private DateTime _playlistMtime;
 
-    public SegmentIndex(string sessionDir)
+    public SegmentIndex(string sessionDir, string? mediaDir = null)
     {
-        _dir = sessionDir;
+        _dir = sessionDir; _media = mediaDir ?? sessionDir;
         var path = IndexPath;
         _file = File.Exists(path)
             ? JsonSerializer.Deserialize(File.ReadAllText(path), SessionJson.Default.SegmentFile) ?? new SegmentFile()
@@ -25,7 +26,8 @@ public sealed class SegmentIndex
     }
 
     private string IndexPath => Path.Combine(_dir, "segments.json");
-    private string PlaylistPath => Path.Combine(_dir, Recording.GsrArguments.PlaylistName);
+    private string PlaylistPath => Path.Combine(_media, Recording.GsrArguments.PlaylistName);
+    public string MediaDir => _media;
 
     public IReadOnlyList<SegmentEntry> All { get { lock (_lock) return _file.Segments.ToList(); } }
 
@@ -40,13 +42,13 @@ public sealed class SegmentIndex
     {
         lock (_lock)
         {
-            var list = _file.Segments.Where(s => File.Exists(Path.Combine(_dir, s.File))).ToList();
+            var list = _file.Segments.Where(s => File.Exists(Path.Combine(_media, s.File))).ToList();
             if (includeTail)
             {
                 var last = _file.Segments.LastOrDefault();
                 var nextSeq = last is null ? 0 : last.Seq + 1;
                 var tailFile = string.Format(Recording.GsrArguments.SegmentPattern.Replace("%06d", "{0:D6}"), nextSeq);
-                if (File.Exists(Path.Combine(_dir, tailFile)))
+                if (File.Exists(Path.Combine(_media, tailFile)))
                     list.Add(new SegmentEntry { Seq = nextSeq, File = tailFile, Start = last is null ? 0 : last.Start + last.Duration, Duration = 1e9 });
             }
             return list;

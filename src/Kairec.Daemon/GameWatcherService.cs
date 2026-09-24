@@ -27,9 +27,9 @@ public sealed class GameWatcherService : BackgroundService
         {
             try
             {
+                await _rec.TickAsync(ct);
                 if (_rec.IsActive)
                 {
-                    await _rec.TickAsync(ct);
                     if (_rec.RecorderDied)
                     {
                         _log.LogWarning("recorder exited unexpectedly; closing session");

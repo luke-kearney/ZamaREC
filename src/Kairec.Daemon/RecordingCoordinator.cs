@@ -68,11 +68,25 @@ public sealed class RecordingCoordinator : IAsyncDisposable
                 return Fail($"already recording profile '{_active.Profile.Name}' (started by {_active.Trigger})");
 
             var profile = _cfg.Effective(profileCfg);
+            if (profile.Mode == CaptureMode.Timeline && profile.TimelineStorage == "ram")
+            {
+                // RAM footage of earlier sessions goes when a new one starts, then check the window fits.
+                PurgeRamSessions(all: true);
+                var ramDir = Paths.Expand(_cfg.Timeline.RamDir);
+                Directory.CreateDirectory(ramDir);
+                var need = profile.WindowBytes(_cfg.Capture.BitrateKbps) * 11 / 10;   // + audio and slack
+                long free = 0; try { free = new DriveInfo(ramDir).AvailableFreeSpace; } catch { }
+                if (need > free)
+                {
+                    _sound.Play("error");
+                    return Fail($"RAM timeline: a {profile.WindowMinutes} min window at {_cfg.Capture.BitrateKbps} kbps needs {need / 1e9:0.0} GB but {ramDir} has {free / 1e9:0.0} GB free. Shorten the window or lower the bitrate.");
+                }
+            }
             var session = SessionStore.Create(_cfg, profileCfg, trigger, gamePid);
             var sock = Path.Combine(Path.GetDirectoryName(ControlPaths.SocketPath())!, "kairec-gsr.sock");
             var incoming = Path.Combine(_cfg.ClipsDir, ".incoming");
             Directory.CreateDirectory(incoming);
-            var args = GsrArguments.Build(_cfg, profile, session.Dir, incoming, sock);
+            var args = GsrArguments.Build(_cfg, profile, session.MediaDir, incoming, sock);
             GsrProcess rec;
             try
             {
@@ -90,10 +104,10 @@ public sealed class RecordingCoordinator : IAsyncDisposable
             _active = new Active
             {
                 Profile = profile, Session = session, Recorder = rec, Trigger = trigger, GamePid = gamePid,
-                Segments = profile.Mode == CaptureMode.Timeline ? new SegmentIndex(session.Dir) : null,
+                Segments = profile.Mode == CaptureMode.Timeline ? new SegmentIndex(session.Dir, session.MediaDir) : null,
             };
             var detail = profile.Mode == CaptureMode.Timeline
-                ? (profile.WindowMinutes > 0 ? $"{profile.WindowMinutes} min window" : "unlimited window")
+                ? (profile.WindowMinutes > 0 ? $"{profile.WindowMinutes} min window" : "unlimited window") + (profile.TimelineStorage == "ram" ? " in RAM" : "")
                 : $"{profile.BufferMinutes} min {profile.BufferStorage} buffer";
             _log.LogInformation("session {id} started ({mode}, {detail}, trigger={trigger}, pid={pid})", session.Info.Id, profile.Mode, detail, trigger, gamePid);
             _sound.Play("start");
@@ -292,9 +306,35 @@ public sealed class RecordingCoordinator : IAsyncDisposable
         if (r.Ok) _sound.Play("save");
     }
 
+    private long _lastPurgeMono;
+
+    /// <summary>Drops RAM footage of finished sessions: all of them, or only those past their keep time.</summary>
+    public void PurgeRamSessions(bool all)
+    {
+        if (!Directory.Exists(_cfg.SessionsDir)) return;
+        foreach (var dir in Directory.EnumerateDirectories(_cfg.SessionsDir))
+        {
+            if (dir == _active?.Session.Dir) continue;
+            SessionStore store;
+            try { if (!File.Exists(Path.Combine(dir, "session.json"))) continue; store = SessionStore.Load(dir); } catch { continue; }
+            if (store.Info.MediaDir is null || store.Info.FootageGone) continue;
+            var keep = _cfg.FindProfile(store.Info.Profile) is { } p ? _cfg.Effective(p).RamKeepHours : _cfg.Timeline.RamKeepHours;
+            var ended = store.Info.EndedAt ?? store.Info.StartedAt;
+            var expired = (DateTimeOffset.Now - ended).TotalHours >= keep;
+            var missing = !Directory.Exists(store.Info.MediaDir);
+            if (all || expired || missing)
+            {
+                _log.LogInformation("dropping RAM footage of {id} ({why})", store.Info.Id, missing ? "already gone" : all ? "new session" : "keep time passed");
+                store.DropMedia();
+            }
+        }
+    }
+
     /// <summary>Called by the watcher loop about once a second. Cheap: an mtime check and a due-time compare.</summary>
     public async Task TickAsync(CancellationToken ct)
     {
+        var nowMono = MonotonicClock.NowMicros();
+        if (nowMono - _lastPurgeMono > 60_000_000) { _lastPurgeMono = nowMono; try { PurgeRamSessions(all: false); } catch (Exception ex) { _log.LogDebug(ex, "purge"); } }
         if (_active is null) return;
         if (!await _lock.WaitAsync(0, ct)) return;
         try
@@ -342,7 +382,10 @@ public sealed class RecordingCoordinator : IAsyncDisposable
         {
             var junk = new[] { "session.json", "markers.json", "segments.json", "live.m3u8", "live.m3u8.ts" };
             if (Directory.EnumerateFiles(dir).All(f => junk.Contains(Path.GetFileName(f))))
+            {
+                try { var info = SessionStore.Load(dir).Info; if (info.MediaDir is not null && Directory.Exists(info.MediaDir)) Directory.Delete(info.MediaDir, true); } catch { }
                 Directory.Delete(dir, recursive: true);
+            }
         }
         catch (Exception ex) { _log.LogDebug(ex, "could not remove {dir}", dir); }
     }

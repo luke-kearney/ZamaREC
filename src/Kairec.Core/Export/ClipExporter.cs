@@ -30,7 +30,7 @@ public static class ClipExporter
         var duration = end - (first.Start + seekInto);
 
         var listFile = Path.Combine(Path.GetTempPath(), $"kairec-concat-{Guid.NewGuid():N}.txt");
-        await File.WriteAllLinesAsync(listFile, segs.Select(s => $"file '{Path.Combine(sessionDir, s.File).Replace("'", "'\\''")}'"), ct);
+        await File.WriteAllLinesAsync(listFile, segs.Select(s => $"file '{Path.Combine(index.MediaDir, s.File).Replace("'", "'\\''")}'"), ct);
         try
         {
             var args = new List<string> { "-hide_banner", "-loglevel", "error", "-y" };

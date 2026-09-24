@@ -64,6 +64,8 @@ main { min-width: 0; display: flex; flex-direction: column; min-height: 0; overf
 .badge.live { background: #3a1216; color: #ff8a8a; border-color: #5a1e24; letter-spacing: .06em; }
 .badge.star { color: var(--accent); border-color: #4a3a12; background: #241c0a; }
 .badge.exp { color: #d9a441; }
+.badge.ram { color: #9ad0ff; border-color: #274a66; background: #0f2233; }
+.badge.gone { color: var(--dim); text-decoration: line-through; }
 .list .empty { padding: 30px 10px; }
 
 /* ---------- empty state */

@@ -57,6 +57,7 @@ public static class WebApi
             {
                 s.Id, s.Info.Profile, s.Info.Mode, s.Info.Map, s.Info.StartedAt, s.Info.EndedAt, s.Info.DurationSeconds,
                 s.MarkerCount, ClipCount = s.Info.Clips.Count, Live = s.Id == rec.ActiveSessionId,
+                Ram = s.Info.MediaDir is not null, s.Info.FootageGone,
             })));
 
         api.MapGet("/sessions/{id}", (string id, SessionCatalog cat, RecordingCoordinator rec) =>
@@ -65,7 +66,7 @@ public static class WebApi
             if (dir is null) return Results.NotFound();
             var live = dir == rec.ActiveSessionDir;
             var store = live ? rec.ActiveSession! : SessionStore.Load(dir);
-            var index = live ? rec.ActiveSegments : (store.Info.Mode == "timeline" ? new SegmentIndex(dir) : null);
+            var index = live ? rec.ActiveSegments : (store.Info.Mode == "timeline" ? new SegmentIndex(dir, store.MediaDir) : null);
             var segs = index?.All ?? [];
             var available = index?.Available(includeTail: false).Select(s => s.Seq).ToHashSet() ?? new HashSet<int>();
             var recorded = index?.TotalSeconds ?? store.Info.DurationSeconds ?? 0;
@@ -73,6 +74,7 @@ public static class WebApi
             return Results.Ok(new
             {
                 store.Info.Id, store.Info.Profile, store.Info.Mode, store.Info.Map, store.Info.StartedAt, store.Info.EndedAt, Live = live,
+                Ram = store.Info.MediaDir is not null, store.Info.FootageGone,
                 RecordedSeconds = recorded,
                 WindowStart = avail.Count > 0 ? avail[0].Start : 0.0,
                 WindowEnd = avail.Count > 0 ? avail[^1].Start + avail[^1].Duration : 0.0,
@@ -92,7 +94,7 @@ public static class WebApi
             var dir = cat.SessionDir(id);
             if (dir is null) return Results.NotFound();
             var live = dir == rec.ActiveSessionDir;
-            var index = live ? rec.ActiveSegments : new SegmentIndex(dir);
+            var index = live ? rec.ActiveSegments : new SegmentIndex(dir, SessionStore.Load(dir).MediaDir);
             if (index is null) return Results.NotFound();
             var segs = index.Available(includeTail: false);
             var sb = new StringBuilder("#EXTM3U\n#EXT-X-VERSION:3\n");
@@ -105,11 +107,12 @@ public static class WebApi
             return Results.Text(sb.ToString(), "application/vnd.apple.mpegurl");
         });
 
-        api.MapGet("/sessions/{id}/seg/{file}", (string id, string file, SessionCatalog cat) =>
+        api.MapGet("/sessions/{id}/seg/{file}", (string id, string file, SessionCatalog cat, RecordingCoordinator rec) =>
         {
             var dir = cat.SessionDir(id);
             if (dir is null || file.Contains('/') || file.Contains("..")) return Results.NotFound();
-            var path = Path.Combine(dir, file);
+            var mediaDir = dir == rec.ActiveSessionDir ? rec.ActiveSession!.MediaDir : SessionStore.Load(dir).MediaDir;
+            var path = Path.Combine(mediaDir, file);
             return File.Exists(path) ? Results.File(path, "video/mp2t", enableRangeProcessing: true) : Results.NotFound();
         });
 
@@ -231,7 +234,7 @@ public static class WebApi
     {
         var live = dir == rec.ActiveSessionDir;
         var store = live ? rec.ActiveSession! : SessionStore.Load(dir);
-        var index = live ? rec.ActiveSegments : new SegmentIndex(dir);
+        var index = live ? rec.ActiveSegments : new SegmentIndex(dir, store.MediaDir);
         if (index is null) return new ExportResult(false, null, null, null, "session has no timeline");
         index.Refresh();
         var target = ClipNaming.NewPath(cfg.ClipsDir, store.Info.Profile, label);
