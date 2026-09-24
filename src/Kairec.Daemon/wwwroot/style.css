@@ -105,6 +105,7 @@ main { min-width: 0; display: flex; flex-direction: column; min-height: 0; overf
 .item.has-banner::before { content: ""; position: absolute; inset: 0; background: var(--banner) center / cover no-repeat; opacity: .38; transition: opacity .15s; -webkit-mask-image: linear-gradient(90deg, rgba(0,0,0,.25), rgba(0,0,0,1) 70%); mask-image: linear-gradient(90deg, rgba(0,0,0,.25), rgba(0,0,0,1) 70%); }
 .item.has-banner::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, var(--panel) 0%, rgba(19,24,34,.55) 45%, rgba(19,24,34,.25) 100%); }
 .item.has-banner:hover::before, .item.has-banner.active::before { opacity: .55; }
+.item.has-banner.active::after { box-shadow: inset 3px 0 0 var(--accent); }   /* the active notch, above the banner layers */
 .item.gone.has-banner::before { filter: grayscale(1); opacity: .22; }
 .item.gone.has-banner:hover::before { opacity: .3; }
 .item > * { position: relative; z-index: 1; }
@@ -153,6 +154,10 @@ video { width: 100%; max-height: 100%; aspect-ratio: auto 16 / 9; display: block
 .tsep { width: 1px; height: 22px; background: var(--line2); margin: 0 8px; }
 .trange { color: var(--muted); font-size: 12px; margin: 0 4px; white-space: nowrap; }
 .trange:empty { display: none; }
+.player-msg { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; text-align: center; padding: 24px; background: radial-gradient(600px 300px at 50% 40%, #171d29 0%, #0b0e14 70%); color: var(--muted); }
+.player-msg svg { width: 52px; height: 52px; fill: none; stroke: var(--dim); stroke-width: 1.5; stroke-linecap: round; margin-bottom: 8px; }
+.player-msg .t { font-size: 17px; font-weight: 600; color: var(--text); }
+.player-msg .s { font-size: 13px; max-width: 420px; }
 .export-pop { position: absolute; right: 10px; bottom: 10px; z-index: 3; width: min(560px, calc(100% - 20px)); display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; background: rgba(15,19,27,.94); border: 1px solid var(--line2); border-radius: var(--radius); box-shadow: var(--shadow); backdrop-filter: blur(6px); }
 .export-pop .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .export-pop .row.batch { border-top: 1px solid var(--line); padding-top: 8px; }
