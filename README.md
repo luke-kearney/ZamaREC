@@ -8,11 +8,9 @@
 *kairec*, from *kairos* (καιρός): the opportune moment.
 
 A Linux game session recorder built around a marker timeline. It records on its own when a game
-starts, puts markers on the timeline from a hotkey or from the game itself, and cuts clips from
-those markers afterwards, so you never have to hit a save key in the moment. Steam's recorder does
-some of this but depends on the Steam overlay, which never reaches native Wayland games; replay
-buffers like gpu-screen-recorder's UI or OBS give you a save hotkey and nothing more. kairec is the
-part after the save: the timeline, the events on it, and the clips library.
+starts, marks moments from a hotkey or from the game itself, and cuts clips from those markers
+afterwards. Steam's recorder needs the overlay, which doesn't reach native Wayland games; replay
+buffers give you a save key and nothing more. kairec is the part after the save.
 
 - Records automatically when a profiled game starts, on the GPU encoder, via
   [gpu-screen-recorder](https://git.dec05eba.com/gpu-screen-recorder/).
@@ -39,7 +37,7 @@ desktops are untested.
 
 ```sh
 sudo pacman -S gpu-screen-recorder ffmpeg   # Arch / CachyOS; other distros: docs/install.md
-git clone <this repo> && cd kairec
+git clone https://github.com/luke-kearney/kairec.git && cd kairec
 ./install.sh
 ```
 

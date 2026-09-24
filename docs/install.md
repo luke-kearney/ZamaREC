@@ -27,7 +27,7 @@ driver, AMD and Intel through VAAPI. Only NVIDIA has been tried with kairec.
 
 ```sh
 sudo pacman -S gpu-screen-recorder ffmpeg pipewire dotnet-sdk clang
-git clone <this repo> && cd kairec
+git clone https://github.com/luke-kearney/kairec.git && cd kairec
 ./install.sh
 ```
 
