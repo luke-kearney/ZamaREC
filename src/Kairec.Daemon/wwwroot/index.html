@@ -72,7 +72,7 @@
       <div class="empty-hint">Sessions record themselves when a profiled game starts. Press <kbd>M</kbd> or your hotkey to drop a marker.</div>
       <div class="keys">
         <span><kbd>space</kbd> play</span><span><kbd>←</kbd><kbd>→</kbd> 5 s</span><span><kbd>J</kbd><kbd>L</kbd> 10 s</span>
-        <span><kbd>,</kbd><kbd>.</kbd> frame</span><span><kbd>[</kbd><kbd>]</kbd> markers</span><span><kbd>I</kbd><kbd>O</kbd> in / out</span><span><kbd>E</kbd> export</span><span><kbd>F</kbd> fullscreen</span><span><kbd>+</kbd><kbd>-</kbd> zoom</span>
+        <span><kbd>,</kbd><kbd>.</kbd> frame</span><span><kbd>[</kbd><kbd>]</kbd> markers</span><span><kbd>I</kbd><kbd>O</kbd> in / out</span><span><kbd>P</kbd> play range</span><span><kbd>E</kbd> export</span><span><kbd>F</kbd> fullscreen</span><span><kbd>+</kbd><kbd>-</kbd> zoom</span>
       </div>
     </div>
 
@@ -137,6 +137,10 @@
           <input id="inVal" class="num mono" type="number" step="0.1" min="0" placeholder="in">
           <button class="btn" id="outBtn" title="O">Set out</button>
           <input id="outVal" class="num mono" type="number" step="0.1" min="0" placeholder="out">
+          <span class="lbl">len</span><input id="rangeLen" class="num mono" type="number" min="1" value="20" title="default range length in seconds"><span class="unit">s</span>
+          <button class="btn" id="goIn" title="jump to in  shift+I">⇤</button>
+          <button class="btn" id="playRange" title="play in → out  P">▶ range</button>
+          <button class="btn" id="goOut" title="jump to out  shift+O">⇥</button>
         </div>
         <div class="tgroup grow">
           <input id="exportLabel" class="text" placeholder="clip label (optional)">

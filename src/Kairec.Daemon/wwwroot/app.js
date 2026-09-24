@@ -15,6 +15,7 @@ const state = {
   coverage: [], clipLoaded: null,   // buffer sessions: footage bands and which clip is in the player
   zoom: 1, viewStart: 0,             // timeline zoom: visible span is total/zoom starting at viewStart
   cursorT: 0,                        // last timeline position the user chose; in/out use this, not the player
+  playingRange: false,               // true while "play range" runs; pauses at outT
 };
 
 // ------------------------------------------------------------------ helpers
@@ -138,6 +139,7 @@ function fromMedia(m) {
   return (segs[0] ? segs[0].start : 0) + m;
 }
 function seek(t) {
+  state.playingRange = false;
   state.cursorT = Math.max(0, Math.min(state.total, t));
   placeHead(state.cursorT);
   const m = toMedia(t);
@@ -339,14 +341,35 @@ async function exportBatch() {
 document.querySelectorAll('.tab').forEach(b => b.onclick = () => { document.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x === b)); state.tab = b.dataset.tab; refreshList(); });
 $('profileFilter').onchange = e => { state.profile = e.target.value; renderList(); };
 $('typeFilter').onchange = e => { state.typeFilter = e.target.value; renderTimeline(); renderMarkers(); };
-$('inBtn').onclick = () => { state.inT = currentT(); if (state.outT != null && state.outT <= state.inT) state.outT = null; renderSelection(); };
-$('outBtn').onclick = () => { state.outT = currentT(); renderSelection(); };
+const rangeLen = () => Math.max(1, +$('rangeLen').value || 20);
+$('inBtn').onclick = () => {
+  state.inT = currentT();
+  if (state.outT == null || state.outT <= state.inT) state.outT = Math.min(state.total, state.inT + rangeLen());
+  renderSelection();
+};
+$('outBtn').onclick = () => {
+  state.outT = currentT();
+  if (state.inT == null || state.inT >= state.outT) state.inT = Math.max(0, state.outT - rangeLen());
+  renderSelection();
+};
+$('goIn').onclick = () => { if (state.inT != null) seek(state.inT); };
+$('goOut').onclick = () => { if (state.outT != null) seek(state.outT); };
+function playRange() {
+  if (state.inT == null || state.outT == null || state.outT <= state.inT) return toast('set in and out points first', true);
+  seek(state.inT);
+  state.playingRange = true;
+}
+$('playRange').onclick = playRange;
 $('inVal').onchange = e => { state.inT = +e.target.value; renderSelection(); };
 $('outVal').onchange = e => { state.outT = +e.target.value; renderSelection(); };
 $('exportBtn').onclick = exportRange;
 $('batchBtn').onclick = exportBatch;
 $('markBtn').onclick = async () => { try { const r = await api('/mark', { body: { label: null } }); toast(r.message, !r.ok); } catch (e) { toast(e.message, true); } };
-$('video').addEventListener('timeupdate', () => { if (!state.current) return; const t = fromMedia($('video').currentTime); state.cursorT = t; followPlayhead(t); placeHead(t); });
+$('video').addEventListener('timeupdate', () => {
+  if (!state.current) return;
+  const t = fromMedia($('video').currentTime); state.cursorT = t; followPlayhead(t); placeHead(t);
+  if (state.playingRange && state.outT != null && t >= state.outT) { $('video').pause(); state.playingRange = false; if (state.inT != null) { state.cursorT = state.outT; placeHead(state.outT); } }
+});
 // ---------------------------------------------------------------- transport
 (() => {
   const v = $('video'), stage = $('stage');
@@ -393,15 +416,26 @@ $('video').addEventListener('timeupdate', () => { if (!state.current) return; co
 })();
 // drag the in/out handles
 (() => {
-  let drag = null;
+  let drag = null, grabOffset = 0;
   document.querySelectorAll('.tl-sel .handle').forEach(h => h.addEventListener('mousedown', e => { e.stopPropagation(); e.preventDefault(); drag = h.dataset.h; }));
+  $('tlSel').addEventListener('mousedown', e => {
+    if (e.target.classList.contains('handle')) return;
+    e.stopPropagation(); e.preventDefault();
+    drag = 'move'; grabOffset = xToT(e.clientX) - state.inT; $('tlSel').classList.add('dragging');
+  });
   window.addEventListener('mousemove', e => {
     if (!drag) return;
     const t = Math.min(state.total, Math.max(0, xToT(e.clientX)));
-    if (drag === 'in') state.inT = Math.min(t, state.outT ?? t); else state.outT = Math.max(t, state.inT ?? t);
+    if (drag === 'in') state.inT = Math.min(t, state.outT ?? t);
+    else if (drag === 'out') state.outT = Math.max(t, state.inT ?? t);
+    else {
+      const len = state.outT - state.inT;
+      let ni = t - grabOffset; ni = Math.max(0, Math.min(state.total - len, ni));
+      state.inT = ni; state.outT = ni + len;
+    }
     renderSelection();
   });
-  window.addEventListener('mouseup', () => { drag = null; });
+  window.addEventListener('mouseup', () => { drag = null; $('tlSel').classList.remove('dragging'); });
   $('tlSel').addEventListener('click', e => e.stopPropagation());
 })();
 document.addEventListener('keydown', e => {
@@ -422,6 +456,8 @@ document.addEventListener('keydown', e => {
     case 'j': nudge(-10); break; case 'l': nudge(10); break;
     case ',': nudge(-1 / 60); break; case '.': nudge(1 / 60); break;
     case 'i': $('inBtn').click(); break; case 'o': $('outBtn').click(); break;
+    case 'I': $('goIn').click(); break; case 'O': $('goOut').click(); break;
+    case 'p': playRange(); break;
     case 'm': $('markBtn').click(); break;
     case 'e': exportRange(); break;
   }

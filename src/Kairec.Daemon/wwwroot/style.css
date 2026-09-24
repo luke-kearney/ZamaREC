@@ -112,6 +112,8 @@ video { width: 100%; max-height: 58vh; display: block; background: #000; cursor:
 .tl-ruler .tick.major { height: 18px; background: var(--line2); }
 .tl-ruler .tick span { position: absolute; left: 4px; bottom: 3px; font: 10.5px "JetBrains Mono", monospace; color: var(--muted); white-space: nowrap; }
 .tl-sel { position: absolute; top: 0; bottom: 18px; background: rgba(76, 201, 240, .22); border-left: 2px solid var(--cyan); border-right: 2px solid var(--cyan); display: none; }
+.tl-sel { cursor: grab; }
+.tl-sel.dragging { cursor: grabbing; }
 .tl-sel .handle { position: absolute; top: 0; bottom: 0; width: 10px; cursor: ew-resize; }
 .tl-sel .handle.l { left: -6px; } .tl-sel .handle.r { right: -6px; }
 .tl-sel .handle::after { content: ""; position: absolute; top: 4px; width: 8px; height: 14px; border-radius: 3px; background: var(--cyan); left: 1px; }
