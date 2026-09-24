@@ -12,6 +12,7 @@ const state = {
   tab: 'sessions', profile: '', sessions: [], clips: [], typeFilter: '',
   current: null,      // { kind: 'session'|'clip', id, data }
   hls: null, details: null, total: 0, inT: null, outT: null, pollTimer: null,
+  coverage: [], clipLoaded: null,   // buffer sessions: footage bands and which clip is in the player
 };
 
 // ------------------------------------------------------------------ helpers
@@ -103,9 +104,19 @@ function attachHls(url) {
   else toast('this browser cannot play HLS', true);
 }
 // session timeline seconds  <->  media element seconds (only differs for HLS sessions)
+function coverageAt(t) { return state.coverage.find(c => t >= c.start && t <= c.end); }
 function toMedia(t) {
   const cur = state.current;
   if (cur.kind !== 'session') return t;
+  if (cur.data.mode === 'buffer') {
+    const c = coverageAt(t);
+    if (!c) return null;
+    if (state.clipLoaded !== c.file) {
+      state.clipLoaded = c.file;
+      $('video').src = `/api/clips/${encodeURIComponent(cur.data.profile)}/${encodeURIComponent(c.file)}`;
+    }
+    return t - c.start;
+  }
   const segs = cur.data.segments.filter(s => s.available);
   const seg = segs.find(s => t >= s.start && t < s.start + s.duration);
   if (!seg) return null;   // purged, or not recorded yet
@@ -115,6 +126,7 @@ function toMedia(t) {
 function fromMedia(m) {
   const cur = state.current;
   if (!cur || cur.kind !== 'session') return m;
+  if (cur.data.mode === 'buffer') { const c = state.coverage.find(c => c.file === state.clipLoaded); return c ? c.start + m : m; }
   if (state.details) {
     const frag = state.details.fragments.find(f => m >= f.start && m < f.start + f.duration) || state.details.fragments[state.details.fragments.length - 1];
     const seg = frag && cur.data.segments.find(s => s.seq === frag.sn);
@@ -125,7 +137,7 @@ function fromMedia(m) {
 }
 function seek(t) {
   const m = toMedia(t);
-  if (m == null) return toast('that moment is no longer in the timeline window', true);
+  if (m == null) return toast(state.current.data.mode === 'buffer' ? 'no footage was saved for that moment' : 'that moment is no longer in the timeline window', true);
   const v = $('video'); v.currentTime = m; if (v.paused) v.play().catch(() => {});
 }
 function currentT() { return fromMedia($('video').currentTime); }
@@ -135,20 +147,23 @@ async function loadSession(id) {
   const data = await api('/sessions/' + id);
   const first = !state.current || state.current.kind !== 'session' || state.current.id !== id;
   state.current = { kind: 'session', id, data };
+  state.coverage = (data.clipDetails || []).filter(c => c.sessionOffset != null && c.durationSeconds).map(c => ({ file: c.file, label: c.label, start: c.sessionOffset, end: c.sessionOffset + c.durationSeconds }));
   if (first) {
-    destroyPlayer(); state.inT = state.outT = null;
+    destroyPlayer(); state.inT = state.outT = null; state.clipLoaded = null;
     if (data.mode === 'timeline') attachHls(`/api/sessions/${id}/playlist.m3u8`);
-    else toast('buffer-mode session: its footage lives in the clips it produced');
     if (data.live) state.pollTimer = setInterval(() => loadSession(id), 5000);
   } else if (data.live && data.mode === 'timeline') {
     const t = currentT();
     if (t < data.windowStart && toMedia(data.windowStart + 1) != null) seek(data.windowStart + 1);
   }
   $('title').textContent = `${data.profile} · ${fmtDate(data.startedAt)}` + (data.map ? ` · ${data.map}` : '');
+  const covered = state.coverage.reduce((a, c) => a + (c.end - c.start), 0);
   $('subtitle').textContent = data.mode === 'timeline'
     ? `${fmt(data.recordedSeconds)} recorded · window ${fmt(data.windowStart)} – ${fmt(data.windowEnd)}` + (data.live ? ' · live' : '')
-    : `buffer mode · ${data.markers.length} marks`;
-  state.total = data.mode === 'timeline' ? Math.max(data.recordedSeconds, data.windowEnd) : Math.max(1, ...data.markers.map(m => m.tVideo || 0));
+    : `buffer mode · ${data.markers.length} marks · ${state.coverage.length} clips covering ${fmt(covered)}` + (data.live ? ' · live, nothing is written until a mark or save' : '');
+  state.total = data.mode === 'timeline'
+    ? Math.max(data.recordedSeconds, data.windowEnd)
+    : Math.max(1, data.elapsedSeconds || 0, ...data.markers.map(m => m.tVideo || 0), ...state.coverage.map(c => c.end));
   showViewer(); renderTimeline(); renderMarkers(); renderList();
 }
 function loadClip(c) {
@@ -175,8 +190,19 @@ function renderTimeline() {
   if (cur.kind === 'session' && cur.data.mode === 'timeline') {
     $('tlPurged').style.width = pct(cur.data.windowStart);
     $('tlWindow').style.left = pct(cur.data.windowStart); $('tlWindow').style.width = pct(cur.data.windowEnd - cur.data.windowStart);
+  } else if (cur.kind === 'session' && cur.data.mode === 'buffer') {
+    // No continuous footage: hatch everything, then draw a band per clip.
+    $('tlPurged').style.width = '100%'; $('tlWindow').style.left = '0'; $('tlWindow').style.width = '0';
   } else { $('tlPurged').style.width = '0'; $('tlWindow').style.left = '0'; $('tlWindow').style.width = '100%'; }
   const box = $('tlMarkers'); box.innerHTML = '';
+  if (cur.kind === 'session' && cur.data.mode === 'buffer') {
+    for (const c of state.coverage) {
+      const b = document.createElement('div'); b.className = 'tl-cov'; b.style.left = pct(c.start); b.style.width = pct(c.end - c.start);
+      b.title = `${c.label || c.file} · ${fmt(c.start)} – ${fmt(c.end)}`;
+      b.onclick = e => { e.stopPropagation(); seek(c.start); };
+      box.appendChild(b);
+    }
+  }
   const types = new Set();
   for (const m of markersOf()) {
     if (m.t == null) continue; types.add(m.type);
@@ -234,12 +260,13 @@ function renderMarkers() {
   const isTimeline = cur.kind === 'session' && cur.data.mode === 'timeline';
   for (const m of markersOf().slice().sort((a, b) => (a.t ?? 0) - (b.t ?? 0))) {
     if (state.typeFilter && m.type !== state.typeFilter) continue;
-    const gone = isTimeline && m.t != null && m.t < cur.data.windowStart;
+    const isBuffer = cur.kind === 'session' && cur.data.mode === 'buffer';
+    const gone = (isTimeline && m.t != null && m.t < cur.data.windowStart) || (isBuffer && m.t != null && !coverageAt(m.t));
     const d = document.createElement('div'); d.className = 'mk' + (gone ? ' gone' : '');
     const extra = m.data && m.data.count ? ` ×${m.data.count}` : '';
     d.innerHTML = `<div class="bar" style="background:${colorOf(m.type)}"></div>
-      <div><div class="name">${m.type}${extra}${m.label ? ' · ' + m.label : ''}</div><div class="t">${fmt(m.t)}${gone ? ' · purged' : ''}${m.clip ? ' · ' + m.clip : ''}</div></div>
-      <div class="acts">${cur.kind === 'session' ? `<button title="star" class="${m.starred ? 'on' : ''}" data-star>★</button>` : ''}${isTimeline && !gone ? '<button title="clip around this marker" data-clip>✂</button>' : ''}</div>`;
+      <div><div class="name">${m.type}${extra}${m.label ? ' · ' + m.label : ''}</div><div class="t">${fmt(m.t)}${gone ? (isBuffer ? (cur.data.live && !m.clip ? ' · clip pending' : ' · no footage') : ' · purged') : ''}${m.clip ? ' · ' + m.clip : ''}</div></div>
+      <div class="acts">${cur.kind === 'session' ? `<button title="star" class="${m.starred ? 'on' : ''}" data-star>★</button>` : ''}${(isTimeline || isBuffer) && !gone ? '<button title="clip around this marker" data-clip>✂</button>' : ''}</div>`;
     d.onclick = () => { if (m.t != null && (!gone)) seek(m.t); };
     const st = d.querySelector('[data-star]');
     if (st) st.onclick = async e => { e.stopPropagation(); await api(`/sessions/${cur.id}/markers/${m.id}/star`, { method: 'POST' }); loadSession(cur.id); };
@@ -254,16 +281,29 @@ function renderMarkers() {
 async function exportRange() {
   const cur = state.current; if (!cur) return;
   if (state.inT == null || state.outT == null || state.outT <= state.inT) return toast('set in and out points first', true);
-  const body = { start: state.inT, end: state.outT, label: $('exportLabel').value || null, exact: $('exact').checked };
+  let body = { start: state.inT, end: state.outT, label: $('exportLabel').value || null, exact: $('exact').checked };
+  let target = cur.kind === 'session' ? `/sessions/${cur.id}/export` : `/clips/${cur.id}/export`;
+  if (cur.kind === 'session' && cur.data.mode === 'buffer') {
+    const c = coverageAt(state.inT);
+    if (!c || state.outT > c.end + 0.5) return toast('the range must lie inside one saved clip', true);
+    target = `/clips/${encodeURIComponent(cur.data.profile)}/${encodeURIComponent(c.file)}/export`;
+    body = { ...body, start: state.inT - c.start, end: Math.min(state.outT, c.end) - c.start };
+  }
   toast('exporting…');
   try {
-    const r = cur.kind === 'session' ? await api(`/sessions/${cur.id}/export`, { body }) : await api(`/clips/${cur.id}/export`, { body });
+    const r = await api(target, { body });
     toast(`exported ${fmt(r.duration)} → ${r.file}`); if (state.tab === 'clips') refreshList();
   } catch (e) { toast('export failed: ' + e.message, true); }
 }
 async function exportAround(m) {
   const cur = state.current;
-  const body = { markerId: m.id, before: +$('before').value || 0, after: +$('after').value || 0, label: $('exportLabel').value || null, exact: $('exact').checked };
+  const before = +$('before').value || 0, after = +$('after').value || 0;
+  if (cur.data.mode === 'buffer') {
+    const c = coverageAt(m.t); if (!c) return toast('no footage for that marker', true);
+    state.inT = Math.max(c.start, m.t - before); state.outT = Math.min(c.end, m.t + after); renderSelection();
+    return exportRange();
+  }
+  const body = { markerId: m.id, before, after, label: $('exportLabel').value || null, exact: $('exact').checked };
   toast('exporting…');
   try { const r = await api(`/sessions/${cur.id}/export-around`, { body }); toast(`exported ${fmt(r.duration)} → ${r.file}`); }
   catch (e) { toast('export failed: ' + e.message, true); }

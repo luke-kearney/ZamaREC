@@ -256,6 +256,7 @@ public sealed class RecordingCoordinator : IAsyncDisposable
         var info = new ClipInfo
         {
             Profile = a.Profile.Name, Label = label, Source = source, SessionId = a.Session.Info.Id,
+            SessionOffset = a.Session.ToVideoTime(saveMono) is double tEnd ? Math.Max(0, tEnd - duration) : null,
             DurationSeconds = duration, CreatedAt = DateTimeOffset.Now,
             ExpiresAt = source == "mark" && a.Profile.MarkClipExpireHours > 0 ? DateTimeOffset.Now.AddHours(a.Profile.MarkClipExpireHours) : null,
         };

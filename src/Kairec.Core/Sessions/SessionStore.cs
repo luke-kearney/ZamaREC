@@ -30,6 +30,9 @@ public sealed class SessionStore
             StartedAt = now, SpawnMonoUs = MonotonicClock.NowMicros(), GamePid = gamePid,
             Playlist = profile.CaptureMode == CaptureMode.Timeline ? Recording.GsrArguments.PlaylistName : null,
         };
+        // Buffer sessions never get a first-frame stamp (nothing is written until a save), so their
+        // timeline origin is the recorder spawn. Clip offsets are computed against the same origin.
+        if (profile.CaptureMode == CaptureMode.Buffer) info.FirstFrameMonoUs = info.SpawnMonoUs;
         var store = new SessionStore(dir, info, new MarkerFile());
         store.Save();
         return store;

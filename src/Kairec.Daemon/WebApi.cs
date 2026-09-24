@@ -79,6 +79,10 @@ public static class WebApi
                 Segments = segs.Select(s => new { s.Seq, s.File, s.Start, s.Duration, Available = available.Contains(s.Seq) }),
                 Markers = store.Markers.Select(m => new { m.Id, m.Type, m.Label, m.TVideo, m.At, m.Starred, m.Clip, m.Data }),
                 store.Info.Clips,
+                ClipDetails = store.Info.Clips.Select(f => (File: f, Path: cat.ClipPath(store.Info.Profile, f)))
+                    .Where(x => x.Path is not null)
+                    .Select(x => { var i = ReadClipInfo(x.Path!, store.Info.Profile); return new { x.File, i.Label, i.Source, i.SessionOffset, i.DurationSeconds, i.Starred, i.ExpiresAt, i.Markers }; }),
+                ElapsedSeconds = live ? (Core.MonotonicClock.NowMicros() - store.Info.SpawnMonoUs) / 1_000_000.0 : (double?)null,
             });
         });
 
