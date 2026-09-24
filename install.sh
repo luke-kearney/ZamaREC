@@ -22,6 +22,17 @@ echo ">> publishing cli (NativeAOT)"
 dotnet publish src/Kairec.Cli -c Release -r linux-x64 -o "$BIN_DIR" --nologo -v q
 rm -f "$BIN_DIR"/kairec.dbg
 
+echo ">> installing icons and desktop entry"
+ICON_DIR="$HOME/.local/share/icons/hicolor"
+mkdir -p "$ICON_DIR/scalable/apps" "$HOME/.local/share/applications"
+cp packaging/brand/kairec-icon.svg "$ICON_DIR/scalable/apps/kairec.svg"
+for s in 16 24 32 48 64 128 256 512; do
+  mkdir -p "$ICON_DIR/${s}x${s}/apps" && cp "packaging/brand/png/kairec-icon-$s.png" "$ICON_DIR/${s}x${s}/apps/kairec.png"
+done
+cp packaging/kairec.desktop "$HOME/.local/share/applications/kairec.desktop"
+command -v gtk-update-icon-cache >/dev/null && gtk-update-icon-cache -q -t "$ICON_DIR" 2>/dev/null || true
+command -v update-desktop-database >/dev/null && update-desktop-database -q "$HOME/.local/share/applications" 2>/dev/null || true
+
 echo ">> installing systemd user unit"
 mkdir -p "$UNIT_DIR"
 cp packaging/kairec.service "$UNIT_DIR/kairec.service"

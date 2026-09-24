@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Kairec
+Comment=Game session recorder: open the web UI
+Exec=xdg-open http://127.0.0.1:3556/
+Icon=kairec
+Terminal=false
+Categories=AudioVideo;Recorder;
+StartupNotify=false

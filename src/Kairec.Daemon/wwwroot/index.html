@@ -4,15 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>kairec</title>
+<link rel="icon" type="image/svg+xml" href="kairec-icon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="kairec-icon-32.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <header>
   <div class="brand">
-    <svg class="logo" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3.5 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/></svg>
-    <span class="wordmark">kairec</span>
+    <svg class="logo" viewBox="14 10 88 100" aria-hidden="true"><rect x="20" y="16" width="14" height="88" rx="2" fill="currentColor"/><line x1="67.9" y1="46.3" x2="96" y2="22" stroke="currentColor" stroke-width="14"/><line x1="67.9" y1="73.7" x2="96" y2="98" stroke="currentColor" stroke-width="14"/><circle cx="52" cy="60" r="11" fill="var(--brand)"/></svg>
+    <span class="wordmark">kai<span class="rec">rec</span></span>
   </div>
   <div class="switch-wrap">
     <button id="powerBtn" class="switch on" title="auto recording on/off"><span class="knob"></span></button>
@@ -84,7 +86,7 @@
       <div class="card logcard"><div id="logList"></div></div>
     </div>
     <div id="empty" class="empty">
-      <svg viewBox="0 0 24 24" class="empty-icon"><rect x="3" y="5" width="18" height="14" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10 9.5v5l4.5-2.5z" fill="currentColor"/></svg>
+      <svg viewBox="14 10 88 100" class="empty-icon"><rect x="20" y="16" width="14" height="88" rx="2" fill="currentColor"/><line x1="67.9" y1="46.3" x2="96" y2="22" stroke="currentColor" stroke-width="14"/><line x1="67.9" y1="73.7" x2="96" y2="98" stroke="currentColor" stroke-width="14"/><circle cx="52" cy="60" r="11" fill="var(--brand)"/></svg>
       <div class="empty-title">Pick a session or clip</div>
       <div class="empty-hint">Sessions record themselves when a profiled game starts. Press <kbd>M</kbd> or your hotkey to drop a marker.</div>
       <div class="keys">

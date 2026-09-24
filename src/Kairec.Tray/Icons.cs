@@ -1,28 +1,66 @@
 namespace Kairec.Tray;
 
-/// <summary>Tiny generated icons: a filled circle with a ring, in the colour of the state. ARGB32, network byte order, as SNI wants.</summary>
+/// <summary>
+/// The brand mark (packaging/brand/kairec-tray-mono.svg) rasterised in software: a bar, two strokes and a dot on a
+/// 120-unit canvas. The dot carries the state colour. ARGB32, network byte order, as SNI wants.
+/// </summary>
 static class Icons
 {
-    public static (int W, int H, byte[] Argb) Circle(int size, (byte R, byte G, byte B) fill, (byte R, byte G, byte B) ring, bool hollow = false)
+    static readonly (byte R, byte G, byte B) Ink = (0xed, 0xe9, 0xe3);
+    static readonly (byte R, byte G, byte B) Dim = (0x6b, 0x72, 0x7d);
+    static readonly (byte R, byte G, byte B) Red = (0xff, 0x4a, 0x2b);
+    static readonly (byte R, byte G, byte B) Gold = (0xf5, 0xb5, 0x44);
+
+    public static (int W, int H, byte[] Argb) Mark(int size, (byte R, byte G, byte B) ink, (byte R, byte G, byte B) dot, byte inkAlpha = 255)
     {
+        const int ss = 4;                       // supersampling per axis
         var px = new byte[size * size * 4];
-        var c = (size - 1) / 2.0; var r = size / 2.0 - 1.0;
+        var scale = 120.0 / size;
         for (int y = 0; y < size; y++)
         for (int x = 0; x < size; x++)
         {
-            var d = Math.Sqrt((x - c) * (x - c) + (y - c) * (y - c));
-            byte a = 0; (byte R, byte G, byte B) col = fill;
-            if (d <= r - 1.5) { a = hollow ? (byte)0 : (byte)255; }
-            else if (d <= r + 0.5) { a = (byte)Math.Clamp((r + 0.5 - d) * 255, 0, 255); col = ring; }
-            if (hollow && d <= r - 1.5 && d >= r - 3.5) { a = 255; col = ring; }
+            int inkHits = 0, dotHits = 0;
+            for (int sy = 0; sy < ss; sy++)
+            for (int sx = 0; sx < ss; sx++)
+            {
+                var u = (x + (sx + 0.5) / ss) * scale;
+                var v = (y + (sy + 0.5) / ss) * scale;
+                if (InDot(u, v)) dotHits++;
+                else if (InInk(u, v)) inkHits++;
+            }
+            var total = (double)(ss * ss);
+            var aDot = dotHits / total;
+            var aInk = inkHits / total * (inkAlpha / 255.0);
+            var a = aDot + aInk;
             var i = (y * size + x) * 4;
-            px[i] = a; px[i + 1] = col.R; px[i + 2] = col.G; px[i + 3] = col.B;
+            if (a <= 0) continue;
+            px[i] = (byte)Math.Round(a * 255);
+            px[i + 1] = (byte)Math.Round((dot.R * aDot + ink.R * aInk) / a);
+            px[i + 2] = (byte)Math.Round((dot.G * aDot + ink.G * aInk) / a);
+            px[i + 3] = (byte)Math.Round((dot.B * aDot + ink.B * aInk) / a);
         }
         return (size, size, px);
     }
 
-    public static readonly (int, int, byte[]) Idle = Circle(22, (0x5b, 0x66, 0x7a), (0xa0, 0xa8, 0xb4), hollow: true);
-    public static readonly (int, int, byte[]) Recording = Circle(22, (0xe5, 0x39, 0x35), (0xff, 0x8a, 0x80));
-    public static readonly (int, int, byte[]) Paused = Circle(22, (0xf5, 0xb5, 0x44), (0xff, 0xd9, 0x8a));
-    public static readonly (int, int, byte[]) Gone = Circle(22, (0x3a, 0x3f, 0x4a), (0x55, 0x5c, 0x68), hollow: true);
+    static bool InDot(double u, double v) => (u - 52) * (u - 52) + (v - 60) * (v - 60) <= 11 * 11;
+
+    static bool InInk(double u, double v) =>
+        (u >= 20 && u <= 34 && v >= 16 && v <= 104)                 // the bar
+        || NearSegment(u, v, 67.9, 46.3, 96, 22, 7)                  // upper stroke
+        || NearSegment(u, v, 67.9, 73.7, 96, 98, 7);                 // lower stroke
+
+    // Distance to a segment with butt caps, like an SVG line with the default linecap.
+    static bool NearSegment(double u, double v, double x1, double y1, double x2, double y2, double halfWidth)
+    {
+        var dx = x2 - x1; var dy = y2 - y1; var len2 = dx * dx + dy * dy;
+        var t = ((u - x1) * dx + (v - y1) * dy) / len2;
+        if (t < 0 || t > 1) return false;
+        var px = x1 + t * dx; var py = y1 + t * dy;
+        return (u - px) * (u - px) + (v - py) * (v - py) <= halfWidth * halfWidth;
+    }
+
+    public static readonly (int, int, byte[]) Idle = Mark(22, Ink, Dim);
+    public static readonly (int, int, byte[]) Recording = Mark(22, Ink, Red);
+    public static readonly (int, int, byte[]) Paused = Mark(22, Ink, Gold);
+    public static readonly (int, int, byte[]) Gone = Mark(22, Dim, Dim, inkAlpha: 160);
 }

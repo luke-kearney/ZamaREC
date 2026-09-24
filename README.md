@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: light)" srcset="packaging/brand/png/kairec-logo-on-light.png">
+    <img src="packaging/brand/png/kairec-logo-on-dark.png" alt="kairec" width="340">
+  </picture>
+</p>
+
 # kairec
 
 *kairec*, from *kairos* (καιρός): the opportune moment.
