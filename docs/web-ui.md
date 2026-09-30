@@ -26,6 +26,10 @@ first hit of a Steam store search for the profile name. The daemon fetches each 
 dropped; markers and clips remain), starred, expiring, and *new* for a session of a Steam game that
 has no profile yet.
 
+A clip is listed and sorted by when its footage was recorded. An export cut today from Monday's
+session or clip is dated Monday, in its file name too, and sits next to what it was cut from.
+Retention still counts an export's age from the day it was cut.
+
 ## Player and timeline
 
 - Timeline sessions play through hls.js, including the live one, a few seconds behind. Buffer

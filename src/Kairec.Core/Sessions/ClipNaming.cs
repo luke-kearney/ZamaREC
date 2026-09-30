@@ -13,11 +13,12 @@ public static class ClipNaming
     }
 
     /// <summary>A fresh clips/&lt;profile&gt;/&lt;stamp&gt;[_label].mp4 path that does not exist yet.</summary>
-    public static string NewPath(string clipsDir, string profile, string? label, string ext = ".mp4")
+    /// <param name="at">The time the name carries: when the footage was recorded, for an export of older footage. Default: now.</param>
+    public static string NewPath(string clipsDir, string profile, string? label, string ext = ".mp4", DateTimeOffset? at = null)
     {
         var dir = Path.Combine(clipsDir, profile);
         Directory.CreateDirectory(dir);
-        var stamp = DateTimeOffset.Now.ToString("yyyy-MM-dd_HH-mm-ss");
+        var stamp = (at ?? DateTimeOffset.Now).ToString("yyyy-MM-dd_HH-mm-ss");
         var name = stamp + (string.IsNullOrWhiteSpace(label) ? "" : "_" + Sanitize(label)) + ext;
         var target = Path.Combine(dir, name);
         for (int i = 2; File.Exists(target); i++)

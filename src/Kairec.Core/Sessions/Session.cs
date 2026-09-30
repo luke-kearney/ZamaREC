@@ -34,6 +34,15 @@ public sealed class SessionInfo
     /// <summary>The Steam app this session recorded, when Steam launched it.</summary>
     [JsonPropertyName("steam_app_id")] public long? SteamAppId { get; set; }
     [JsonPropertyName("clips")] public List<string> Clips { get; set; } = new();
+
+    /// <summary>The wall-clock time of a point on this session's timeline (seconds from its first frame).</summary>
+    public DateTimeOffset TimeAt(double seconds)
+    {
+        var origin = FirstFrameRealtimeUs is long us ? DateTimeOffset.FromUnixTimeMilliseconds(us / 1000).ToOffset(StartedAt.Offset)
+            : FirstFrameMonoUs is long ff ? StartedAt.AddSeconds((ff - SpawnMonoUs) / 1e6)
+            : StartedAt;
+        return origin.AddSeconds(seconds);
+    }
 }
 
 public sealed class Marker
@@ -84,7 +93,13 @@ public sealed class ClipInfo
     /// <summary>Seconds into the session timeline where this clip starts, when known.</summary>
     [JsonPropertyName("session_offset")] public double? SessionOffset { get; set; }
     [JsonPropertyName("duration_seconds")] public double? DurationSeconds { get; set; }
+    /// <summary>When the file was written. Retention counts a clip's age from here.</summary>
     [JsonPropertyName("created_at")] public DateTimeOffset CreatedAt { get; set; }
+    /// <summary>
+    /// When the footage was recorded (its last frame), for clips cut later from older footage. Unset on mark and
+    /// save clips, which are written as they happen: created_at is their time. Lists show and sort by this.
+    /// </summary>
+    [JsonPropertyName("recorded_at")] public DateTimeOffset? RecordedAt { get; set; }
     [JsonPropertyName("starred")] public bool Starred { get; set; }
     /// <summary>Mark clips expire; null means retention's normal rules apply.</summary>
     [JsonPropertyName("expires_at")] public DateTimeOffset? ExpiresAt { get; set; }

@@ -51,7 +51,7 @@ localhost. Everything the web UI does goes through these.
 
 | method | path | notes |
 |---|---|---|
-| GET | `/clips` | all clips with their sidecar data |
+| GET | `/clips` | all clips with their sidecar data, newest footage first. `recordedAt` is when the footage was recorded, `createdAt` when the file was written; they differ for exports |
 | GET | `/clips/{profile}/{file}` | the MP4, with range support |
 | POST | `/clips/{profile}/{file}/star` | toggle; starring clears the expiry |
 | DELETE | `/clips/{profile}/{file}` | |

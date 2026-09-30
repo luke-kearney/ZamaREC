@@ -118,7 +118,7 @@ function renderList() {
       const hasBanner = banner(d, c.profile);
       const exp = c.expiresAt ? `<span class="badge exp" title="expires ${fmtDate(c.expiresAt)}">⌛</span>` : '';
       d.innerHTML = `<div class="l1"><span>${c.label || c.file.replace('.mp4', '')}</span><span class="r">${c.starred ? '<span class="badge star">★</span>' : ''}${exp}${hasBanner ? '' : `<span class="badge">${c.profile}</span>`}</span></div>
-        <div class="l2"><span>${fmtDate(c.createdAt)}</span><span class="mono">${fmt(c.durationSeconds)}</span><span>${gb(c.bytes)}</span><span>${c.source}</span></div>`;
+        <div class="l2"><span>${fmtDate(c.recordedAt || c.createdAt)}</span><span class="mono">${fmt(c.durationSeconds)}</span><span>${gb(c.bytes)}</span><span>${c.source}</span></div>`;
       d.onclick = () => { if (window.closePages) window.closePages(); loadClip(c); };
       box.appendChild(d);
     }
@@ -231,7 +231,7 @@ function loadClip(c) {
   $('title').textContent = c.label || c.file;
   const sb = $('starClip'); sb.hidden = false; sb.classList.toggle('on', !!c.starred); sb.querySelector('span').textContent = c.starred ? 'Starred' : 'Star';
   disarmDelete(); $('deleteClip').hidden = false;
-  $('subtitle').textContent = `${c.profile} · ${c.source} · ${fmtDate(c.createdAt)} · ${fmt(c.durationSeconds)} · ${gb(c.bytes)}` + (c.expiresAt ? ` · expires ${fmtDate(c.expiresAt)}` : '');
+  $('subtitle').textContent = `${c.profile} · ${c.source} · ${fmtDate(c.recordedAt || c.createdAt)} · ${fmt(c.durationSeconds)} · ${gb(c.bytes)}` + (c.expiresAt ? ` · expires ${fmtDate(c.expiresAt)}` : '');
   state.total = c.durationSeconds || 1;
   showViewer(); renderTimeline(); renderMarkers(); renderList();
 }

@@ -4,7 +4,8 @@ using Kairec.Core.Config;
 namespace Kairec.Core.Sessions;
 
 public sealed record SessionSummary(string Id, string Dir, SessionInfo Info, int MarkerCount);
-public sealed record ClipSummary(string Profile, string File, string Path, long Bytes, ClipInfo Info);
+/// <param name="At">When the clip's footage was recorded: what lists show and sort by.</param>
+public sealed record ClipSummary(string Profile, string File, string Path, long Bytes, ClipInfo Info, DateTimeOffset At);
 
 /// <summary>Read-side view over sessions/ and clips/ for the UI and CLI.</summary>
 public sealed class SessionCatalog
@@ -44,6 +45,7 @@ public sealed class SessionCatalog
     {
         var list = new List<ClipSummary>();
         if (!Directory.Exists(_cfg.ClipsDir)) return list;
+        var sessions = new Dictionary<string, SessionInfo?>();
         foreach (var pdir in Directory.EnumerateDirectories(_cfg.ClipsDir))
         {
             var profile = Path.GetFileName(pdir);
@@ -57,10 +59,33 @@ public sealed class SessionCatalog
                     info = File.Exists(side) ? JsonSerializer.Deserialize(File.ReadAllText(side), SessionJson.Default.ClipInfo) ?? new ClipInfo { Profile = profile } : new ClipInfo { Profile = profile, CreatedAt = File.GetCreationTime(mp4) };
                 }
                 catch { info = new ClipInfo { Profile = profile }; }
-                list.Add(new ClipSummary(profile, Path.GetFileName(mp4), mp4, new FileInfo(mp4).Length, info));
+                list.Add(new ClipSummary(profile, Path.GetFileName(mp4), mp4, new FileInfo(mp4).Length, info, FootageTime(info, sessions)));
             }
         }
-        return list.OrderByDescending(c => c.Info.CreatedAt).ToList();
+        return list.OrderByDescending(c => c.At).ToList();
+    }
+
+    /// <summary>
+    /// When a clip's footage ends on the wall clock. Mark and save clips are written as they happen, so that is
+    /// created_at. An export carries recorded_at; one from before that field existed is placed through its session.
+    /// </summary>
+    public DateTimeOffset FootageTime(ClipInfo info, Dictionary<string, SessionInfo?>? cache = null)
+    {
+        if (info.RecordedAt is { } at) return at;
+        if (info.Source != "export" || info.SessionId is not { } sid || info.SessionOffset is not double offset) return info.CreatedAt;
+        cache ??= new();
+        if (!cache.TryGetValue(sid, out var session))
+        {
+            session = null;
+            try
+            {
+                if (SessionDir(sid) is { } dir && File.Exists(Path.Combine(dir, "session.json")))
+                    session = JsonSerializer.Deserialize(File.ReadAllText(Path.Combine(dir, "session.json")), SessionJson.Default.SessionInfo);
+            }
+            catch { }
+            cache[sid] = session;
+        }
+        return session?.TimeAt(offset + (info.DurationSeconds ?? 0)) ?? info.CreatedAt;
     }
 
     public string? ClipPath(string profile, string file)
