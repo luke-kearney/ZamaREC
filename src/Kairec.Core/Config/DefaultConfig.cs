@@ -60,6 +60,10 @@ public static class DefaultConfig
         # quality = "medium"              # unset = capture.quality
         ignore = []                       # Steam app ids never to record this way
 
+        [share]
+        # discord_webhook = "https://discord.com/api/webhooks/..."   # a clip's Share menu can post to this channel; keep it secret
+        discord_max_mb = 10               # the channel's upload limit; bigger clips are re-encoded to fit first
+
         [feedback]
         sound = true                      # short tone on mark/save. Never a popup, never focus.
         volume = 0.5

@@ -83,9 +83,20 @@
         <button class="tab" data-tab="clips">Clips</button>
       </div>
       <select id="profileFilter" class="sel" title="profile"><option value="">all profiles</option></select>
+      <button class="tbtn pin" id="selectBtn" title="select several, to star or delete them together">
+        <svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg>
+      </button>
     </div>
     <div class="pane-tab" id="asideTab" title="expand sidebar"><span id="asideTabLabel">Sessions</span></div>
     <div id="list" class="list"></div>
+    <div id="selectBar" class="select-bar" hidden>
+      <span id="selectCount" class="muted"></span><span class="spacer"></span>
+      <button class="btn small" id="selAll">All</button>
+      <button class="btn small" id="selStar" title="star the selected clips">Star</button>
+      <button class="btn small" id="selUnstar" title="unstar the selected clips">Unstar</button>
+      <button class="btn small danger" id="selDelete"><span>Delete</span></button>
+      <button class="tiny" id="selDone" title="leave select mode"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+    </div>
   </aside>
 
   <main>
@@ -133,6 +144,20 @@
           <div id="subtitle" class="subtitle"></div>
         </div>
         <div class="title-acts">
+          <button class="btn ghost icon" id="renameClip" title="rename this clip" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4"/></svg></button>
+          <button class="btn ghost icon" id="revealClip" title="show this clip in the file manager" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></button>
+          <span class="switch-wrap" id="shareWrap" hidden>
+            <button class="btn ghost" id="shareClip" title="send this clip somewhere, or make a copy small enough to post"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 3L10 14M21 3l-7 18-4-7-7-4z"/></svg><span>Share</span></button>
+            <div id="shareMenu" class="menu right" hidden>
+              <button id="shareDiscord">Send to Discord<span class="sub" id="shareDiscordSub"></span></button>
+              <div class="menu-title">A copy small enough to post</div>
+              <button data-share-mb="10">under 10 MB<span class="sub">Discord without Nitro</span></button>
+              <button data-share-mb="25">under 25 MB</button>
+              <button data-share-mb="50">under 50 MB</button>
+              <button data-share-mb="100">under 100 MB</button>
+              <div class="menu-note">Re-encoded on the GPU to fit, smaller picture if it has to be. The original is kept.</div>
+            </div>
+          </span>
           <button class="btn ghost star" id="starClip" title="star this clip: it is never deleted by retention" hidden><svg class="ic ic-star" viewBox="0 0 24 24" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><span>Star</span></button>
           <button class="btn ghost danger" id="deleteClip" title="delete this clip" hidden><span>Delete</span></button>
         </div>
@@ -154,6 +179,9 @@
             </div>
             <div class="row">
               <input id="exportLabel" class="text" placeholder="clip label (optional)">
+              <select id="exportSize" class="sel" title="original: a stream copy, as recorded. A size: re-encoded on the GPU to fit under it, for posting where uploads are limited">
+                <option value="">original size</option><option value="10">under 10 MB</option><option value="25">under 25 MB</option><option value="50">under 50 MB</option><option value="100">under 100 MB</option>
+              </select>
               <label class="chk"><input type="checkbox" id="exact"> frame-exact</label>
               <label class="chk" id="exportMixWrap" title="remake the clip's mix from the separate tracks at the mixer's levels, so it sounds like what you hear now. The tracks themselves are kept" hidden><input type="checkbox" id="exportMix" checked> mixer levels</label>
               <button class="btn primary" id="exportBtn" title="E">Export range</button>

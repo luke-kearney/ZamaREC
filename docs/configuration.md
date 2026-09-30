@@ -139,6 +139,21 @@ runs one now.
 | `cfg_dir` | `""` | CS2's `csgo/cfg` folder. Empty = found through Steam's library list |
 | `capture_raw` | `true` | keep every payload in `gsi.jsonl` inside the session folder |
 
+## `[share]`
+
+| key | default | meaning |
+|---|---|---|
+| `discord_webhook` | unset | a Discord webhook address (Server Settings → Integrations → Webhooks). With it set, a clip's Share menu can post the clip to that channel. It is a secret: anyone who has it can post there. Only `discord.com` addresses are accepted |
+| `discord_max_mb` | `10` | the largest file the channel takes: 10 without Nitro or boosts. A clip over it is re-encoded to fit before it is sent |
+
+Nothing is ever sent on its own; a clip goes out only when you click *Send to Discord*.
+
+A share-size copy is always a re-encode on the GPU (NVENC, decoded and scaled on the GPU too): the
+bitrate is what fits the size over the clip's length, and the picture steps down from the source
+through 1080p60, 720p60, 720p30, 540p, 480p to 360p until that bitrate is enough for it. A clip too
+long for the size even at 360p is refused. It carries one audio track: the mix, or the mixer's
+levels when exporting with them.
+
 ## `[auto_games]`
 
 A Steam game with no profile (an "unconfirmed" game) is still recorded: a RAM timeline with the

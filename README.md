@@ -21,6 +21,8 @@ buffers give you a save key and nothing more. kairec is the part after the save.
   round results, MVPs, map changes) through Valve's Game State Integration.
 - Optional separate audio tracks (game, mic, voice chat) next to the normal mix, kept in every clip,
   with a mixer in the viewer to set their levels afterwards and export a clip that sounds that way.
+- Share-size copies (a clip re-encoded on the GPU to fit under 10 MB, say) and one-click posting
+  to a Discord channel through a webhook.
 - Clips around markers and events, saves of the last N seconds, and range exports, all as stream
   copies with no re-encode, or frame-exact on nvenc if you ask.
 - A web UI with a timeline, a games page, settings, stats and a log, in a window of its own or a

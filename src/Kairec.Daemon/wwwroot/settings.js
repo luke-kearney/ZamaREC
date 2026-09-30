@@ -83,6 +83,12 @@
       ${field('never record these Steam app ids (comma list)', inp('autoGames.ignore', (ag.ignore || []).join(', ')), true)}
     </div></div>`;
 
+    const sh = c.share || (c.share = { discordWebhook: null, discordMaxMb: 10 });
+    h += `<div class="card"><h3>Sharing</h3><div class="help">A clip's Share button can post it to a Discord channel through a webhook. Nothing is sent unless you click it. A clip over the size limit is re-encoded on the GPU to fit first.</div><div class="fields">
+      ${field('Discord webhook address', inp('share.discordWebhook', sh.discordWebhook, 'text', 'placeholder="https://discord.com/api/webhooks/…" autocomplete="off" spellcheck="false"'), true, 'in Discord: Server Settings → Integrations → Webhooks → New Webhook → Copy Webhook URL. Treat it like a password: anyone who has it can post to that channel')}
+      ${field('largest file the channel takes, MB', inp('share.discordMaxMb', sh.discordMaxMb, 'number', 'min="1" max="500" step="1"'), false, '10 without Nitro or server boosts')}
+    </div></div>`;
+
     h += `<div class="card"><h3>Quality presets <span class="spacer"></span><button class="btn small" id="addQuality">+ Add preset</button></h3>
       <div class="help">Encoder settings. Blank fields mean 60 fps, h264, 20000 kbps, 1 s keyframes. Scale limits the output size, e.g. 1280x720. h264 plays in every browser.</div>
       <div class="qgrid"><div class="qh">name</div><div class="qh">fps</div><div class="qh">codec</div><div class="qh">bitrate kbps</div><div class="qh">keyframe s</div><div class="qh">scale</div><div class="qh">≈ GB/h</div><div class="qh"></div>

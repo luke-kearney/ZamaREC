@@ -13,7 +13,10 @@ namespace Kairec.Daemon;
 public static class WebApi
 {
     /// <param name="Mix">Track name to level: remake the clip's mix from the separate tracks at these levels.</param>
-    public sealed record ExportRequest(double Start, double End, string? Label, bool Exact, Dictionary<string, double>? Mix = null);
+    /// <param name="MaxMb">Make a re-encoded copy that fits under this many megabytes, for posting somewhere with a size limit.</param>
+    public sealed record ExportRequest(double Start, double End, string? Label, bool Exact, Dictionary<string, double>? Mix = null, double? MaxMb = null);
+    public sealed record LabelRequest(string? Label);
+    public sealed record DiscordRequest(string? Message);
     public sealed record AroundRequest(string MarkerId, double Before, double After, string? Label, bool Exact, Dictionary<string, double>? Mix = null);
     public sealed record BatchRequest(string Type, double Before, double After, bool Exact, Dictionary<string, double>? Mix = null);
     public sealed record MarkRequest(string? Label);
@@ -34,6 +37,7 @@ public static class WebApi
                 GsiLastSeconds = gsi.SecondsSinceLastPayload, GsiMap = gsi.CurrentMap, GsiCfg = gsi.CfgPath,
                 Usage = new { u.CpuPercent, u.RssBytes, u.Processes, RamFsBytes = ProcessUsage.DirBytes(ramDir), RamFsFree = FreeBytes(ramDir), Cores = Environment.ProcessorCount },
                 Pause = ps.Mode == "off" ? null : new { ps.Mode, ps.Until, Text = PauseControl.Describe(ps) },
+                Discord = !string.IsNullOrWhiteSpace(cfg.Share.DiscordWebhook), DiscordMaxMb = cfg.Share.DiscordMaxMb,
                 Profiles = cfg.Profiles.Select(p => new { p.Name, p.Mode }) });
         });
 
@@ -325,6 +329,24 @@ public static class WebApi
             return path is null ? Results.NotFound() : Results.File(path, "image/jpeg");
         });
 
+        // Removes a finished session: its folder, markers and any RAM footage. Its clips stay unless clips=true,
+        // and starred clips stay even then.
+        api.MapDelete("/sessions/{id}", (string id, bool? clips, SessionCatalog cat, RecordingCoordinator rec, EventLog events) =>
+        {
+            var dir = cat.SessionDir(id);
+            if (dir is null || !File.Exists(Path.Combine(dir, "session.json"))) return Results.NotFound();
+            if (dir == rec.ActiveSessionDir) return Results.Conflict(new { Error = "that session is still recording; stop it first" });
+            var info = SessionStore.Load(dir).Info;
+            var removed = 0;
+            if (clips == true)
+                foreach (var c in cat.Clips().Where(c => c.Info.SessionId == id && !c.Info.Starred))
+                { File.Delete(c.Path); if (File.Exists(c.Path + ".json")) File.Delete(c.Path + ".json"); removed++; }
+            try { if (info.MediaDir is not null && Directory.Exists(info.MediaDir)) Directory.Delete(info.MediaDir, true); } catch (IOException) { }
+            Directory.Delete(dir, true);
+            events.Write("purge", "session deleted by request" + (removed > 0 ? $" with {removed} clip{(removed == 1 ? "" : "s")}" : ""), info.Profile, id);
+            return Results.Ok(new { Ok = true, ClipsDeleted = removed });
+        });
+
         api.MapPost("/sessions/{id}/markers/{mid}/star", (string id, string mid, SessionCatalog cat, RecordingCoordinator rec) =>
         {
             var dir = cat.SessionDir(id);
@@ -341,7 +363,7 @@ public static class WebApi
         {
             var dir = cat.SessionDir(id);
             if (dir is null) return Results.NotFound();
-            var r = await ExportRangeAsync(dir, req.Start, req.End, req.Label, req.Exact, "export", cat, rec, cfg, log, ct, req.Mix);
+            var r = await ExportRangeAsync(dir, req.Start, req.End, req.Label, req.Exact, "export", cat, rec, cfg, log, ct, req.Mix, req.MaxMb);
             return r.Ok ? Results.Ok(r) : Results.BadRequest(r);
         });
 
@@ -403,12 +425,13 @@ public static class WebApi
             return await stems.ClipAsync(p, profile, track, ct) is { } path ? Results.File(path, "audio/mp4", enableRangeProcessing: true) : Results.NotFound();
         });
 
-        api.MapPost("/clips/{profile}/{file}/star", (string profile, string file, SessionCatalog cat) =>
+        // Toggles, or with ?on=true|false sets (for starring several at once).
+        api.MapPost("/clips/{profile}/{file}/star", (string profile, string file, bool? on, SessionCatalog cat) =>
         {
             var p = cat.ClipPath(profile, file);
             if (p is null) return Results.NotFound();
             var info = ReadClipInfo(p, profile);
-            info.Starred = !info.Starred;
+            info.Starred = on ?? !info.Starred;
             if (info.Starred) info.ExpiresAt = null;
             SessionCatalog.SaveClipInfo(p, info);
             return Results.Ok(new { info.Starred });
@@ -431,19 +454,81 @@ public static class WebApi
             // The new clip is dated by its footage, not by when it was cut: the source's end, less what was left off.
             var recordedAt = cat.FootageTime(src).AddSeconds(src.DurationSeconds is double len ? Math.Min(0, req.End - len) : 0);
             var target = ClipNaming.NewPath(cfg.ClipsDir, profile, req.Label ?? src.Label, at: recordedAt);
-            var r = await ClipExporter.ExportFromFileAsync(p, req.Start, req.End, target, req.Exact, log, ct, src.AudioTracks, req.Mix);
+            var share = ShareBytes(req.MaxMb);
+            var r = await ClipExporter.ExportFromFileAsync(p, req.Start, req.End, target, req.Exact, log, ct, src.AudioTracks, req.Mix, share);
             if (!r.Ok) return Results.BadRequest(new { r.Ok, r.Error });
             var info = new ClipInfo
             {
-                Profile = profile, Label = req.Label ?? src.Label, Source = "export", SessionId = src.SessionId,
-                SessionOffset = src.SessionOffset is double o ? o + req.Start : null, DurationSeconds = r.Duration, CreatedAt = DateTimeOffset.Now, RecordedAt = recordedAt, AudioTracks = src.AudioTracks,
+                Profile = profile, Label = req.Label ?? src.Label, Source = share is null ? "export" : "share", SessionId = src.SessionId,
+                SessionOffset = src.SessionOffset is double o ? o + req.Start : null, DurationSeconds = r.Duration, CreatedAt = DateTimeOffset.Now, RecordedAt = recordedAt,
+                AudioTracks = share is null ? src.AudioTracks : null,
                 MixLevels = ClipExporter.Mixes(src.AudioTracks, req.Mix) ? req.Mix : null,
                 Markers = src.Markers.Where(m => m.T >= req.Start && m.T <= req.End).Select(m => new ClipMarker { T = m.T - req.Start, Type = m.Type, Label = m.Label, Data = m.Data }).ToList(),
             };
             SessionCatalog.SaveClipInfo(target, info);
             rec.RecordExport(profile, src.SessionId, target, r.Duration);
-            return Results.Ok(new { r.Ok, Path = target, File = Path.GetFileName(target), r.Duration });
+            return Results.Ok(new { r.Ok, Path = target, File = Path.GetFileName(target), r.Duration, Bytes = new FileInfo(target).Length });
         });
+
+        // ------------------------------------------------------------ managing and sharing clips
+
+        api.MapMethods("/clips/{profile}/{file}", ["PATCH"], (string profile, string file, LabelRequest req, SessionCatalog cat) =>
+        {
+            var p = cat.ClipPath(profile, file);
+            if (p is null) return Results.NotFound();
+            var info = ReadClipInfo(p, profile);
+            info.Label = string.IsNullOrWhiteSpace(req.Label) ? null : req.Label.Trim();   // the file keeps its name; sessions refer to it
+            SessionCatalog.SaveClipInfo(p, info);
+            return Results.Ok(new { info.Label });
+        });
+
+        // Shows the clip in the file manager, selected. Opens a window, so only ever on a click.
+        api.MapPost("/clips/{profile}/{file}/reveal", (string profile, string file, SessionCatalog cat) =>
+        {
+            var p = cat.ClipPath(profile, file);
+            if (p is null) return Results.NotFound();
+            var shown = Run("busctl", ["--user", "call", "org.freedesktop.FileManager1", "/org/freedesktop/FileManager1", "org.freedesktop.FileManager1", "ShowItems", "ass", "1", new Uri(p).AbsoluteUri, ""])
+                        || Run("xdg-open", [Path.GetDirectoryName(p)!]);
+            return shown ? Results.Ok(new { Ok = true }) : Results.BadRequest(new { Error = "no file manager answered" });
+        });
+
+        // Posts the clip to the Discord webhook in [share]. A clip over the channel's limit is re-encoded to fit
+        // first, and that smaller copy is kept as a clip.
+        api.MapPost("/clips/{profile}/{file}/discord", async (string profile, string file, DiscordRequest req, SessionCatalog cat, KairecConfig cfg, DiscordShare discord,
+            RecordingCoordinator rec, EventLog events, ILogger<Program> log, CancellationToken ct) =>
+        {
+            var p = cat.ClipPath(profile, file);
+            if (p is null) return Results.NotFound();
+            if (string.IsNullOrWhiteSpace(cfg.Share.DiscordWebhook)) return Results.BadRequest(new { Error = "no Discord webhook is set: add one under Settings → Sharing" });
+            var src = ReadClipInfo(p, profile);
+            var cap = ShareBytes(cfg.Share.DiscordMaxMb)!.Value;
+            var send = p;
+            if (new FileInfo(p).Length > cap)
+            {
+                var (copy, error) = await ShareCopyAsync(p, profile, src, cap, $"{cfg.Share.DiscordMaxMb:0.#}mb", cat, cfg, rec, log, ct);
+                if (copy is null) return Results.BadRequest(new { Error = error });
+                send = copy;
+            }
+            var bytes = new FileInfo(send).Length;
+            var sent = await discord.SendAsync(cfg.Share.DiscordWebhook, send, req.Message ?? src.Label, ct);
+            events.Write(sent.Ok ? "export" : "error", sent.Ok ? $"sent to Discord: {bytes / 1e6:0.0} MB" + (send != p ? " (re-encoded to fit)" : "") : "Discord upload failed: " + sent.Error,
+                profile, src.SessionId, Path.GetFileName(send), bytes, level: sent.Ok ? "info" : "error");
+            return sent.Ok
+                ? Results.Ok(new { Ok = true, sent.Url, File = Path.GetFileName(send), Reencoded = send != p, Bytes = bytes })
+                : Results.BadRequest(new { sent.Error, File = send != p ? Path.GetFileName(send) : null });
+        });
+    }
+
+    private static bool Run(string exe, IEnumerable<string> args)
+    {
+        try
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo(exe) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
+            foreach (var a in args) psi.ArgumentList.Add(a);
+            using var p = System.Diagnostics.Process.Start(psi);
+            return p is not null && p.WaitForExit(5000) && p.ExitCode == 0;
+        }
+        catch { return false; }
     }
 
     private static string? _uid;
@@ -479,11 +564,13 @@ public static class WebApi
         return new ClipInfo { Profile = profile, CreatedAt = File.GetCreationTime(clipPath) };
     }
 
-    public sealed record ExportResult(bool Ok, string? Path, string? File, double? Duration, string? Error);
+    public sealed record ExportResult(bool Ok, string? Path, string? File, double? Duration, string? Error, long? Bytes = null);
 
     private static async Task<ExportResult> ExportRangeAsync(string dir, double start, double end, string? label, bool exact, string source,
-        SessionCatalog cat, RecordingCoordinator rec, KairecConfig cfg, ILogger log, CancellationToken ct, Dictionary<string, double>? mix = null)
+        SessionCatalog cat, RecordingCoordinator rec, KairecConfig cfg, ILogger log, CancellationToken ct, Dictionary<string, double>? mix = null, double? maxMb = null)
     {
+        var share = ShareBytes(maxMb);
+        if (share is not null) source = "share";
         var live = dir == rec.ActiveSessionDir;
         var store = live ? rec.ActiveSession! : SessionStore.Load(dir);
         var index = live ? rec.ActiveSegments : new SegmentIndex(dir, store.MediaDir);
@@ -491,13 +578,14 @@ public static class WebApi
         index.Refresh();
         var recordedAt = store.Info.TimeAt(end);   // dated by its footage, not by when it was cut
         var target = ClipNaming.NewPath(cfg.ClipsDir, store.Info.Profile, label, at: recordedAt);
-        var r = await ClipExporter.ExportAsync(dir, index, start, end, target, exact, log, ct, store.Info.AudioTracks, mix);
+        var r = await ClipExporter.ExportAsync(dir, index, start, end, target, exact, log, ct, store.Info.AudioTracks, mix, share);
         if (!r.Ok) return new ExportResult(false, null, null, null, r.Error);
         var actualStart = end - (r.Duration ?? (end - start));
         var info = new ClipInfo
         {
             Profile = store.Info.Profile, Label = label, Source = source, SessionId = store.Info.Id, SessionOffset = actualStart,
-            DurationSeconds = r.Duration, CreatedAt = DateTimeOffset.Now, RecordedAt = recordedAt, AudioTracks = store.Info.AudioTracks,
+            DurationSeconds = r.Duration, CreatedAt = DateTimeOffset.Now, RecordedAt = recordedAt,
+            AudioTracks = share is null ? store.Info.AudioTracks : null,   // a share copy carries one track
             MixLevels = ClipExporter.Mixes(store.Info.AudioTracks, mix) ? mix : null,
             Markers = store.Markers.Where(m => m.TVideo is double t && t >= actualStart && t <= end)
                 .Select(m => new ClipMarker { T = m.TVideo!.Value - actualStart, Type = m.Type, Label = m.Label, Data = m.Data }).ToList(),
@@ -507,6 +595,28 @@ public static class WebApi
         store.Save();
         log.LogInformation("exported {start:0.0}-{end:0.0}s of {id} -> {path}", start, end, store.Info.Id, target);
         rec.RecordExport(store.Info.Profile, store.Info.Id, target, r.Duration);
-        return new ExportResult(true, target, Path.GetFileName(target), r.Duration, null);
+        return new ExportResult(true, target, Path.GetFileName(target), r.Duration, null, new FileInfo(target).Length);
+    }
+
+    /// <summary>Megabytes as the byte cap a share copy must fit: decimal megabytes, so it is under any "N MB" limit however the site counts.</summary>
+    private static long? ShareBytes(double? maxMb) => maxMb is double mb && mb > 0 ? (long)(Math.Min(mb, 4000) * 1_000_000) : null;
+
+    /// <summary>A re-encoded copy of a whole clip that fits under <paramref name="cap"/> bytes, filed as a clip of its own.</summary>
+    private static async Task<(string? Path, string? Error)> ShareCopyAsync(string clipPath, string profile, ClipInfo src, long cap, string suffix,
+        SessionCatalog cat, KairecConfig cfg, RecordingCoordinator rec, ILogger log, CancellationToken ct)
+    {
+        var length = src.DurationSeconds ?? await VideoProbe.DurationSecondsAsync(clipPath, ct) ?? 0;
+        if (length <= 0) return (null, "could not read the clip's length");
+        var label = (src.Label ?? Path.GetFileNameWithoutExtension(clipPath)) + " " + suffix;
+        var target = ClipNaming.NewPath(cfg.ClipsDir, profile, label, at: cat.FootageTime(src));
+        var r = await ClipExporter.ExportFromFileAsync(clipPath, 0, length, target, false, log, ct, src.AudioTracks, null, cap);
+        if (!r.Ok) return (null, r.Error);
+        SessionCatalog.SaveClipInfo(target, new ClipInfo
+        {
+            Profile = profile, Label = label, Source = "share", SessionId = src.SessionId, SessionOffset = src.SessionOffset, DurationSeconds = r.Duration,
+            CreatedAt = DateTimeOffset.Now, RecordedAt = cat.FootageTime(src), Markers = src.Markers,
+        });
+        rec.RecordExport(profile, src.SessionId, target, r.Duration);
+        return (target, null);
     }
 }

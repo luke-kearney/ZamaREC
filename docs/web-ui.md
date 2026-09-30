@@ -49,6 +49,11 @@ A clip is listed and sorted by when its footage was recorded. An export cut toda
 session or clip is dated Monday, in its file name too, and sits next to what it was cut from.
 Retention still counts an export's age from the day it was cut.
 
+**Selecting several.** The tick button beside the profile filter turns clicks on cards into ticks;
+shift+click ticks everything up to the last one. The bar at the bottom then stars, unstars or
+deletes the ticked clips, or deletes the ticked sessions (their clips are kept; the one being
+recorded cannot be ticked). Delete asks for a second click.
+
 ## Player and timeline
 
 - Timeline sessions play through hls.js, including the live one, a few seconds behind. Buffer
@@ -88,6 +93,19 @@ Retention still counts an export's age from the day it was cut.
   where it is. A failed export keeps the range and label for another try.
 - A clip's title bar has a *Star* button: a starred clip never expires and is never removed by
   retention. Starring a marker (the star in its row) protects its whole session the same way.
+- The rest of a clip's title bar:
+  - **Rename** (pencil): edit the clip's name in place; Enter saves, Escape cancels. The file keeps
+    its name, since sessions and markers refer to it.
+  - **Show in folder**: opens the file manager with the clip selected.
+  - **Share**: *Send to Discord* posts the clip to the webhook set under Settings → Sharing,
+    re-encoding it first if it is over the channel's limit; and *a copy small enough to post*
+    makes a re-encoded copy under 10, 25, 50 or 100 MB, filed as a clip of its own (source
+    `share`). The original is never touched.
+  - **Delete**, which asks for a second click.
+- A session that has ended has a *Delete* button too: it removes the session with its markers and
+  any footage still in RAM, and keeps its clips.
+- The export panel's size list does the same for a range: *original size* is the usual stream
+  copy; a size re-encodes the range to fit under it. It goes back to original after each export.
 - The marker pane collapses to a strip (chevron in its header). The sidebar has a pin, on by
   default, at the left of the Sessions/Clips switch; unpinned it collapses to a strip. Hovering that strip
   floats it over the page until the mouse leaves; clicking its strip pins it open.
@@ -119,8 +137,8 @@ Profile edits are saved with **Save**, like Settings. Keep, Never record and all
 Left: capture (monitor, default preset, cursor, audio sources as chips, and a switch for separate
 audio tracks with a row per track: name, sources, a list to add a device or a running application
 from, remove), the defaults for
-unconfirmed games (on/off, RAM budget, quality, ignored app ids), and the quality presets table
-with GB/h. Right: defaults for timeline, buffer, clips, retention, feedback and ports.
+unconfirmed games (on/off, RAM budget, quality, ignored app ids), sharing (the Discord webhook
+address and the largest file its channel takes), and the quality presets table with GB/h. Right: defaults for timeline, buffer, clips, retention, feedback and ports.
 
 Save applies immediately or when the current session ends; the notice says which. **Raw TOML**
 edits the file directly and keeps comments. Settings and Games edit the same config: switching

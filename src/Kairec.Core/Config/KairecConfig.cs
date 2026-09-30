@@ -16,6 +16,7 @@ public sealed class KairecConfig
     public DaemonConfig Daemon { get; set; } = new();
     public GsiConfig Gsi { get; set; } = new();
     public AutoGamesConfig AutoGames { get; set; } = new();
+    public ShareConfig Share { get; set; } = new();
     /// <summary>Named quality presets a profile can pick; blank profile.quality means the [capture] values.</summary>
     public List<QualityPreset> Quality { get; set; } = QualityPreset.Defaults();
     public List<ProfileConfig> Profiles { get; set; } = new();
@@ -34,7 +35,7 @@ public sealed class KairecConfig
     public void CopyFrom(KairecConfig o)
     {
         Storage = o.Storage; Capture = o.Capture; Timeline = o.Timeline; Buffer = o.Buffer; Clips = o.Clips;
-        Retention = o.Retention; Feedback = o.Feedback; Daemon = o.Daemon; Gsi = o.Gsi; AutoGames = o.AutoGames; Quality = o.Quality; Profiles = o.Profiles;
+        Retention = o.Retention; Feedback = o.Feedback; Daemon = o.Daemon; Gsi = o.Gsi; AutoGames = o.AutoGames; Share = o.Share; Quality = o.Quality; Profiles = o.Profiles;
         Version++;
     }
 
@@ -269,6 +270,15 @@ public sealed class AutoGamesConfig
         Math.Max(1, (int)(RamGb * 1e9 / 1.1 / (Math.Max(1, bitrateKbps) * 125.0) / 60));
 }
 
+/// <summary>Sending clips out of the library: copies small enough to post, and a Discord webhook to post them through.</summary>
+public sealed class ShareConfig
+{
+    /// <summary>A Discord webhook address (Server Settings → Integrations → Webhooks). Empty = "Send to Discord" is off. It is a secret: anyone who has it can post to that channel.</summary>
+    public string? DiscordWebhook { get; set; }
+    /// <summary>The largest file the channel takes. 10 without Nitro or boosts; a clip over it is re-encoded to fit before it is sent.</summary>
+    public double DiscordMaxMb { get; set; } = 10;
+}
+
 public sealed class RetentionConfig
 {
     public double? MaxGb { get; set; } = 100;
@@ -389,6 +399,15 @@ public static class ConfigLoader
         return Parse(File.ReadAllText(path));
     }
 
+    /// <summary>Discord's own hosts only (loopback too, for tests): the address is a secret and clips are uploaded to it.</summary>
+    public static bool LooksLikeDiscordWebhook(string? url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var u)) return false;
+        if (u.IsLoopback) return true;
+        return u.Scheme == "https" && u.AbsolutePath.StartsWith("/api/webhooks/", StringComparison.Ordinal)
+            && (u.Host is "discord.com" or "discordapp.com" || u.Host.EndsWith(".discord.com", StringComparison.Ordinal));
+    }
+
     public static void Validate(KairecConfig cfg)
     {
         var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -418,6 +437,9 @@ public static class ConfigLoader
             if (t.Sources.Count == 0 || t.Sources.Any(string.IsNullOrWhiteSpace)) throw new InvalidOperationException($"capture.tracks: track '{t.Name}' needs at least one source");
         }
         if (cfg.Daemon.UiWindow is not ("app" or "browser")) throw new InvalidOperationException($"daemon.ui_window must be app or browser (got '{cfg.Daemon.UiWindow}')");
+        if (cfg.Share.DiscordMaxMb is < 1 or > 500) throw new InvalidOperationException("share.discord_max_mb must be between 1 and 500");
+        if (!string.IsNullOrWhiteSpace(cfg.Share.DiscordWebhook) && !LooksLikeDiscordWebhook(cfg.Share.DiscordWebhook))
+            throw new InvalidOperationException("share.discord_webhook must be a Discord webhook address (https://discord.com/api/webhooks/...)");
         if (cfg.AutoGames.RamGb <= 0) throw new InvalidOperationException("auto_games.ram_gb must be above 0");
         if (!string.IsNullOrEmpty(cfg.AutoGames.Quality) && cfg.FindQuality(cfg.AutoGames.Quality) is null)
             throw new InvalidOperationException($"auto_games.quality: unknown preset '{cfg.AutoGames.Quality}' (known: {string.Join(", ", cfg.Quality.Select(q => q.Name))})");

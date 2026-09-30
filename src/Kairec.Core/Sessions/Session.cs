@@ -89,7 +89,7 @@ public sealed class ClipInfo
 {
     [JsonPropertyName("profile")] public string Profile { get; set; } = "";
     [JsonPropertyName("label")] public string? Label { get; set; }
-    /// <summary>mark | save | export</summary>
+    /// <summary>mark | save | export | share (a re-encoded copy made to fit a size)</summary>
     [JsonPropertyName("source")] public string Source { get; set; } = "save";
     [JsonPropertyName("session_id")] public string? SessionId { get; set; }
     /// <summary>Seconds into the session timeline where this clip starts, when known.</summary>

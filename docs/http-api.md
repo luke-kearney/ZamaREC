@@ -45,8 +45,9 @@ localhost. Everything the web UI does goes through these.
 | GET | `/sessions/{id}/audio/{n}/playlist.m3u8` | the same playlist for audio track `n` alone (0 is the mix); its segments are audio-only, remuxed on request |
 | GET | `/sessions/{id}/audio/{n}/seg/{file}` | track `n` of one segment as MPEG-TS |
 | GET | `/sessions/{id}/thumb?t=12` | a 240 px wide JPEG of the keyframe at second `t` of the timeline; 404 where there is no footage |
+| DELETE | `/sessions/{id}` | remove a finished session (409 while it records). Its clips stay; `?clips=true` removes them too, except starred ones |
 | POST | `/sessions/{id}/markers/{mid}/star` | toggle |
-| POST | `/sessions/{id}/export` | `{ "start": s, "end": s, "label": "", "exact": false }`. Every export call also takes `"mix": { "game": 0.5, "mic": 1.5 }`: remake the first track from the separate tracks at these levels (0 to 4; a track left out counts as 1). Ignored on a single-track recording |
+| POST | `/sessions/{id}/export` | `{ "start": s, "end": s, "label": "", "exact": false }`. Every export call also takes `"mix": { "game": 0.5, "mic": 1.5 }`: remake the first track from the separate tracks at these levels (0 to 4; a track left out counts as 1). Ignored on a single-track recording. `"maxMb": 10` makes a re-encoded copy that fits under that size instead (source `share`, one audio track); the reply carries `bytes` |
 | POST | `/sessions/{id}/export-around` | `{ "markerId": "", "before": 10, "after": 5, "label": "", "exact": false }` |
 | POST | `/sessions/{id}/export-batch` | `{ "type": "kill", "before": 10, "after": 5, "exact": false }` |
 
@@ -58,7 +59,10 @@ localhost. Everything the web UI does goes through these.
 | GET | `/clips/{profile}/{file}` | the MP4, with range support |
 | GET | `/clips/{profile}/{file}/audio/{n}` | audio track `n` alone as an audio-only MP4, with range support; made on first request and kept a few hours under the RAM dir |
 | GET | `/clips/{profile}/{file}/thumb?t=12` | the same for a clip |
-| POST | `/clips/{profile}/{file}/star` | toggle; starring clears the expiry |
+| POST | `/clips/{profile}/{file}/star` | toggle, or set with `?on=true\|false`; starring clears the expiry |
+| PATCH | `/clips/{profile}/{file}` | `{ "label": "..." }`: rename (the file keeps its name) |
+| POST | `/clips/{profile}/{file}/reveal` | show the clip in the file manager |
+| POST | `/clips/{profile}/{file}/discord` | `{ "message": "..." }`: post it to `share.discord_webhook`, re-encoded first if over `share.discord_max_mb`; returns the attachment link |
 | DELETE | `/clips/{profile}/{file}` | |
 | POST | `/clips/{profile}/{file}/export` | cut a clip out of a clip: `{ "start", "end", "label", "exact" }` |
 

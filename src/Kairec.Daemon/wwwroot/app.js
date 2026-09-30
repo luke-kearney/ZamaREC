@@ -56,9 +56,9 @@ async function api(path, opts) {
   return data;
 }
 let toastTimer;
-function toast(msg, err) {
+function toast(msg, err, ms) {
   const t = $('toast'); t.textContent = msg; t.hidden = false; t.classList.toggle('err', !!err);
-  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.hidden = true, err ? 7000 : 3500);
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.hidden = true, ms || (err ? 7000 : 3500));
 }
 
 // ------------------------------------------------------------------ status
@@ -72,6 +72,7 @@ async function refreshStatus() {
     } else { el.className = 'status idle'; txt.textContent = s.state; }
     if (s.pause) { el.className = 'status paused'; txt.textContent = (s.state === 'recording' ? txt.textContent + ' · ' : '') + 'auto recording off ' + s.pause.text; }
     $('powerBtn').className = 'switch ' + (s.pause ? 'off' : 'on');
+    state.discord = !!s.discord; state.discordMaxMb = s.discordMaxMb;
     if (s.usage) {
       const perCore = localStorage.getItem('cpuPerCore') === '1';
       $('uCpu').textContent = (perCore ? s.usage.cpuPercent : s.usage.cpuPercent / (s.usage.cores || 1)).toFixed(1) + '%';
@@ -113,6 +114,7 @@ function banner(el, profile) {
 }
 function renderList() {
   const box = $('list'); box.innerHTML = '';
+  select.order = [];
   if (state.tab === 'sessions') {
     let day = null;
     for (const s of state.sessions.filter(s => !state.profile || s.profile === state.profile)) {
@@ -124,6 +126,7 @@ function renderList() {
       d.innerHTML = `<div class="l1"><span>${s.gameName || s.profile}</span><span class="r">${s.live ? '<span class="badge live">LIVE</span>' : ''}${s.unconfirmed ? '<span class="badge new" title="a Steam game without a profile, recorded with the defaults for unconfirmed games. Keep or ignore it on the Games page">new</span>' : ''}${s.ram && !(hasBanner && s.footageGone) ? `<span class="badge ${s.footageGone ? 'gone' : 'ram'}" title="${s.footageGone ? 'RAM footage has been dropped' : 'segments live in RAM'}">${s.footageGone ? 'gone' : 'RAM'}</span>` : ''}<span class="badge time mono" title="${fmtDate(s.startedAt)}">${fmtTime(s.startedAt)}</span></span></div>
         <div class="l2"><span>${s.map || s.mode}</span>${s.durationSeconds != null ? `<span class="mono">${fmt(s.durationSeconds)}</span>` : ''}<span>${s.markerCount} marker${s.markerCount === 1 ? '' : 's'}</span><span>${s.clipCount} clip${s.clipCount === 1 ? '' : 's'}</span></div>`;
       d.onclick = () => { if (window.closePages) window.closePages(); loadSession(s.id); };
+      selectable(d, s.id, !s.live);
       box.appendChild(d);
     }
     if (!box.children.length) box.innerHTML = '<div class="empty">no sessions yet</div>';
@@ -136,6 +139,7 @@ function renderList() {
       d.innerHTML = `<div class="l1"><span>${c.label || c.file.replace('.mp4', '')}</span><span class="r">${c.starred ? `<span class="badge star" title="starred: never deleted">${icon('star')}</span>` : ''}${exp}${hasBanner ? '' : `<span class="badge">${c.profile}</span>`}</span></div>
         <div class="l2"><span>${fmtDate(c.recordedAt || c.createdAt)}</span><span class="mono">${fmt(c.durationSeconds)}</span><span>${gb(c.bytes)}</span><span>${c.source}</span></div>`;
       d.onclick = () => { if (window.closePages) window.closePages(); loadClip(c); };
+      selectable(d, c.profile + '/' + c.file, true);
       box.appendChild(d);
     }
     if (!box.children.length) box.innerHTML = '<div class="empty">no clips yet</div>';
@@ -231,7 +235,7 @@ async function loadSession(id) {
   }
   $('title').textContent = `${data.profile} · ${fmtDate(data.startedAt)}` + (data.map ? ` · ${data.map}` : '');
   const covered = state.coverage.reduce((a, c) => a + (c.end - c.start), 0);
-  $('starClip').hidden = true; $('deleteClip').hidden = true;
+  titleButtons();
   $('subtitle').textContent = data.mode === 'timeline'
     ? `${fmt(data.recordedSeconds)} recorded · window ${fmt(data.windowStart)} – ${fmt(data.windowEnd)}` + (data.ram ? ' · RAM' : '') + (data.footageGone ? ' · footage dropped, markers and clips kept' : '') + (data.live ? ' · live' : '')
     : `buffer mode · ${data.markers.length} marks · ${state.coverage.length} clips covering ${fmt(covered)}` + (data.live ? ' · live, nothing is written until a mark or save' : '');
@@ -247,7 +251,7 @@ function loadClip(c) {
   $('video').src = `/api/clips/${encodeURIComponent(c.profile)}/${encodeURIComponent(c.file)}`;
   $('title').textContent = c.label || c.file;
   const sb = $('starClip'); sb.hidden = false; sb.classList.toggle('on', !!c.starred); sb.querySelector('span').textContent = c.starred ? 'Starred' : 'Star';
-  disarmDelete(); $('deleteClip').hidden = false;
+  titleButtons();
   $('subtitle').textContent = `${c.profile} · ${c.source} · ${fmtDate(c.recordedAt || c.createdAt)} · ${fmt(c.durationSeconds)} · ${gb(c.bytes)}` + (c.expiresAt ? ` · expires ${fmtDate(c.expiresAt)}` : '') + tracksNote(c.audioTracks);
   state.total = c.durationSeconds || 1;
   showViewer(); renderTimeline(); renderMarkers(); renderList();
@@ -422,7 +426,8 @@ function hoverThumb(t, x) {
 async function exportRange() {
   const cur = state.current; if (!cur) return;
   if (state.inT == null || state.outT == null || state.outT <= state.inT) return toast('set in and out points first', true);
-  let body = { start: state.inT, end: state.outT, label: $('exportLabel').value || null, exact: $('exact').checked, mix: exportMix() };
+  const maxMb = +$('exportSize').value || null;
+  let body = { start: state.inT, end: state.outT, label: $('exportLabel').value || null, exact: $('exact').checked, mix: exportMix(), maxMb };
   let target = cur.kind === 'session' ? `/sessions/${cur.id}/export` : `/clips/${cur.id}/export`;
   if (clipPlayback(cur)) {
     const c = coverageAt(state.inT);
@@ -434,12 +439,13 @@ async function exportRange() {
   // them so it can be retried. The playhead is never moved.
   const inT = state.inT, outT = state.outT, label = $('exportLabel').value;
   showExportPop(false);
-  toast('exporting…');
+  toast(maxMb ? `re-encoding to fit under ${maxMb} MB…` : 'exporting…', false, maxMb ? 120000 : 0);
   try {
     const r = await api(target, { body });
+    $('exportSize').value = '';   // a size is a one-off: the next export is an ordinary copy again
     if (state.current && state.current.kind === cur.kind && state.current.id === cur.id && state.inT === inT && state.outT === outT) { state.inT = state.outT = null; renderSelection(); }
     if ($('exportLabel').value === label) $('exportLabel').value = '';
-    toast(`export complete${body.mix ? ' with your mix' : ''}: ${fmt(r.duration)} → ${r.file}`); if (state.tab === 'clips') refreshList();
+    toast(`export complete${body.mix ? ' with your mix' : ''}: ${fmt(r.duration)}${maxMb && r.bytes ? ', ' + (r.bytes / 1e6).toFixed(1) + ' MB' : ''} → ${r.file}`); if (state.tab === 'clips') refreshList();
   } catch (e) { toast('export failed: ' + e.message, true); }
 }
 // The mixer's levels, when it is on and the "mixer levels" box is ticked: the export's mix is remade from them.
@@ -467,7 +473,7 @@ async function exportBatch() {
 }
 
 // ------------------------------------------------------------------ wiring
-document.querySelectorAll('.tab').forEach(b => b.onclick = () => { document.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x === b)); state.tab = b.dataset.tab; $('asideTabLabel').textContent = b.textContent; refreshList(); });
+document.querySelectorAll('.tab').forEach(b => b.onclick = () => { document.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x === b)); state.tab = b.dataset.tab; $('asideTabLabel').textContent = b.textContent; select.keys.clear(); select.last = null; selectBar(); refreshList(); });
 $('profileFilter').onchange = e => { state.profile = e.target.value; renderList(); };
 $('typeFilter').onchange = e => { state.typeFilter = e.target.value; renderTimeline(); renderMarkers(); };
 const rangeLen = () => Math.max(1, +$('rangeLen').value || 30);
@@ -488,16 +494,133 @@ let deleteTimer;
 function disarmDelete() { clearTimeout(deleteTimer); const b = $('deleteClip'); b.classList.remove('arm'); b.querySelector('span').textContent = 'Delete'; }
 $('deleteClip').onclick = async e => {
   e.stopPropagation();
-  const cur = state.current; if (!cur || cur.kind !== 'clip') return;
+  const cur = state.current; if (!cur) return;
+  const clip = cur.kind === 'clip';
   const b = $('deleteClip');
-  if (!b.classList.contains('arm')) { b.classList.add('arm'); b.querySelector('span').textContent = 'Click again to delete'; deleteTimer = setTimeout(disarmDelete, 4000); return; }
+  if (!b.classList.contains('arm')) { b.classList.add('arm'); b.querySelector('span').textContent = clip ? 'Click again to delete' : 'Click again: deletes the session, keeps its clips'; deleteTimer = setTimeout(disarmDelete, 4000); return; }
   disarmDelete();
-  try { await api(`/clips/${encodeURIComponent(cur.data.profile)}/${encodeURIComponent(cur.data.file)}`, { method: 'DELETE' }); }
+  try { await api(clip ? `/clips/${encodeURIComponent(cur.data.profile)}/${encodeURIComponent(cur.data.file)}` : `/sessions/${encodeURIComponent(cur.id)}`, { method: 'DELETE' }); }
   catch (err) { return toast('not deleted: ' + err.message, true); }
-  toast(`deleted ${cur.data.label || cur.data.file}`);
+  toast(clip ? `deleted ${cur.data.label || cur.data.file}` : 'session deleted; its clips are kept');
+  closeViewer();
+  refreshList();
+};
+function closeViewer() {
   destroyPlayer(); playerMessage(null); state.current = null; state.inT = state.outT = null;
   $('viewer').hidden = true; $('empty').hidden = false; $('markerList').innerHTML = ''; $('typeChips').innerHTML = ''; $('markersCount').textContent = '';
-  refreshList();
+}
+
+// ------------------------------------------------------------------ the clip in the viewer: rename, share, show in folder
+// Which title-bar buttons apply: everything for a clip, only Delete for a session that has ended.
+function titleButtons() {
+  const cur = state.current, clip = !!cur && cur.kind === 'clip';
+  for (const id of ['renameClip', 'revealClip', 'shareWrap']) $(id).hidden = !clip;
+  if (!clip) $('starClip').hidden = true;
+  $('deleteClip').hidden = !(clip || (cur && cur.kind === 'session' && !cur.data.live));
+  $('deleteClip').title = clip ? 'delete this clip' : 'delete this session: its markers and any footage still in RAM. Its clips are kept';
+  disarmDelete(); $('shareMenu').hidden = true;
+}
+const clipPath = c => `/clips/${encodeURIComponent(c.profile)}/${encodeURIComponent(c.file)}`;
+
+// Rename edits the label in place; the file keeps its name, since sessions and markers refer to it.
+$('renameClip').onclick = () => {
+  const cur = state.current; if (!cur || cur.kind !== 'clip' || $('title').querySelector('input')) return;
+  const inp = document.createElement('input'); inp.className = 'text title-edit'; inp.value = cur.data.label || ''; inp.placeholder = cur.data.file;
+  $('title').textContent = ''; $('title').appendChild(inp); inp.focus(); inp.select();
+  let finished = false;
+  const finish = async save => {
+    if (finished) return; finished = true;
+    const label = inp.value.trim();
+    if (save && label !== (cur.data.label || '')) {
+      try { const r = await api(clipPath(cur.data), { method: 'PATCH', body: { label } }); cur.data.label = r.label; toast(r.label ? `renamed to "${r.label}"` : 'name cleared'); refreshList(); }
+      catch (e) { toast('not renamed: ' + e.message, true); }
+    }
+    if (state.current === cur) $('title').textContent = cur.data.label || cur.data.file;
+  };
+  inp.onkeydown = e => { e.stopPropagation(); if (e.key === 'Enter') finish(true); else if (e.key === 'Escape') finish(false); };
+  inp.onblur = () => finish(true);
+};
+$('revealClip').onclick = async () => {
+  const cur = state.current; if (!cur || cur.kind !== 'clip') return;
+  try { await api(clipPath(cur.data) + '/reveal', { method: 'POST' }); } catch (e) { toast('could not open the folder: ' + e.message, true); }
+};
+$('shareClip').onclick = e => {
+  e.stopPropagation();
+  const menu = $('shareMenu'); menu.hidden = !menu.hidden;
+  $('shareDiscord').disabled = !state.discord;
+  $('shareDiscordSub').textContent = state.discord ? `to the webhook in Settings; re-encoded first if over ${state.discordMaxMb} MB` : 'add a webhook under Settings → Sharing first';
+};
+$('shareMenu').onclick = e => e.stopPropagation();
+document.addEventListener('click', () => { $('shareMenu').hidden = true; });
+$('shareDiscord').onclick = async () => {
+  const cur = state.current; if (!cur || cur.kind !== 'clip' || !state.discord) return;
+  $('shareMenu').hidden = true;
+  toast('sending to Discord…', false, 300000);
+  try {
+    const r = await api(clipPath(cur.data) + '/discord', { body: { message: cur.data.label || null } });
+    toast(`sent to Discord: ${(r.bytes / 1e6).toFixed(1)} MB` + (r.reencoded ? ', re-encoded to fit' : ''));
+    if (r.reencoded && state.tab === 'clips') refreshList();
+  } catch (e) { toast('not sent: ' + e.message, true); }
+};
+document.querySelectorAll('[data-share-mb]').forEach(b => b.onclick = async () => {
+  const cur = state.current; if (!cur || cur.kind !== 'clip') return;
+  const mb = +b.dataset.shareMb; $('shareMenu').hidden = true;
+  if (cur.data.bytes <= mb * 1e6) return toast(`this clip is already under ${mb} MB (${(cur.data.bytes / 1e6).toFixed(1)} MB)`);
+  toast(`re-encoding to fit under ${mb} MB…`, false, 300000);
+  try {
+    const r = await api(clipPath(cur.data) + '/export', { body: { start: 0, end: cur.data.durationSeconds || state.total, label: `${cur.data.label || cur.data.file.replace('.mp4', '')} ${mb}mb`, exact: false, maxMb: mb } });
+    toast(`copy made: ${(r.bytes / 1e6).toFixed(1)} MB → ${r.file}`); if (state.tab === 'clips') refreshList();
+  } catch (e) { toast('no copy made: ' + e.message, true); }
+});
+
+// ------------------------------------------------------------------ selecting several in the sidebar
+// Select mode turns a click on a card into a tick. Shift+click ticks everything between it and the last one.
+const select = { on: false, keys: new Set(), order: [], last: null };
+function selectable(el, key, allowed) {
+  select.order.push(allowed ? key : null);
+  if (!select.on) return;
+  el.classList.add('selecting'); el.classList.toggle('picked', select.keys.has(key)); el.classList.toggle('unpickable', !allowed);
+  const box = document.createElement('span'); box.className = 'pick'; el.prepend(box);
+  el.onclick = e => {
+    if (!allowed) return toast('the session being recorded cannot be selected');
+    const keys = select.order.filter(Boolean);
+    if (e.shiftKey && select.last && keys.includes(select.last)) {
+      const [a, b] = [keys.indexOf(select.last), keys.indexOf(key)].sort((x, y) => x - y);
+      for (const k of keys.slice(a, b + 1)) select.keys.add(k);
+    } else { select.keys.has(key) ? select.keys.delete(key) : select.keys.add(key); }
+    select.last = key; renderList(); selectBar();
+  };
+}
+let selDeleteTimer;
+function selectBar() {
+  const clips = state.tab === 'clips', n = select.keys.size;
+  $('selectBar').hidden = !select.on; $('selectBtn').classList.toggle('on', select.on);
+  $('selectCount').textContent = n ? `${n} selected` : 'pick some';
+  $('selStar').hidden = $('selUnstar').hidden = !clips;
+  for (const id of ['selStar', 'selUnstar', 'selDelete']) $(id).disabled = !n;
+  clearTimeout(selDeleteTimer); $('selDelete').classList.remove('arm'); $('selDelete').querySelector('span').textContent = 'Delete';
+}
+function selectMode(on) { select.on = on; select.keys.clear(); select.last = null; renderList(); selectBar(); }
+$('selectBtn').onclick = () => selectMode(!select.on);
+$('selDone').onclick = () => selectMode(false);
+$('selAll').onclick = () => { const all = select.order.filter(Boolean); const every = all.every(k => select.keys.has(k)); select.keys = new Set(every ? [] : all); renderList(); selectBar(); };
+// One request per item, in turn; the list is reloaded once at the end.
+async function forSelected(what, call) {
+  const keys = [...select.keys]; let done = 0, failed = 0;
+  for (const k of keys) { try { await call(k); done++; } catch { failed++; } }
+  const open = state.current && keys.includes(state.current.kind === 'clip' ? state.current.id : state.current.id);
+  toast(`${done} ${what}` + (failed ? `, ${failed} failed` : ''), failed > 0);
+  return { open };
+}
+const clipKeyPath = k => { const i = k.indexOf('/'); return `/clips/${encodeURIComponent(k.slice(0, i))}/${encodeURIComponent(k.slice(i + 1))}`; };
+$('selStar').onclick = async () => { await forSelected('starred', k => api(clipKeyPath(k) + '/star?on=true', { method: 'POST' })); select.keys.clear(); await refreshList(); selectBar(); };
+$('selUnstar').onclick = async () => { await forSelected('unstarred', k => api(clipKeyPath(k) + '/star?on=false', { method: 'POST' })); select.keys.clear(); await refreshList(); selectBar(); };
+$('selDelete').onclick = async () => {
+  const b = $('selDelete'), clips = state.tab === 'clips', n = select.keys.size;
+  if (!b.classList.contains('arm')) { b.classList.add('arm'); b.querySelector('span').textContent = `Delete ${n}? Click again`; selDeleteTimer = setTimeout(selectBar, 4000); return; }
+  const { open } = await forSelected(clips ? 'clips deleted' : 'sessions deleted (their clips are kept)', k => api(clips ? clipKeyPath(k) : `/sessions/${encodeURIComponent(k)}`, { method: 'DELETE' }));
+  if (open) closeViewer();
+  select.keys.clear(); await refreshList(); selectBar();
 };
 $('starClip').onclick = async () => {
   const cur = state.current; if (!cur || cur.kind !== 'clip') return;

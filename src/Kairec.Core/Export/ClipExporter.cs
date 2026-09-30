@@ -15,7 +15,7 @@ public static class ClipExporter
     /// With stream copy the cut lands on the keyframe at or before <paramref name="start"/>, so the clip may
     /// begin up to one keyframe interval early; the caller can read the exact duration from the result.
     /// </summary>
-    public static async Task<Result> ExportAsync(string sessionDir, SegmentIndex index, double start, double end, string outputPath, bool exact, ILogger log, CancellationToken ct, IReadOnlyList<string>? tracks = null, IReadOnlyDictionary<string, double>? mix = null)
+    public static async Task<Result> ExportAsync(string sessionDir, SegmentIndex index, double start, double end, string outputPath, bool exact, ILogger log, CancellationToken ct, IReadOnlyList<string>? tracks = null, IReadOnlyDictionary<string, double>? mix = null, long? maxBytes = null)
     {
         if (end <= start) return new Result(false, null, null, "end must be after start");
         var segs = index.Available().Where(s => s.Start + s.Duration > start && s.Start < end).OrderBy(s => s.Seq).ToList();
@@ -33,6 +33,13 @@ public static class ClipExporter
         await File.WriteAllLinesAsync(listFile, segs.Select(s => $"file '{Path.Combine(index.MediaDir, s.File).Replace("'", "'\\''")}'"), ct);
         try
         {
+            if (maxBytes is long cap)
+            {
+                // A share copy is re-encoded anyway, so the cut is exact: from "start", not from the keyframe before it.
+                var from = Math.Max(0, start - first.Start);
+                return await ShareAsync(["-f", "concat", "-safe", "0", "-i", listFile, "-ss", F(from), "-t", F(end - start)],
+                    Path.Combine(index.MediaDir, first.File), end - start, cap, outputPath, tracks, mix, log, ct);
+            }
             var args = new List<string> { "-hide_banner", "-loglevel", "error", "-y" };
             if (exact) args.AddRange(["-hwaccel", "cuda"]);
             args.AddRange(["-f", "concat", "-safe", "0", "-i", listFile, "-ss", F(seekInto), "-t", F(duration)]);
@@ -56,9 +63,11 @@ public static class ClipExporter
     }
 
     /// <summary>Cuts [start, end] out of a finished MP4 clip. Input seeking works here, so the cut is keyframe-accurate.</summary>
-    public static async Task<Result> ExportFromFileAsync(string sourcePath, double start, double end, string outputPath, bool exact, ILogger log, CancellationToken ct, IReadOnlyList<string>? tracks = null, IReadOnlyDictionary<string, double>? mix = null)
+    public static async Task<Result> ExportFromFileAsync(string sourcePath, double start, double end, string outputPath, bool exact, ILogger log, CancellationToken ct, IReadOnlyList<string>? tracks = null, IReadOnlyDictionary<string, double>? mix = null, long? maxBytes = null)
     {
         if (end <= start) return new Result(false, null, null, "end must be after start");
+        if (maxBytes is long cap)
+            return await ShareAsync(["-ss", F(start), "-i", sourcePath, "-t", F(end - start)], sourcePath, end - start, cap, outputPath, tracks, mix, log, ct);
         var args = new List<string> { "-hide_banner", "-loglevel", "error", "-y" };
         if (exact) args.AddRange(["-hwaccel", "cuda"]);
         // A stream copy starts on the keyframe at or before "start", up to a keyframe interval early. Copied audio
@@ -93,6 +102,94 @@ public static class ClipExporter
         for (int i = 0; tracks is not null && i < tracks.Count; i++)
             args.AddRange([$"-metadata:s:a:{i}", "title=" + tracks[i], $"-metadata:s:a:{i}", "handler_name=" + tracks[i]]);
         return args;
+    }
+
+    // ---------------------------------------------------------------- share size: a copy that fits under a cap
+
+    /// <summary>How a clip is encoded to fit a size: what is left for the video after the audio, and the picture that bitrate can carry.</summary>
+    public sealed record SharePlan(int VideoKbps, int AudioKbps, int Height, int Fps);
+
+    /// <summary>
+    /// Picks bitrates and a picture size for <paramref name="seconds"/> of video to land under <paramref name="maxBytes"/>.
+    /// The whole budget (less 6% for the container and the encoder's overshoot) is spread over the length; the
+    /// picture steps down a ladder until each pixel gets enough bits to look decent, 60 fps kept as long as it can be.
+    /// Null when even the smallest step would be mush: the clip is too long for that size.
+    /// </summary>
+    public static SharePlan? PlanShare(long maxBytes, double seconds, int srcWidth, int srcHeight, double srcFps)
+    {
+        if (seconds <= 0 || srcHeight <= 0) return null;
+        var total = maxBytes * 8 * 0.94 / seconds / 1000;
+        var audio = total >= 1200 ? 128 : total >= 600 ? 96 : 64;
+        var video = (int)(total - audio);
+        if (video < 250) return null;
+        var fps = srcFps > 45 ? 60 : 30;
+        (int H, int Fps)[] ladder = [(srcHeight, fps), (1080, 60), (720, 60), (720, 30), (540, 30), (480, 30), (360, 30)];
+        const double bitsPerPixel = 0.055;
+        foreach (var (h, f) in ladder)
+        {
+            if (h > srcHeight || f > fps) continue;
+            var w = (double)srcWidth * h / srcHeight;
+            if (video >= w * h * f * bitsPerPixel / 1000) return new SharePlan(video, audio, h, f);
+        }
+        return new SharePlan(video, audio, Math.Min(srcHeight, 360), 30);
+    }
+
+    /// <summary>The ffmpeg arguments after the input for a share-size encode: NVENC at the planned bitrate, scaled on the GPU, one stereo audio track.</summary>
+    private static List<string> ShareArgs(SharePlan plan, int srcHeight, IReadOnlyList<string>? tracks, IReadOnlyDictionary<string, double>? mix, double scale = 1)
+    {
+        var v = Math.Max(150, (int)(plan.VideoKbps * scale));
+        var args = new List<string>();
+        if (Mixes(tracks, mix))
+        {
+            var mixed = MixedTracks(tracks!, mix!);
+            args.AddRange(["-filter_complex", mixed[1], "-map", "0:v:0", "-map", "[mix]"]);   // only the new mix: a shared clip carries one track
+        }
+        else args.AddRange(["-map", "0:v:0", "-map", "0:a:0?"]);
+        if (plan.Height < srcHeight) args.AddRange(["-vf", $"scale_cuda=-2:{plan.Height}"]);
+        args.AddRange(["-r", plan.Fps.ToString(), "-c:v", "h264_nvenc", "-preset", "p6", "-tune", "hq", "-rc", "vbr", "-multipass", "fullres",
+            "-b:v", $"{v}k", "-maxrate", $"{v}k", "-bufsize", $"{v * 2}k", "-c:a", "aac", "-b:a", $"{plan.AudioKbps}k", "-ac", "2",
+            "-movflags", "+faststart"]);
+        return args;
+    }
+
+    /// <summary>
+    /// Runs a share-size encode and checks the result really is under the cap; if the encoder overshot, once more
+    /// with the bitrate scaled down by as much. <paramref name="input"/> is everything up to and including the cut
+    /// (-ss/-i/-t), decoded on the GPU so the frames never leave it.
+    /// </summary>
+    private static async Task<Result> ShareAsync(List<string> input, string probePath, double seconds, long maxBytes, string outputPath,
+        IReadOnlyList<string>? tracks, IReadOnlyDictionary<string, double>? mix, ILogger log, CancellationToken ct)
+    {
+        var src = await Recording.VideoProbe.InfoAsync(probePath, ct);
+        if (src is null) return new Result(false, null, null, "could not read the source video");
+        var plan = PlanShare(maxBytes, seconds, src.Width, src.Height, src.Fps);
+        if (plan is null)
+            return new Result(false, null, null, $"{seconds:0} s is too long for {maxBytes / 1e6:0.#} MB: shorten the range or pick a larger size");
+        Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
+        double scale = 1;
+        for (int attempt = 0; ; attempt++)
+        {
+            var args = new List<string> { "-hide_banner", "-loglevel", "error", "-y", "-hwaccel", "cuda", "-hwaccel_output_format", "cuda" };
+            args.AddRange(input);
+            args.AddRange(ShareArgs(plan, src.Height, tracks, mix, scale));
+            args.Add(outputPath);
+            var (code, stderr) = await RunAsync("ffmpeg", args, ct);
+            if (code != 0)
+            {
+                log.LogError("ffmpeg (share) failed ({code}): {err}", code, stderr);
+                return new Result(false, null, null, stderr.Trim().Split('\n').LastOrDefault() ?? "ffmpeg failed");
+            }
+            var size = new FileInfo(outputPath).Length;
+            log.LogInformation("share encode: {h}p{fps} at {v} kbps -> {mb:0.00} MB (cap {cap:0.#} MB)", plan.Height, plan.Fps, (int)(plan.VideoKbps * scale), size / 1e6, maxBytes / 1e6);
+            if (size <= maxBytes || attempt >= 2) break;
+            scale *= (double)maxBytes / size * 0.96;
+        }
+        if (new FileInfo(outputPath).Length > maxBytes)
+        {
+            try { File.Delete(outputPath); } catch { }
+            return new Result(false, null, null, "could not get under that size; pick a larger one");
+        }
+        return new Result(true, outputPath, await Recording.VideoProbe.DurationSecondsAsync(outputPath, ct), null);
     }
 
     /// <summary>True when the recording has separate tracks to mix and levels were given for them.</summary>

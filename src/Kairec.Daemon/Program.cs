@@ -33,6 +33,7 @@ builder.Services.AddSingleton<SeenGames>();
 builder.Services.AddSingleton<BannerService>();
 builder.Services.AddSingleton<StemService>();
 builder.Services.AddSingleton<ThumbService>();
+builder.Services.AddSingleton<DiscordShare>();
 builder.Services.AddHostedService<GameWatcherService>();
 builder.Services.AddHostedService<ControlSocketServer>();
 builder.Services.AddSingleton<RetentionService>();

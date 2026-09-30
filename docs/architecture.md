@@ -65,6 +65,15 @@ normalising, then a limiter) and encodes the result as the clip's first track in
 recorded mix. Video and the separate tracks are still copied, and the clip's sidecar records the
 levels used (`mix_levels`).
 
+## Share-size copies and Discord
+
+A clip can be re-encoded to fit under a size (`ClipExporter.PlanShare` and `ShareAsync`): the byte
+budget, less 6%, is spread over the length; audio takes 64 to 128 kbps and the rest is the video
+bitrate; the picture steps down a ladder until the bitrate gives each pixel enough. The encode is
+NVENC two-pass VBR with the frames decoded and scaled on the GPU (`-hwaccel cuda`, `scale_cuda`),
+and the result is checked against the cap and redone at a lower bitrate if the encoder overshot.
+`DiscordShare` uploads a clip to a webhook as one multipart request. Both run only on a click.
+
 ## Hover previews
 
 `ThumbService` makes the timeline's hover thumbnails, one per request: ffmpeg seeks to the second,
