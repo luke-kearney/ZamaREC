@@ -43,7 +43,9 @@ has no profile yet.
 - **Export panel** (save icon, or `E`): the in/out numbers, `len`, a clip label, and *Export range*,
   which writes a clip (stream copy, or frame-exact re-encode with the box ticked). Its lower row is
   **around markers**: the before/after boxes used by ✂ on a marker, and *Export all* for every marker
-  of one type. Escape or a click outside closes the panel.
+  of one type. Escape or a click outside closes the panel. *Export range* closes it too; when the
+  clip is written a toast says so and the in/out range and label are cleared, with the playhead left
+  where it is. A failed export keeps the range and label for another try.
 - A clip's title bar has a *Star* button: a starred clip never expires and is never removed by
   retention. Starring a marker (★ in its row) protects its whole session the same way.
 - The marker pane collapses to a strip (chevron in its header). The sidebar has a pin, on by

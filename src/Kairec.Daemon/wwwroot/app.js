@@ -369,10 +369,16 @@ async function exportRange() {
     target = `/clips/${encodeURIComponent(cur.data.profile)}/${encodeURIComponent(c.file)}/export`;
     body = { ...body, start: state.inT - c.start, end: Math.min(state.outT, c.end) - c.start };
   }
+  // The panel closes at once; the range and label are cleared once the clip exists. A failed export keeps
+  // them so it can be retried. The playhead is never moved.
+  const inT = state.inT, outT = state.outT, label = $('exportLabel').value;
+  showExportPop(false);
   toast('exporting…');
   try {
     const r = await api(target, { body });
-    toast(`exported ${fmt(r.duration)} → ${r.file}`); if (state.tab === 'clips') refreshList();
+    if (state.current && state.current.kind === cur.kind && state.current.id === cur.id && state.inT === inT && state.outT === outT) { state.inT = state.outT = null; renderSelection(); }
+    if ($('exportLabel').value === label) $('exportLabel').value = '';
+    toast(`export complete: ${fmt(r.duration)} → ${r.file}`); if (state.tab === 'clips') refreshList();
   } catch (e) { toast('export failed: ' + e.message, true); }
 }
 async function exportAround(m) {
