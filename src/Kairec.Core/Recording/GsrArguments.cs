@@ -26,7 +26,8 @@ public static class GsrArguments
             "-write-first-frame-ts", "yes",
             "-ipc", ipcSocket,
         };
-        if (c.Audio.Count > 0) { args.Add("-a"); args.Add(string.Join("|", c.Audio)); }
+        // One -a per track; sources joined with | share a track. The mix comes first because players only play the first.
+        foreach (var track in c.EffectiveTracks()) { args.Add("-a"); args.Add(string.Join("|", track.Sources)); }
         if (!string.IsNullOrWhiteSpace(p.Scale)) { args.Add("-s"); args.Add(p.Scale.Trim()); }
 
         switch (p.Mode)

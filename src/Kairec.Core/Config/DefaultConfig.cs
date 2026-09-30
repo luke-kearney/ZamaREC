@@ -14,6 +14,8 @@ public static class DefaultConfig
         quality = "high"                  # default preset (see [[quality]]); profiles may pick another
         audio = ["default_output"]        # add "default_input" to record the microphone
         cursor = false
+        # multitrack = true               # also record the [[capture.tracks]] below as separate audio tracks, for mixing
+        #                                 # afterwards. The first track stays the mix of `audio`, so clips play anywhere.
         # fps / codec / bitrate_kbps / keyframe_seconds may still be set here; presets fall back to them.
 
         # Two capture modes, chosen per profile:

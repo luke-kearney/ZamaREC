@@ -21,7 +21,7 @@ localhost. Everything the web UI does goes through these.
 
 | method | path | notes |
 |---|---|---|
-| GET | `/config` | path, raw text, structured config, pending flag, monitors, audio devices, codecs, free space |
+| GET | `/config` | path, raw text, structured config, pending flag, monitors, audio devices, applications playing audio, codecs, free space |
 | PUT | `/config` | `{ "text": "<toml>" }`; validated, applied now or when the session ends |
 | PUT | `/config/structured` | the structured config object; rewritten as TOML without comments |
 
@@ -38,7 +38,7 @@ localhost. Everything the web UI does goes through these.
 
 | method | path | notes |
 |---|---|---|
-| GET | `/sessions` | list with profile, mode, map, times, marker and clip counts, live/ram/gone flags, `steamAppId`, `unconfirmed` |
+| GET | `/sessions` | list with profile, mode, map, times, marker and clip counts, live/ram/gone flags, `steamAppId`, `unconfirmed`, `audioTracks` (track names, when more than the mix) |
 | GET | `/sessions/{id}` | details: segments with availability, window start/end, markers, clip details |
 | GET | `/sessions/{id}/playlist.m3u8` | HLS playlist of the segments on disk (live or VOD) |
 | GET | `/sessions/{id}/seg/{file}` | a segment, with range support |

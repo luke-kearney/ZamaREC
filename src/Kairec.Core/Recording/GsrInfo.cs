@@ -20,6 +20,10 @@ public static class GsrInfo
         return lines.Select(l => l.Split('|')).Where(p => p.Length >= 2).Select(p => new Device(p[0], p[1])).ToList();
     }
 
+    /// <summary>Applications playing or recording audio right now, by the name app: and app-inverse: sources match.</summary>
+    public static async Task<List<string>> AudioApplicationsAsync(CancellationToken ct) =>
+        (await RunAsync("--list-application-audio", ct)).Where(l => l.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+
     private static async Task<List<string>> RunAsync(string flag, CancellationToken ct)
     {
         try

@@ -19,6 +19,7 @@ buffers give you a save key and nothing more. kairec is the part after the save.
   even mid-session. **Buffer mode** keeps a ring buffer in RAM and writes nothing until you act.
 - Markers from a hotkey, the tray, the web UI, or CS2 itself (kills with the round count, deaths,
   round results, MVPs, map changes) through Valve's Game State Integration.
+- Optional separate audio tracks (game, mic, voice chat) next to the normal mix, kept in every clip.
 - Clips around markers and events, saves of the last N seconds, and range exports, all as stream
   copies with no re-encode, or frame-exact on nvenc if you ask.
 - A web UI with a timeline, a games page, settings, stats and a log. A tray icon. A CLI.

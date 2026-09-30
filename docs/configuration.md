@@ -20,9 +20,46 @@ Every key below is optional. Profiles override the global sections under the sam
 |---|---|---|
 | `monitor` | `"DP-1"` | name from `gpu-screen-recorder --list-monitors`, or `"screen"` for the first |
 | `quality` | `"high"` | the `[[quality]]` preset used by profiles that do not pick their own |
-| `audio` | `["default_output"]` | recorder audio sources: `default_output`, `default_input`, `device:NAME`, `app:NAME` |
+| `audio` | `["default_output"]` | recorder audio sources merged into the recording's audio: `default_output`, `default_input`, `device:NAME`, `app:NAME`, `app-inverse:NAME` |
+| `multitrack` | `false` | also record the `[[capture.tracks]]` as separate audio tracks |
 | `cursor` | `false` | draw the pointer into the recording |
 | `fps`, `codec`, `bitrate_kbps`, `keyframe_seconds`, `scale` | 60, h264, 20000, 1.0, native | raw encoder values; presets fall back to these for fields they leave blank |
+
+### `[[capture.tracks]]`: separate audio tracks
+
+Off by default. With `multitrack = true` a recording's first audio track is still the mix of
+`capture.audio`, which is the track every player plays, and each entry here follows it as a track
+of its own: for setting levels afterwards, or for an editor. Sessions and clips remember the track
+names, and clips and exports keep every track, named.
+
+| key | meaning |
+|---|---|
+| `name` | shown in the mixer and written into clips as the track name. `mix` is taken by the first track |
+| `sources` | sources merged into this track, the same forms as `capture.audio` |
+
+```toml
+[capture]
+audio = ["default_output", "default_input"]
+multitrack = true
+[[capture.tracks]]
+name = "game"
+sources = ["app-inverse:WEBRTC VoiceEngine"]   # everything except Discord's voice chat
+[[capture.tracks]]
+name = "mic"
+sources = ["default_input"]
+[[capture.tracks]]
+name = "discord"
+sources = ["app:WEBRTC VoiceEngine"]
+```
+
+`app:NAME` is one application and `app-inverse:NAME` everything except it, matched without case
+against the names `gpu-screen-recorder --list-application-audio` prints. Discord's voice chat
+appears there as `WEBRTC VoiceEngine` once Discord is open; its other sounds, like those of any
+Electron app, come under `Chromium` and stay in the game track. An application that is
+not running when the session starts is picked up when it appears. The mix holds what plays on the
+default output; an application sent to another device is in its own track but not in the mix.
+Each extra track costs a little CPU while recording: four tracks measured 8 to 11% of one core
+against 5% for one. At most 8 tracks.
 
 ## `[[quality]]`
 

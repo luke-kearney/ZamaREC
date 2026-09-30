@@ -81,7 +81,9 @@ Profile edits are saved with **Save**, like Settings. Keep, Never record and all
 
 ## Settings
 
-Left: capture (monitor, default preset, cursor, audio sources as chips), the defaults for
+Left: capture (monitor, default preset, cursor, audio sources as chips, and a switch for separate
+audio tracks with a row per track: name, sources, a list to add a device or a running application
+from, remove), the defaults for
 unconfirmed games (on/off, RAM budget, quality, ignored app ids), and the quality presets table
 with GB/h. Right: defaults for timeline, buffer, clips, retention, feedback and ports.
 

@@ -15,7 +15,7 @@ public static class ClipExporter
     /// With stream copy the cut lands on the keyframe at or before <paramref name="start"/>, so the clip may
     /// begin up to one keyframe interval early; the caller can read the exact duration from the result.
     /// </summary>
-    public static async Task<Result> ExportAsync(string sessionDir, SegmentIndex index, double start, double end, string outputPath, bool exact, ILogger log, CancellationToken ct)
+    public static async Task<Result> ExportAsync(string sessionDir, SegmentIndex index, double start, double end, string outputPath, bool exact, ILogger log, CancellationToken ct, IReadOnlyList<string>? tracks = null)
     {
         if (end <= start) return new Result(false, null, null, "end must be after start");
         var segs = index.Available().Where(s => s.Start + s.Duration > start && s.Start < end).OrderBy(s => s.Seq).ToList();
@@ -36,6 +36,7 @@ public static class ClipExporter
             var args = new List<string> { "-hide_banner", "-loglevel", "error", "-y" };
             if (exact) args.AddRange(["-hwaccel", "cuda"]);
             args.AddRange(["-f", "concat", "-safe", "0", "-i", listFile, "-ss", F(seekInto), "-t", F(duration)]);
+            args.AddRange(AllTracks(tracks));
             if (exact) args.AddRange(["-c:v", "h264_nvenc", "-preset", "p4", "-rc", "vbr", "-cq", "21", "-b:v", "0", "-c:a", "copy"]);
             else args.AddRange(["-c", "copy"]);
             args.AddRange(["-avoid_negative_ts", "make_zero", "-movflags", "+faststart", outputPath]);
@@ -54,12 +55,13 @@ public static class ClipExporter
     }
 
     /// <summary>Cuts [start, end] out of a finished MP4 clip. Input seeking works here, so the cut is keyframe-accurate.</summary>
-    public static async Task<Result> ExportFromFileAsync(string sourcePath, double start, double end, string outputPath, bool exact, ILogger log, CancellationToken ct)
+    public static async Task<Result> ExportFromFileAsync(string sourcePath, double start, double end, string outputPath, bool exact, ILogger log, CancellationToken ct, IReadOnlyList<string>? tracks = null)
     {
         if (end <= start) return new Result(false, null, null, "end must be after start");
         var args = new List<string> { "-hide_banner", "-loglevel", "error", "-y" };
         if (exact) args.AddRange(["-hwaccel", "cuda"]);
         args.AddRange(["-ss", F(start), "-i", sourcePath, "-t", F(end - start)]);
+        args.AddRange(AllTracks(tracks));
         if (exact) args.AddRange(["-c:v", "h264_nvenc", "-preset", "p4", "-rc", "vbr", "-cq", "21", "-b:v", "0", "-c:a", "copy"]);
         else args.AddRange(["-c", "copy"]);
         args.AddRange(["-avoid_negative_ts", "make_zero", "-movflags", "+faststart", outputPath]);
@@ -72,6 +74,19 @@ public static class ClipExporter
         }
         var dur = await Recording.VideoProbe.DurationSecondsAsync(outputPath, ct);
         return new Result(true, outputPath, dur, null);
+    }
+
+    /// <summary>
+    /// ffmpeg keeps one audio stream unless told otherwise: map the video and every audio track, and title the
+    /// tracks so players and editors show "mix", "game", "mic" rather than "Track 2".
+    /// </summary>
+    public static List<string> AllTracks(IReadOnlyList<string>? tracks)
+    {
+        var args = new List<string> { "-map", "0:v:0", "-map", "0:a?" };
+        // MP4 has two places a track name can live; players differ in which they read, so both are set.
+        for (int i = 0; tracks is not null && i < tracks.Count; i++)
+            args.AddRange([$"-metadata:s:a:{i}", "title=" + tracks[i], $"-metadata:s:a:{i}", "handler_name=" + tracks[i]]);
+        return args;
     }
 
     private static string F(double v) => v.ToString("0.###", CultureInfo.InvariantCulture);

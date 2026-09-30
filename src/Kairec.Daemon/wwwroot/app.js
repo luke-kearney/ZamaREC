@@ -17,6 +17,9 @@ const ICONS = {
 const icon = name => `<svg class="ic ic-${name}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]}</svg>`;
 window.icon = icon;
 
+// " · 4 audio tracks (mix, game, mic, discord)" for a multi-track recording, nothing for an ordinary one.
+const tracksNote = t => t && t.length > 1 ? ` · ${t.length} audio tracks (${t.join(', ')})` : '';
+
 // How long until a mark clip expires, short enough for a badge: 3d, 29h, 40m.
 const timeLeft = iso => { const m = (new Date(iso) - Date.now()) / 60000; return m <= 0 ? 'now' : m >= 2880 ? Math.floor(m / 1440) + 'd' : m >= 60 ? Math.floor(m / 60) + 'h' : Math.ceil(m) + 'm'; };
 const markerName = m => {
@@ -232,6 +235,7 @@ async function loadSession(id) {
   $('subtitle').textContent = data.mode === 'timeline'
     ? `${fmt(data.recordedSeconds)} recorded · window ${fmt(data.windowStart)} – ${fmt(data.windowEnd)}` + (data.ram ? ' · RAM' : '') + (data.footageGone ? ' · footage dropped, markers and clips kept' : '') + (data.live ? ' · live' : '')
     : `buffer mode · ${data.markers.length} marks · ${state.coverage.length} clips covering ${fmt(covered)}` + (data.live ? ' · live, nothing is written until a mark or save' : '');
+  $('subtitle').textContent += tracksNote(data.audioTracks);
   state.total = data.mode === 'timeline'
     ? Math.max(data.recordedSeconds, data.windowEnd)
     : Math.max(1, data.elapsedSeconds || 0, ...data.markers.map(m => m.tVideo || 0), ...state.coverage.map(c => c.end));
@@ -244,7 +248,7 @@ function loadClip(c) {
   $('title').textContent = c.label || c.file;
   const sb = $('starClip'); sb.hidden = false; sb.classList.toggle('on', !!c.starred); sb.querySelector('span').textContent = c.starred ? 'Starred' : 'Star';
   disarmDelete(); $('deleteClip').hidden = false;
-  $('subtitle').textContent = `${c.profile} · ${c.source} · ${fmtDate(c.recordedAt || c.createdAt)} · ${fmt(c.durationSeconds)} · ${gb(c.bytes)}` + (c.expiresAt ? ` · expires ${fmtDate(c.expiresAt)}` : '');
+  $('subtitle').textContent = `${c.profile} · ${c.source} · ${fmtDate(c.recordedAt || c.createdAt)} · ${fmt(c.durationSeconds)} · ${gb(c.bytes)}` + (c.expiresAt ? ` · expires ${fmtDate(c.expiresAt)}` : '') + tracksNote(c.audioTracks);
   state.total = c.durationSeconds || 1;
   showViewer(); renderTimeline(); renderMarkers(); renderList();
 }

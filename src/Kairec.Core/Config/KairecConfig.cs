@@ -177,6 +177,32 @@ public sealed class CaptureConfig
     /// <summary>gpu-screen-recorder audio sources: default_output, default_input, device:NAME, app:NAME.</summary>
     public List<string> Audio { get; set; } = new() { "default_output" };
     public bool Cursor { get; set; } = false;
+    /// <summary>Record the sources below as separate audio tracks after the mix. Off = one track, the sources in `audio`.</summary>
+    public bool Multitrack { get; set; } = false;
+    /// <summary>The separate tracks, in file order after the mix. Only used with multitrack = true.</summary>
+    public List<AudioTrack> Tracks { get; set; } = new();
+
+    public const string MixName = "mix";
+
+    /// <summary>
+    /// The audio tracks a recording gets, in file order. The first is always the mix of `audio`, which is what
+    /// every player picks; with multitrack on, the configured tracks follow it for mixing afterwards.
+    /// </summary>
+    public List<AudioTrack> EffectiveTracks()
+    {
+        var list = new List<AudioTrack>();
+        if (Audio.Count > 0) list.Add(new AudioTrack { Name = MixName, Sources = Audio });
+        if (Multitrack) list.AddRange(Tracks.Where(t => t.Sources.Count > 0));
+        return list;
+    }
+}
+
+/// <summary>One audio track of a recording: a name for the mixer and the sources merged into it.</summary>
+public sealed class AudioTrack
+{
+    public string Name { get; set; } = "";
+    /// <summary>gpu-screen-recorder audio sources: default_output, default_input, device:NAME, app:NAME, app-inverse:NAME.</summary>
+    public List<string> Sources { get; set; } = new();
 }
 
 /// <summary>Timeline mode: a rolling window of segments on disk. Anything older than the window is deleted while you play.</summary>
@@ -380,6 +406,14 @@ public static class ConfigLoader
             if (e.TimelineStorage == "ram" && e.WindowMinutes <= 0) throw new InvalidOperationException($"Profile '{p.Name}': a RAM timeline needs a window (window_minutes > 0)");
             if (e.SegmentSeconds < 2) throw new InvalidOperationException($"Profile '{p.Name}': timeline segment_seconds must be at least 2");
             if (e.BufferMinutes < 1) throw new InvalidOperationException($"Profile '{p.Name}': buffer minutes must be at least 1");
+        }
+        var trackNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { CaptureConfig.MixName };
+        if (cfg.Capture.Tracks.Count > 8) throw new InvalidOperationException("capture.tracks: at most 8 separate audio tracks");
+        foreach (var t in cfg.Capture.Tracks)
+        {
+            if (string.IsNullOrWhiteSpace(t.Name)) throw new InvalidOperationException("capture.tracks: every track needs a name");
+            if (!trackNames.Add(t.Name)) throw new InvalidOperationException($"capture.tracks: '{t.Name}' is used twice (\"{CaptureConfig.MixName}\" is the first track's name)");
+            if (t.Sources.Count == 0 || t.Sources.Any(string.IsNullOrWhiteSpace)) throw new InvalidOperationException($"capture.tracks: track '{t.Name}' needs at least one source");
         }
         if (cfg.AutoGames.RamGb <= 0) throw new InvalidOperationException("auto_games.ram_gb must be above 0");
         if (!string.IsNullOrEmpty(cfg.AutoGames.Quality) && cfg.FindQuality(cfg.AutoGames.Quality) is null)

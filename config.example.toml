@@ -19,6 +19,20 @@ cursor = false
 #   buffer    a ring buffer in RAM. Nothing touches the disk until you mark or save.
 #             A mark dumps mark_before_seconds + mark_after_seconds around it into a clip.
 
+# Separate audio tracks, off by default. With multitrack = true every recording gets the mix of
+# capture.audio as its first track (what every player plays) and then one track per entry here.
+# [capture]
+# multitrack = true
+# [[capture.tracks]]
+# name = "game"
+# sources = ["app-inverse:WEBRTC VoiceEngine"]   # everything except Discord's voice chat
+# [[capture.tracks]]
+# name = "mic"
+# sources = ["default_input"]
+# [[capture.tracks]]
+# name = "discord"
+# sources = ["app:WEBRTC VoiceEngine"]           # Discord voice; names: gpu-screen-recorder --list-application-audio
+
 [timeline]                        # defaults; profiles override under timeline.*
 window_minutes = 120              # 0 = keep everything
 segment_seconds = 5                # a save waits for the current segment to finish, so keep this short

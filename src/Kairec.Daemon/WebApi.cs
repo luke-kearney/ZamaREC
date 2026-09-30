@@ -120,7 +120,7 @@ public static class WebApi
             cs.Path, Text = cs.ReadText(), Config = cfg, Pending = cs.HasPending, SessionRunning = rec.IsActive,
             RamFree = FreeBytes(Paths.Expand(cfg.Timeline.RamDir)), RamTotal = TotalBytes(Paths.Expand(cfg.Timeline.RamDir)),
             DiskFree = FreeBytes(cfg.RootDir), MemTotal = MemTotalBytes(),
-            Monitors = await GsrInfo.MonitorsAsync(ct), AudioDevices = await GsrInfo.AudioDevicesAsync(ct),
+            Monitors = await GsrInfo.MonitorsAsync(ct), AudioDevices = await GsrInfo.AudioDevicesAsync(ct), AudioApps = await GsrInfo.AudioApplicationsAsync(ct),
             Codecs = new[] { "h264", "hevc", "av1" },
         }));
 
@@ -232,6 +232,7 @@ public static class WebApi
                 s.MarkerCount, ClipCount = s.Info.Clips.Count, Live = s.Id == rec.ActiveSessionId,
                 Ram = s.Info.MediaDir is not null, s.Info.FootageGone,
                 s.Info.SteamAppId, Unconfirmed = s.Info.SteamAppId is not null && cfg.FindProfile(s.Info.Profile) is null,
+                s.Info.AudioTracks,
                 Game = GamePresets.ResolveByProfileName(cfg, s.Info.Profile)?.Id,
                 GameName = GamePresets.ResolveByProfileName(cfg, s.Info.Profile)?.Name ?? s.Info.Profile,
             })));
@@ -251,6 +252,7 @@ public static class WebApi
             {
                 store.Info.Id, store.Info.Profile, store.Info.Mode, store.Info.Map, store.Info.StartedAt, store.Info.EndedAt, Live = live,
                 store.Info.SteamAppId, Unconfirmed = store.Info.SteamAppId is not null && cfg.FindProfile(store.Info.Profile) is null,
+                store.Info.AudioTracks,
                 Game = GamePresets.ResolveByProfileName(cfg, store.Info.Profile)?.Id,
                 Ram = store.Info.MediaDir is not null, store.Info.FootageGone,
                 RecordedSeconds = recorded,
@@ -346,7 +348,7 @@ public static class WebApi
             Results.Ok(cat.Clips().Select(c => new
             {
                 c.Profile, c.File, c.Bytes, c.Info.Label, c.Info.Source, c.Info.SessionId, c.Info.SessionOffset, c.Info.DurationSeconds,
-                c.Info.CreatedAt, RecordedAt = c.At, c.Info.Starred, c.Info.ExpiresAt, Markers = c.Info.Markers,
+                c.Info.CreatedAt, RecordedAt = c.At, c.Info.AudioTracks, c.Info.Starred, c.Info.ExpiresAt, Markers = c.Info.Markers,
                 Game = GamePresets.ResolveByProfileName(cfg, c.Profile)?.Id,
             })));
 
@@ -384,12 +386,12 @@ public static class WebApi
             // The new clip is dated by its footage, not by when it was cut: the source's end, less what was left off.
             var recordedAt = cat.FootageTime(src).AddSeconds(src.DurationSeconds is double len ? Math.Min(0, req.End - len) : 0);
             var target = ClipNaming.NewPath(cfg.ClipsDir, profile, req.Label ?? src.Label, at: recordedAt);
-            var r = await ClipExporter.ExportFromFileAsync(p, req.Start, req.End, target, req.Exact, log, ct);
+            var r = await ClipExporter.ExportFromFileAsync(p, req.Start, req.End, target, req.Exact, log, ct, src.AudioTracks);
             if (!r.Ok) return Results.BadRequest(new { r.Ok, r.Error });
             var info = new ClipInfo
             {
                 Profile = profile, Label = req.Label ?? src.Label, Source = "export", SessionId = src.SessionId,
-                SessionOffset = src.SessionOffset is double o ? o + req.Start : null, DurationSeconds = r.Duration, CreatedAt = DateTimeOffset.Now, RecordedAt = recordedAt,
+                SessionOffset = src.SessionOffset is double o ? o + req.Start : null, DurationSeconds = r.Duration, CreatedAt = DateTimeOffset.Now, RecordedAt = recordedAt, AudioTracks = src.AudioTracks,
                 Markers = src.Markers.Where(m => m.T >= req.Start && m.T <= req.End).Select(m => new ClipMarker { T = m.T - req.Start, Type = m.Type, Label = m.Label, Data = m.Data }).ToList(),
             };
             SessionCatalog.SaveClipInfo(target, info);
@@ -443,13 +445,13 @@ public static class WebApi
         index.Refresh();
         var recordedAt = store.Info.TimeAt(end);   // dated by its footage, not by when it was cut
         var target = ClipNaming.NewPath(cfg.ClipsDir, store.Info.Profile, label, at: recordedAt);
-        var r = await ClipExporter.ExportAsync(dir, index, start, end, target, exact, log, ct);
+        var r = await ClipExporter.ExportAsync(dir, index, start, end, target, exact, log, ct, store.Info.AudioTracks);
         if (!r.Ok) return new ExportResult(false, null, null, null, r.Error);
         var actualStart = end - (r.Duration ?? (end - start));
         var info = new ClipInfo
         {
             Profile = store.Info.Profile, Label = label, Source = source, SessionId = store.Info.Id, SessionOffset = actualStart,
-            DurationSeconds = r.Duration, CreatedAt = DateTimeOffset.Now, RecordedAt = recordedAt,
+            DurationSeconds = r.Duration, CreatedAt = DateTimeOffset.Now, RecordedAt = recordedAt, AudioTracks = store.Info.AudioTracks,
             Markers = store.Markers.Where(m => m.TVideo is double t && t >= actualStart && t <= end)
                 .Select(m => new ClipMarker { T = m.TVideo!.Value - actualStart, Type = m.Type, Label = m.Label, Data = m.Data }).ToList(),
         };

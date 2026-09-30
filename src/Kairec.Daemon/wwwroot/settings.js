@@ -27,6 +27,11 @@
       if (!devs.length) return '';
       return `<div class="agroup"><div class="alabel">${g}</div><div class="achips">${devs.map(a => `<button type="button" class="achip ${c.capture.audio.includes(a.id) ? 'on' : ''}" data-audio="${a.id}" title="${a.id}"><span class="dot"></span>${a.id === 'default_output' ? 'Default output' : a.id === 'default_input' ? 'Default input (mic)' : a.description}</button>`).join('')}</div></div>`;
     }).join('');
+    const escA = v => String(v ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    const tracks = c.capture.tracks || (c.capture.tracks = []);
+    const apps = meta.audioApps || [];
+    const srcGroups = `<optgroup label="devices">${meta.audioDevices.map(a => `<option value="${escA(a.id)}">${escA(a.id === 'default_output' ? 'Default output' : a.id === 'default_input' ? 'Default input (mic)' : a.description)}</option>`).join('')}</optgroup>`
+      + (apps.length ? `<optgroup label="an application">${apps.map(a => `<option value="app:${escA(a)}">${escA(a)}</option>`).join('')}</optgroup><optgroup label="everything except">${apps.map(a => `<option value="app-inverse:${escA(a)}">all but ${escA(a)}</option>`).join('')}</optgroup>` : '');
     let h = `<div class="settings-cols"><div class="col left"><div class="card"><h3>Capture</h3><div class="help">Applies to every profile. Encoder settings live in the presets below; the recorder always uses the GPU encoder.</div><div class="fields">
       ${field('monitor', sel('capture.monitor', c.capture.monitor, monitors), false, 'the screen the game runs on')}
       ${field('default quality preset', sel('capture.quality', c.capture.quality ?? '', [{ v: '', l: '(built-in defaults: 60 fps h264 20000 kbps)' }, ...presetOpts]), false, 'used by every profile that does not pick its own')}
@@ -34,6 +39,13 @@
       <div class="field wide"><span>audio sources</span><small class="hint">pick what goes into the recording. "Default output" is the game audio; add the mic if you want your voice</small>
         ${audioHtml}
         <label class="other"><span class="muted">other, comma separated (e.g. app:cs2)</span><input type="text" id="audioExtra" value="${audioExtra.join(', ')}"></label>
+      </div>
+      <div class="field wide"><span>separate audio tracks ${chk('capture.multitrack', c.capture.multitrack)}</span>
+        <small class="hint">record extra tracks next to the mix, to set their levels afterwards. Track 1 stays the mix of the sources above, so clips sound the same in every player; the tracks below follow it. Costs a little CPU per track while recording</small>
+        <div class="tracks" ${c.capture.multitrack ? '' : 'hidden'}>
+          ${tracks.map((t, i) => `<div class="trow"><input type="text" data-path="capture.tracks.${i}.name" value="${escA(t.name)}" placeholder="name"><input type="text" data-path="capture.tracks.${i}.sources" value="${escA((t.sources || []).join(', '))}" placeholder="sources, comma separated"><select data-addsrc="${i}" title="add a source to this track"><option value="">+ source…</option>${srcGroups}</select><button type="button" class="tiny" data-deltrack="${i}" title="remove track">${window.icon('x')}</button></div>`).join('')}
+          <div class="trow-foot"><button type="button" class="btn small" id="addTrack">+ Add track</button><span class="muted">app:NAME is one application, app-inverse:NAME is everything except it. Discord's voice chat is called WEBRTC VoiceEngine. The lists show what is playing audio right now</span></div>
+        </div>
       </div>
     </div></div>`;
 
@@ -129,6 +141,22 @@
     applyModes();
     document.querySelectorAll('.profile [data-path$=".mode"]').forEach(sel => sel.addEventListener('change', applyModes));
     document.querySelectorAll('.achip').forEach(b => b.onclick = () => { b.classList.toggle('on'); updateFootprints(); });
+    // separate audio tracks: switching it on the first time fills in game / mic / discord as a starting point
+    const mt = document.querySelector('#cfgForm [data-path="capture.multitrack"]');
+    if (mt) mt.onchange = () => {
+      collect();
+      if (cfg.capture.multitrack && !cfg.capture.tracks.length)
+        cfg.capture.tracks = [{ name: 'game', sources: ['app-inverse:WEBRTC VoiceEngine'] }, { name: 'mic', sources: ['default_input'] }, { name: 'discord', sources: ['app:WEBRTC VoiceEngine'] }];   // Discord's voice audio goes by that name
+      render();
+    };
+    if ($('addTrack')) $('addTrack').onclick = () => { collect(); cfg.capture.tracks.push({ name: '', sources: [] }); render(); };
+    document.querySelectorAll('[data-deltrack]').forEach(b => b.onclick = () => { collect(); cfg.capture.tracks.splice(+b.dataset.deltrack, 1); render(); });
+    document.querySelectorAll('[data-addsrc]').forEach(sel => sel.onchange = () => {
+      const inp = document.querySelector(`#cfgForm [data-path="capture.tracks.${sel.dataset.addsrc}.sources"]`);
+      const have = inp.value.split(',').map(x => x.trim()).filter(Boolean);
+      if (sel.value && !have.includes(sel.value)) inp.value = [...have, sel.value].join(', ');
+      sel.value = '';
+    });
     if ($('addQuality')) $('addQuality').onclick = () => { collect(); (cfg.quality ||= []).push({ name: '', fps: null, codec: null, bitrateKbps: null, keyframeSeconds: null, scale: null }); render(); };
     document.querySelectorAll('[data-delq]').forEach(b => b.onclick = () => { collect(); cfg.quality.splice(+b.dataset.delq, 1); render(); });
     const pm = $('presetMenu');
@@ -304,6 +332,8 @@
       let v = el.type === 'checkbox' ? el.checked : el.type === 'number' ? num(el.value) : (el.value === '' ? null : el.value);
       if (path.endsWith('markSaves') && v != null) v = v === 'true';
       if (path.endsWith('eventClips')) v = (v || '').split(',').map(x => x.trim()).filter(Boolean);
+      if (/^capture\.tracks\.\d+\.sources$/.test(path)) v = (v || '').split(',').map(x => x.trim()).filter(Boolean);
+      if (/^capture\.tracks\.\d+\.name$/.test(path)) v = v || '';
       if (path === 'autoGames.ignore') v = (v || '').split(',').map(x => +x.trim()).filter(x => x > 0);
       setPath(cfg, path, v);
     });
@@ -333,6 +363,7 @@
   }
   async function saveStructured() {
     collect();
+    cfg.capture.tracks = (cfg.capture.tracks || []).filter(t => t && (t.name || (t.sources || []).length));   // rows left blank
     const r = await fetch('/api/config/structured', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(cfg) });
     const d = await r.json();
     if (!r.ok) return window.toast('not saved: ' + d.error, true);

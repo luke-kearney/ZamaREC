@@ -329,14 +329,14 @@ public sealed class RecordingCoordinator : IAsyncDisposable
             a.Segments.Refresh();
         }
         var target = ClipNaming.NewPath(_cfg.ClipsDir, a.Profile.Name, label);
-        var r = await ClipExporter.ExportAsync(a.Session.Dir, a.Segments, start, end, target, exact: false, _log, ct);
+        var r = await ClipExporter.ExportAsync(a.Session.Dir, a.Segments, start, end, target, exact: false, _log, ct, a.Session.Info.AudioTracks);
         if (!r.Ok) { if (source != "mark") _sound.Play("error"); return Fail($"{source} failed: " + r.Error); }
 
         var actualStart = end - (r.Duration ?? (end - start));   // stream copy may begin up to a keyframe early
         var info = new ClipInfo
         {
             Profile = a.Profile.Name, Label = label, Source = source, SessionId = a.Session.Info.Id,
-            SessionOffset = actualStart, DurationSeconds = r.Duration, CreatedAt = DateTimeOffset.Now,
+            SessionOffset = actualStart, DurationSeconds = r.Duration, CreatedAt = DateTimeOffset.Now, AudioTracks = a.Session.Info.AudioTracks,
             ExpiresAt = source == "mark" && a.Profile.MarkClipExpireHours > 0 ? DateTimeOffset.Now.AddHours(a.Profile.MarkClipExpireHours) : null,
         };
         if (job is not null)
@@ -375,7 +375,7 @@ public sealed class RecordingCoordinator : IAsyncDisposable
         {
             Profile = a.Profile.Name, Label = label, Source = source, SessionId = a.Session.Info.Id,
             SessionOffset = a.Session.ToVideoTime(saveMono) is double tEnd ? Math.Max(0, tEnd - duration) : null,
-            DurationSeconds = duration, CreatedAt = DateTimeOffset.Now,
+            DurationSeconds = duration, CreatedAt = DateTimeOffset.Now, AudioTracks = a.Session.Info.AudioTracks,
             ExpiresAt = source == "mark" && a.Profile.MarkClipExpireHours > 0 ? DateTimeOffset.Now.AddHours(a.Profile.MarkClipExpireHours) : null,
         };
         if (job is not null)
