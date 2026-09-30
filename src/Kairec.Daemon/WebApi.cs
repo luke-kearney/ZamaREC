@@ -311,6 +311,20 @@ public static class WebApi
             return File.Exists(path) ? Results.File(path, "video/mp2t", enableRangeProcessing: true) : Results.NotFound();
         });
 
+        // A small preview of the moment t seconds into the session, for hovering over the timeline.
+        // Whole seconds: it is the keyframe there. 404 where the footage has gone or is not written yet.
+        api.MapGet("/sessions/{id}/thumb", async (string id, double t, SessionCatalog cat, RecordingCoordinator rec, ThumbService thumbs, CancellationToken ct) =>
+        {
+            var dir = cat.SessionDir(id);
+            if (dir is null || t < 0) return Results.NotFound();
+            var live = dir == rec.ActiveSessionDir;
+            var index = live ? rec.ActiveSegments : new SegmentIndex(dir, SessionStore.Load(dir).MediaDir);
+            var seg = index?.Available(includeTail: false).FirstOrDefault(s => t >= s.Start && t < s.Start + s.Duration);
+            if (index is null || seg is null) return Results.NotFound();
+            var path = await thumbs.FrameAsync(Path.Combine(index.MediaDir, seg.File), id, (int)Math.Floor(t - seg.Start), ct);
+            return path is null ? Results.NotFound() : Results.File(path, "image/jpeg");
+        });
+
         api.MapPost("/sessions/{id}/markers/{mid}/star", (string id, string mid, SessionCatalog cat, RecordingCoordinator rec) =>
         {
             var dir = cat.SessionDir(id);
@@ -371,6 +385,14 @@ public static class WebApi
         {
             var p = cat.ClipPath(profile, file);
             return p is null ? Results.NotFound() : Results.File(p, "video/mp4", enableRangeProcessing: true);
+        });
+
+        api.MapGet("/clips/{profile}/{file}/thumb", async (string profile, string file, double t, SessionCatalog cat, ThumbService thumbs, CancellationToken ct) =>
+        {
+            var p = cat.ClipPath(profile, file);
+            if (p is null || t < 0) return Results.NotFound();
+            var path = await thumbs.FrameAsync(p, profile, (int)Math.Floor(t), ct);
+            return path is null ? Results.NotFound() : Results.File(path, "image/jpeg");
         });
 
         // One audio track of a clip on its own, for the mixer. Seekable, like the clip.

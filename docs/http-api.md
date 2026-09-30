@@ -44,6 +44,7 @@ localhost. Everything the web UI does goes through these.
 | GET | `/sessions/{id}/seg/{file}` | a segment, with range support |
 | GET | `/sessions/{id}/audio/{n}/playlist.m3u8` | the same playlist for audio track `n` alone (0 is the mix); its segments are audio-only, remuxed on request |
 | GET | `/sessions/{id}/audio/{n}/seg/{file}` | track `n` of one segment as MPEG-TS |
+| GET | `/sessions/{id}/thumb?t=12` | a 240 px wide JPEG of the keyframe at second `t` of the timeline; 404 where there is no footage |
 | POST | `/sessions/{id}/markers/{mid}/star` | toggle |
 | POST | `/sessions/{id}/export` | `{ "start": s, "end": s, "label": "", "exact": false }`. Every export call also takes `"mix": { "game": 0.5, "mic": 1.5 }`: remake the first track from the separate tracks at these levels (0 to 4; a track left out counts as 1). Ignored on a single-track recording |
 | POST | `/sessions/{id}/export-around` | `{ "markerId": "", "before": 10, "after": 5, "label": "", "exact": false }` |
@@ -56,6 +57,7 @@ localhost. Everything the web UI does goes through these.
 | GET | `/clips` | all clips with their sidecar data, newest footage first. `recordedAt` is when the footage was recorded, `createdAt` when the file was written; they differ for exports |
 | GET | `/clips/{profile}/{file}` | the MP4, with range support |
 | GET | `/clips/{profile}/{file}/audio/{n}` | audio track `n` alone as an audio-only MP4, with range support; made on first request and kept a few hours under the RAM dir |
+| GET | `/clips/{profile}/{file}/thumb?t=12` | the same for a clip |
 | POST | `/clips/{profile}/{file}/star` | toggle; starring clears the expiry |
 | DELETE | `/clips/{profile}/{file}` | |
 | POST | `/clips/{profile}/{file}/export` | cut a clip out of a clip: `{ "start", "end", "label", "exact" }` |

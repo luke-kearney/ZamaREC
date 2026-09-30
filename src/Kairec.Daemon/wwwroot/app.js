@@ -312,8 +312,8 @@ function renderTimeline() {
   renderSelection();
   placeHead(state.cursorT);
   tl.onclick = e => seek(xToT(e.clientX));
-  tl.onmousemove = e => { const r = tl.getBoundingClientRect(); const t = xToT(e.clientX); const tip = $('tlTip'); tip.style.display = 'block'; tip.style.left = Math.min(e.clientX - r.left + 8, r.width - 70) + 'px'; tip.textContent = fmt(t); };
-  tl.onmouseleave = () => $('tlTip').style.display = 'none';
+  tl.onmousemove = e => { const r = tl.getBoundingClientRect(); const t = xToT(e.clientX); const tip = $('tlTip'); tip.style.display = 'block'; tip.style.left = Math.min(e.clientX - r.left + 8, r.width - 70) + 'px'; tip.textContent = fmt(t); hoverThumb(t, e.clientX - r.left, r.width); };
+  tl.onmouseleave = () => { $('tlTip').style.display = 'none'; hoverThumb(null); };
 }
 function renderRuler() {
   const r = $('tlRuler'); r.innerHTML = '';
@@ -372,6 +372,50 @@ function renderMarkers() {
   }
   const n = box.children.length; $('markersCount').textContent = n ? String(n) : '';
   if (!n) box.innerHTML = '<div class="empty">no markers</div>';
+}
+
+// ------------------------------------------------------------------ hover preview
+// A thumbnail of the moment under the cursor, above the timeline. The daemon makes one per whole second and only
+// on request, so the cursor has to rest for a moment before a new one is asked for; one already fetched shows
+// at once. One request at a time: where the cursor ends up is what gets loaded next.
+const thumbs = { dwellMs: 64, cache: new Map(), timer: null, busy: false, queued: null, want: null, shown: null, x: 0 };
+function thumbUrl(t) {
+  const cur = state.current; if (!cur || t < 0 || t > state.total) return null;
+  const enc = encodeURIComponent;
+  if (cur.kind === 'clip') return `/api/clips/${enc(cur.data.profile)}/${enc(cur.data.file)}/thumb?t=${Math.floor(t)}`;
+  if (clipPlayback(cur)) { const c = coverageAt(t); return c ? `/api/clips/${enc(cur.data.profile)}/${enc(c.file)}/thumb?t=${Math.max(0, Math.floor(t - c.start))}` : null; }
+  if (cur.data.mode !== 'timeline') return null;
+  return cur.data.segments.some(s => s.available && t >= s.start && t < s.start + s.duration) ? `/api/sessions/${enc(cur.id)}/thumb?t=${Math.floor(t)}` : null;
+}
+// Shows what is known for the spot under the cursor: its picture if fetched, else the last picture while the cursor moves.
+function drawThumb() {
+  const box = $('tlThumb'), img = box.querySelector('img'), url = thumbs.want;
+  const have = url && thumbs.cache.get(url);
+  if (have && thumbs.shown !== url) { img.src = have; thumbs.shown = url; }
+  if (!url || thumbs.cache.get(url) === '' || !thumbs.shown) { box.hidden = true; if (!url) thumbs.shown = null; return; }
+  box.hidden = false;
+  const w = box.offsetWidth, wrap = box.parentElement.clientWidth;
+  box.style.left = Math.max(0, Math.min($('timeline').offsetLeft + thumbs.x - w / 2, wrap - w)) + 'px';
+}
+async function loadThumb(url) {
+  if (thumbs.busy) { thumbs.queued = url; return; }
+  thumbs.busy = true;
+  try {
+    const r = await fetch(url);
+    thumbs.cache.set(url, r.ok ? URL.createObjectURL(await r.blob()) : '');   // '' = nothing to show there
+    if (thumbs.cache.size > 400) { const old = thumbs.cache.keys().next().value; URL.revokeObjectURL(thumbs.cache.get(old)); thumbs.cache.delete(old); }
+  } catch { /* the daemon went away: the next rest tries again */ }
+  thumbs.busy = false;
+  drawThumb();
+  const next = thumbs.queued; thumbs.queued = null;
+  if (next && next === thumbs.want && !thumbs.cache.has(next)) loadThumb(next);
+}
+function hoverThumb(t, x) {
+  clearTimeout(thumbs.timer);
+  const url = t == null ? null : thumbUrl(t);
+  thumbs.want = url; thumbs.x = x || 0;
+  drawThumb();
+  if (url && !thumbs.cache.has(url)) thumbs.timer = setTimeout(() => loadThumb(url), thumbs.dwellMs);
 }
 
 // ------------------------------------------------------------------ export

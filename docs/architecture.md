@@ -65,6 +65,14 @@ normalising, then a limiter) and encodes the result as the clip's first track in
 recorded mix. Video and the separate tracks are still copied, and the clip's sidecar records the
 levels used (`mix_levels`).
 
+## Hover previews
+
+`ThumbService` makes the timeline's hover thumbnails, one per request: ffmpeg seeks to the second,
+decodes that single keyframe (`-skip_frame nokey -noaccurate_seek`) on one CPU thread at low
+priority and writes a 240 px JPEG under `<ram_dir>/.thumbs`, kept six hours. About 0.1 s each, at
+most two at a time, never on the GPU. The page only asks after the cursor has rested for 64 ms
+and keeps what it has fetched, so moving across the bar costs nothing.
+
 ## What starts a session
 
 The scan looks for two things. A process that a profile's `match` or `match_cmdline` fits starts

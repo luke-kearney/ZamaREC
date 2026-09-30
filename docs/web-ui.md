@@ -55,6 +55,10 @@ Retention still counts an export's age from the day it was cut.
 - The bar: ruler, markers colour-coded by type, playhead, window (purged part hatched). Click to
   seek. Ctrl+wheel zooms around the mouse, wheel pans; the zoom buttons and `+`/`-`/`0` zoom centred on the playhead. The view
   follows the playhead while playing.
+- **Hover preview**: rest the cursor on the bar for a moment (64 ms) and a thumbnail of
+  that moment appears above it. Previews are per whole second (the keyframe there) and are made by
+  the daemon only when asked, so sweeping across the bar asks for nothing; a spot already seen
+  shows at once. No preview over a part with no footage.
 - **In/out**: *set in* takes the playhead and sets out to in + the `len` box (30 s default);
   *set out* the other way round. Drag the handles or the whole range. *Play range* plays in to out
   and pauses at out; *jump to in* seeks to in.
