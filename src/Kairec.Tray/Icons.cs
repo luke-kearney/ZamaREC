@@ -63,4 +63,40 @@ static class Icons
     public static readonly (int, int, byte[]) Recording = Mark(22, Ink, Red);
     public static readonly (int, int, byte[]) Paused = Mark(22, Ink, Gold);
     public static readonly (int, int, byte[]) Gone = Mark(22, Dim, Dim, inkAlpha: 160);
+
+    // No dashes in the names: Plasma's lookup strips "-suffixes" theme by theme, so "kairec-tray-idle" resolves
+    // to the installed app icon "kairec" before IconThemePath is even searched.
+    public const string IdleName = "kairec_tray_idle", RecordingName = "kairec_tray_recording", PausedName = "kairec_tray_paused", GoneName = "kairec_tray_gone";
+
+    // The same mark as an SVG in the Breeze convention: the host replaces the "current-color-scheme" stylesheet
+    // with its panel colours, so the ink follows light and dark panels. The dot keeps its state colour.
+    // The strokes are polygons because only fill:currentColor is reliably recoloured.
+    static string Svg((byte R, byte G, byte B) dot, string inkOpacity = "1") => $$"""
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="22" height="22">
+          <style type="text/css" id="current-color-scheme">.ColorScheme-Text { color:#232629; }</style>
+          <g class="ColorScheme-Text" style="fill:currentColor;fill-opacity:{{inkOpacity}};stroke:none">
+            <rect x="20" y="16" width="14" height="88" rx="2"/>
+            <path d="M72.48 51.59 L100.58 27.29 L91.42 16.71 L63.32 41.01 Z"/>
+            <path d="M72.48 68.41 L100.58 92.71 L91.42 103.29 L63.32 78.99 Z"/>
+          </g>
+          <circle cx="52" cy="60" r="11" style="fill:#{{dot.R:x2}}{{dot.G:x2}}{{dot.B:x2}}"/>
+        </svg>
+        """;
+
+    /// <summary>Writes the themed icons to a runtime dir and returns it, for the item's IconThemePath. Null if that fails; the pixmaps still work.</summary>
+    public static string? WriteThemeDir()
+    {
+        try
+        {
+            var theme = Path.Combine(Environment.GetEnvironmentVariable("XDG_RUNTIME_DIR") ?? Path.GetTempPath(), "kairec-tray-icons");
+            var dir = Path.Combine(theme, "hicolor", "scalable", "status");
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(Path.Combine(dir, IdleName + ".svg"), Svg(Dim));
+            File.WriteAllText(Path.Combine(dir, RecordingName + ".svg"), Svg(Red));
+            File.WriteAllText(Path.Combine(dir, PausedName + ".svg"), Svg(Gold));
+            File.WriteAllText(Path.Combine(dir, GoneName + ".svg"), Svg(Dim, "0.6"));
+            return theme;
+        }
+        catch (Exception ex) { Console.Error.WriteLine("could not write tray icons: " + ex.Message); return null; }
+    }
 }

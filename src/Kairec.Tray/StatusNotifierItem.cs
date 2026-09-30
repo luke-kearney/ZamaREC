@@ -9,7 +9,9 @@ sealed class StatusNotifierItem : IPathMethodHandler
     public string Path => "/StatusNotifierItem";
     public bool HandlesChildPaths => false;
 
-    public string Status = "Active";
+    public string Status = "Passive";   // Passive lets the host tuck the icon away ("shown when relevant"); Active keeps it visible
+    public string IconName = "";        // looked up in IconThemePath; hosts that can't resolve it fall back to the pixmap
+    public string IconThemePath = "";
     public string Title = "kairec";
     public string TooltipTitle = "kairec";
     public string TooltipBody = "";
@@ -59,8 +61,8 @@ sealed class StatusNotifierItem : IPathMethodHandler
         yield return ("Title", (ref MessageWriter w) => w.VStr(Title));
         yield return ("Status", (ref MessageWriter w) => w.VStr(Status));
         yield return ("WindowId", (ref MessageWriter w) => w.VInt(0));
-        yield return ("IconName", (ref MessageWriter w) => w.VStr(""));
-        yield return ("IconThemePath", (ref MessageWriter w) => w.VStr(""));
+        yield return ("IconName", (ref MessageWriter w) => w.VStr(IconName));
+        yield return ("IconThemePath", (ref MessageWriter w) => w.VStr(IconThemePath));
         yield return ("OverlayIconName", (ref MessageWriter w) => w.VStr(""));
         yield return ("AttentionIconName", (ref MessageWriter w) => w.VStr(""));
         yield return ("AttentionMovieName", (ref MessageWriter w) => w.VStr(""));

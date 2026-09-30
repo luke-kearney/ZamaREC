@@ -10,6 +10,8 @@ var conn = new DBusConnection(DBusAddress.Session ?? throw new InvalidOperationE
 await conn.ConnectAsync();
 
 var sni = new StatusNotifierItem();
+var iconDir = Icons.WriteThemeDir();
+if (iconDir is not null) { sni.IconThemePath = iconDir; sni.IconName = Icons.IdleName; }
 var menu = new DbusMenu();
 conn.AddMethodHandlers([sni, menu]);
 
@@ -72,6 +74,10 @@ while (true)
     {
         lastKey = key;
         sni.Icon = st is null ? Icons.Gone : recording ? Icons.Recording : paused ? Icons.Paused : Icons.Idle;
+        if (iconDir is not null) sni.IconName = st is null ? Icons.GoneName : recording ? Icons.RecordingName : paused ? Icons.PausedName : Icons.IdleName;
+        // Idle is the only state with nothing to tell; everything else keeps the icon on the panel.
+        var status = st is not null && !recording && !paused ? "Passive" : "Active";
+        if (status != sni.Status) { sni.Status = status; sni.EmitNewStatus(conn); }
         sni.TooltipTitle = st is null ? "kairec: daemon not running" : recording ? $"kairec: recording {st.Profile}" : paused ? "kairec: auto recording off" : "kairec: idle";
         sni.TooltipBody = st is null ? "" : recording ? $"{st.Mode} · {st.MarkerCount} markers" : paused ? $"paused {st.Paused}" : "waiting for a profiled game";
         sni.EmitNewIcon(conn); sni.EmitNewToolTip(conn);

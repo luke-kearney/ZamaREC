@@ -37,8 +37,11 @@ is at fault, not the daemon: try another browser.
 player switches files when one runs out. Marks close together are merged into one clip to reduce
 this; timeline mode has no boundaries at all.
 
-**The tray icon is missing.** Plasma hides new tray icons: right-click the tray → Configure
-System Tray → Entries. `systemctl --user status kairec-tray` for the service itself.
+**The tray icon is missing.** While kairec is idle the icon reports itself as passive, so with
+Plasma's default "Shown when relevant" it sits under the tray's expander arrow and comes out
+when a recording starts, auto recording is off, or the daemon is down. To keep it on the panel
+all the time: right-click the tray → Configure System Tray → Entries → kairec → "Always shown".
+`systemctl --user status kairec-tray` for the service itself.
 
 **Settings changes do not take effect.** They wait for the current session to end; the page
 says so. Port and bind changes need `systemctl --user restart kairec`.
