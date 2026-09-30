@@ -18,7 +18,8 @@ Every key below is optional. Profiles override the global sections under the sam
 
 | key | default | meaning |
 |---|---|---|
-| `monitor` | `"DP-1"` | name from `gpu-screen-recorder --list-monitors`, or `"screen"` for the first |
+| `monitor` | `"DP-1"` | name from `gpu-screen-recorder --list-monitors`, or `"screen"` for the first. Windows: the display number, `"0"` for the first |
+| `gpu` | `"nvidia"` | `nvidia`, `amd` or `intel`: whose encoder and decoder ffmpeg uses for exports, and on Windows for recording too. Only NVIDIA has been tried |
 | `quality` | `"high"` | the `[[quality]]` preset used by profiles that do not pick their own |
 | `audio` | `["default_output"]` | recorder audio sources merged into the recording's audio: `default_output`, `default_input`, `device:NAME`, `app:NAME`, `app-inverse:NAME` |
 | `multitrack` | `false` | also record the `[[capture.tracks]]` as separate audio tracks |
@@ -114,6 +115,17 @@ Always deleted, regardless of the caps: a finished session with no footage left,
 no clips. Never deleted: starred clips, the live session, sessions with starred markers, sessions whose
 clips are still on disk. A pass runs a minute after start and every ten minutes; `kairec retention`
 runs one now.
+
+## `[hotkeys]` (Windows only)
+
+| key | default | meaning |
+|---|---|---|
+| `mark` | `"ctrl+alt+m"` | drops a marker. `ctrl`, `alt`, `shift`, `win` plus a letter, digit, F-key or key name (`space`, `home`, `pause`, `numpad0`); `""` turns it off |
+| `save` | `"ctrl+alt+s"` | saves the last `save_seconds` |
+| `ui` | `"ctrl+alt+k"` | opens or raises the kairec window |
+
+On Linux the daemon registers nothing; bind the desktop's shortcuts to the `kairec` CLI instead (see [CLI](cli.md)).
+On Windows a buffer profile records a timeline of `buffer.minutes` and `storage = "ram"` means disk; see [Windows](windows.md).
 
 ## `[feedback]`
 

@@ -96,27 +96,11 @@ public static class WebApi
             });
         });
 
-        // Running processes, for the profile picker in Settings. Read from /proc on demand only.
+        // Running processes, for the profile picker in Settings. Read from /proc (Windows: the process table) on demand only.
         api.MapGet("/processes", () =>
-        {
-            var self = Environment.ProcessId;
-            var list = new List<object>();
-            foreach (var dir in Directory.EnumerateDirectories("/proc"))
-            {
-                if (!int.TryParse(Path.GetFileName(dir), out var pid) || pid == self) continue;
-                try
-                {
-                    var comm = File.ReadAllText(Path.Combine(dir, "comm")).TrimEnd('\n');
-                    var cmd = File.ReadAllText(Path.Combine(dir, "cmdline")).Replace('\0', ' ').Trim();
-                    if (cmd.Length == 0) continue;   // kernel threads
-                    var uid = File.ReadLines(Path.Combine(dir, "status")).FirstOrDefault(l => l.StartsWith("Uid:"))?.Split('\t', StringSplitOptions.RemoveEmptyEntries)[1];
-                    if (uid != Environment.GetEnvironmentVariable("UID") && uid != GetUid()) continue;   // only my own processes
-                    list.Add(new { Pid = pid, Comm = comm, Cmdline = cmd.Length > 160 ? cmd[..160] + "…" : cmd });
-                }
-                catch { }
-            }
-            return Results.Ok(list.OrderBy(x => ((dynamic)x).Comm).ToList());
-        });
+            Results.Ok(ProcessWatcher.ListAll(Environment.ProcessId)
+                .Select(p => new { p.Pid, p.Comm, Cmdline = p.Cmdline.Length > 160 ? p.Cmdline[..160] + "…" : p.Cmdline })
+                .OrderBy(x => x.Comm).ToList()));
 
         // ------------------------------------------------------------ config
 
@@ -127,6 +111,7 @@ public static class WebApi
             DiskFree = FreeBytes(cfg.RootDir), MemTotal = MemTotalBytes(),
             Monitors = await GsrInfo.MonitorsAsync(ct), AudioDevices = await GsrInfo.AudioDevicesAsync(ct), AudioApps = await GsrInfo.AudioApplicationsAsync(ct),
             Codecs = new[] { "h264", "hevc", "av1" },
+            Platform = Core.Platform.IsWindows ? "windows" : "linux",
         }));
 
         api.MapPut("/config", (ConfigTextRequest req, ConfigService cs, RecordingCoordinator rec) =>
@@ -487,8 +472,10 @@ public static class WebApi
         {
             var p = cat.ClipPath(profile, file);
             if (p is null) return Results.NotFound();
-            var shown = Run("busctl", ["--user", "call", "org.freedesktop.FileManager1", "/org/freedesktop/FileManager1", "org.freedesktop.FileManager1", "ShowItems", "ass", "1", new Uri(p).AbsoluteUri, ""])
-                        || Run("xdg-open", [Path.GetDirectoryName(p)!]);
+            var shown = Core.Platform.IsWindows
+                ? Run("explorer.exe", ["/select,", p], wait: false)
+                : Run("busctl", ["--user", "call", "org.freedesktop.FileManager1", "/org/freedesktop/FileManager1", "org.freedesktop.FileManager1", "ShowItems", "ass", "1", new Uri(p).AbsoluteUri, ""])
+                  || Run("xdg-open", [Path.GetDirectoryName(p)!]);
             return shown ? Results.Ok(new { Ok = true }) : Results.BadRequest(new { Error = "no file manager answered" });
         });
 
@@ -519,24 +506,17 @@ public static class WebApi
         });
     }
 
-    private static bool Run(string exe, IEnumerable<string> args)
+    private static bool Run(string exe, IEnumerable<string> args, bool wait = true)
     {
         try
         {
             var psi = new System.Diagnostics.ProcessStartInfo(exe) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
             foreach (var a in args) psi.ArgumentList.Add(a);
             using var p = System.Diagnostics.Process.Start(psi);
+            if (!wait) return p is not null;
             return p is not null && p.WaitForExit(5000) && p.ExitCode == 0;
         }
         catch { return false; }
-    }
-
-    private static string? _uid;
-    private static string GetUid()
-    {
-        if (_uid is not null) return _uid;
-        try { _uid = File.ReadLines("/proc/self/status").First(l => l.StartsWith("Uid:")).Split('\t', StringSplitOptions.RemoveEmptyEntries)[1]; } catch { _uid = ""; }
-        return _uid;
     }
 
     private static long FreeBytes(string path)
@@ -550,7 +530,7 @@ public static class WebApi
     private static long MemTotalBytes()
     {
         try { foreach (var l in File.ReadLines("/proc/meminfo")) if (l.StartsWith("MemTotal:")) return long.Parse(l.Split(' ', StringSplitOptions.RemoveEmptyEntries)[1]) * 1024; } catch { }
-        return 0;
+        try { return GC.GetGCMemoryInfo().TotalAvailableMemoryBytes; } catch { return 0; }
     }
 
     private static ClipInfo ReadClipInfo(string clipPath, string profile)

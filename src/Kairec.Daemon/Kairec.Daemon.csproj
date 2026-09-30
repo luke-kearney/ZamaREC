@@ -4,9 +4,26 @@
     <RollForward>LatestMajor</RollForward>
     <SelfContained>false</SelfContained>
     <UseAppHost>true</UseAppHost>
+    <GenerateEmbeddedFilesManifest>true</GenerateEmbeddedFilesManifest>
+    <ApplicationIcon>../../packaging/brand/kairec.ico</ApplicationIcon>
+  </PropertyGroup>
+  <!-- The Windows build: no console (it lives in the tray and logs to a file), one self-contained exe. -->
+  <PropertyGroup Condition="$(RuntimeIdentifier.StartsWith('win'))">
+    <OutputType>WinExe</OutputType>
+    <AssemblyName>kairec-daemon</AssemblyName>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <DebugType>none</DebugType>
   </PropertyGroup>
   <ItemGroup>
     <Content Update="wwwroot\**" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Also built into the assembly, for the single-file exe (served when no wwwroot folder sits next to the daemon). -->
+    <EmbeddedResource Include="wwwroot\**" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.FileProviders.Embedded" Version="10.0.12" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../Kairec.Core/Kairec.Core.csproj" />

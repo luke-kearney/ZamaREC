@@ -38,9 +38,7 @@ static class Top
     /// <summary>Prints the tail of events.jsonl. Reads the file directly, so it works even when the daemon is down.</summary>
     public static int PrintLog(int n, string? kind)
     {
-        var xdg = Environment.GetEnvironmentVariable("XDG_DATA_HOME");
-        var dataDir = string.IsNullOrEmpty(xdg) ? Path.Combine(Environment.GetEnvironmentVariable("HOME") ?? "", ".local", "share") : xdg;
-        var path = Path.Combine(dataDir, "kairec", "events.jsonl");
+        var path = Path.Combine(ControlPaths.DataDir(), "events.jsonl");
         if (!File.Exists(path)) { Console.WriteLine("no events yet"); return 0; }
         var lines = File.ReadAllLines(path);
         var shown = 0;
@@ -128,7 +126,8 @@ static class Top
                 sb.AppendLine();
                 sb.AppendLine($"  storage   sessions {Bytes(sessionsBytes)}   clips {Bytes(clipsBytes)}   free {Bytes(diskFree)}   writing {Bytes((long)Math.Max(0, writeRate))}/s ({(writeRate * 3600 / 1e9):0.0} GB/h)");
                 sb.AppendLine();
-                sb.AppendLine("  cpu% is of one core. Figures come from /proc only; the GPU is never queried.");
+                sb.AppendLine(OperatingSystem.IsWindows() ? "  cpu% is of one core. Figures come from the process table only; the GPU is never queried."
+                                                          : "  cpu% is of one core. Figures come from /proc only; the GPU is never queried.");
                 Console.Out.Write(sb.ToString());
                 Console.Out.Flush();
                 try { await Task.Delay(1000, cts.Token); } catch (OperationCanceledException) { }
@@ -143,8 +142,8 @@ static class Top
         yield return ("daemon", st.DaemonPid);
         if (st.RecorderPid is int rp)
         {
-            yield return ("gpu-screen-recorder", rp);
-            foreach (var child in Children(rp)) yield return (child.Comm, child.Pid);
+            yield return (OperatingSystem.IsWindows() ? "ffmpeg" : "gpu-screen-recorder", rp);
+            if (!OperatingSystem.IsWindows()) foreach (var child in Children(rp)) yield return (child.Comm, child.Pid);
         }
     }
 
@@ -168,6 +167,20 @@ static class Top
 
     private static (double Cpu, long Rss, int Threads)? ProcStat(int pid)
     {
+        if (OperatingSystem.IsWindows())
+        {
+            try
+            {
+                using var p = System.Diagnostics.Process.GetProcessById(pid);
+                var ms = (long)p.TotalProcessorTime.TotalMilliseconds;
+                var now = Environment.TickCount64;
+                double pct = 0;
+                if (_lastProc.TryGetValue(pid, out var last) && now > last.At) pct = (ms - last.Cpu) * 100.0 / (now - last.At);
+                _lastProc[pid] = (ms, now);
+                return (pct, p.WorkingSet64, p.Threads.Count);
+            }
+            catch { return null; }
+        }
         try
         {
             var stat = File.ReadAllText($"/proc/{pid}/stat");
@@ -188,6 +201,7 @@ static class Top
 
     private static double SysCpu()
     {
+        if (OperatingSystem.IsWindows()) return 0;   // not shown there
         try
         {
             var line = File.ReadLines("/proc/stat").First();
@@ -204,6 +218,10 @@ static class Top
     private static (long Total, long Avail) MemInfo()
     {
         long total = 0, avail = 0;
+        if (OperatingSystem.IsWindows())
+        {
+            try { var gc = GC.GetGCMemoryInfo(); return (gc.TotalAvailableMemoryBytes, Math.Max(0, gc.TotalAvailableMemoryBytes - gc.MemoryLoadBytes)); } catch { return (0, 0); }
+        }
         try
         {
             foreach (var line in File.ReadLines("/proc/meminfo"))

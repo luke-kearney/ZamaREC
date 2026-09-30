@@ -17,6 +17,8 @@ public sealed class KairecConfig
     public GsiConfig Gsi { get; set; } = new();
     public AutoGamesConfig AutoGames { get; set; } = new();
     public ShareConfig Share { get; set; } = new();
+    /// <summary>Windows only: global hotkeys the daemon registers itself (Linux binds the CLI to desktop shortcuts).</summary>
+    public HotkeysConfig Hotkeys { get; set; } = new();
     /// <summary>Named quality presets a profile can pick; blank profile.quality means the [capture] values.</summary>
     public List<QualityPreset> Quality { get; set; } = QualityPreset.Defaults();
     public List<ProfileConfig> Profiles { get; set; } = new();
@@ -35,7 +37,7 @@ public sealed class KairecConfig
     public void CopyFrom(KairecConfig o)
     {
         Storage = o.Storage; Capture = o.Capture; Timeline = o.Timeline; Buffer = o.Buffer; Clips = o.Clips;
-        Retention = o.Retention; Feedback = o.Feedback; Daemon = o.Daemon; Gsi = o.Gsi; AutoGames = o.AutoGames; Share = o.Share; Quality = o.Quality; Profiles = o.Profiles;
+        Retention = o.Retention; Feedback = o.Feedback; Daemon = o.Daemon; Gsi = o.Gsi; AutoGames = o.AutoGames; Share = o.Share; Hotkeys = o.Hotkeys; Quality = o.Quality; Profiles = o.Profiles;
         Version++;
     }
 
@@ -65,22 +67,27 @@ public sealed class KairecConfig
     public EffectiveProfile Effective(ProfileConfig p)
     {
         var q = FindQuality(p.Quality) ?? FindQuality(Capture.Quality);
+        // The Windows recorder (ffmpeg) has no replay buffer and Windows has no tmpfs: a buffer profile records a
+        // timeline as long as the buffer would have been, and RAM storage is disk storage. Marks still write clips.
+        var win = Platform.IsWindows;
+        var mode = win ? CaptureMode.Timeline : p.CaptureMode;
+        var bufferMinutes = p.Buffer?.Minutes ?? Buffer.Minutes;
         return new()
         {
         Profile = p,
-        Mode = p.CaptureMode,
+        Mode = mode,
         QualityName = q?.Name,
         Fps = p.Fps ?? q?.Fps ?? Capture.Fps,
         Codec = q?.Codec ?? Capture.Codec,
         BitrateKbps = q?.BitrateKbps ?? Capture.BitrateKbps,
         KeyframeSeconds = q?.KeyframeSeconds ?? Capture.KeyframeSeconds,
         Scale = q?.Scale ?? Capture.Scale,
-        WindowMinutes = p.Timeline?.WindowMinutes ?? Timeline.WindowMinutes,
+        WindowMinutes = win && p.CaptureMode == CaptureMode.Buffer ? bufferMinutes : p.Timeline?.WindowMinutes ?? Timeline.WindowMinutes,
         SegmentSeconds = p.Timeline?.SegmentSeconds ?? Timeline.SegmentSeconds,
-        TimelineStorage = p.Timeline?.Storage ?? Timeline.Storage,
+        TimelineStorage = win ? "disk" : p.Timeline?.Storage ?? Timeline.Storage,
         RamKeepHours = p.Timeline?.RamKeepHours ?? Timeline.RamKeepHours,
-        BufferMinutes = p.Buffer?.Minutes ?? Buffer.Minutes,
-        BufferStorage = p.Buffer?.Storage ?? Buffer.Storage,
+        BufferMinutes = bufferMinutes,
+        BufferStorage = win ? "disk" : p.Buffer?.Storage ?? Buffer.Storage,
         SaveSeconds = p.Clips?.SaveSeconds ?? Clips.SaveSeconds,
         MarkBeforeSeconds = p.Clips?.MarkBeforeSeconds ?? Clips.MarkBeforeSeconds,
         MarkAfterSeconds = p.Clips?.MarkAfterSeconds ?? Clips.MarkAfterSeconds,
@@ -178,6 +185,8 @@ public sealed class CaptureConfig
     /// <summary>gpu-screen-recorder audio sources: default_output, default_input, device:NAME, app:NAME.</summary>
     public List<string> Audio { get; set; } = new() { "default_output" };
     public bool Cursor { get; set; } = false;
+    /// <summary>nvidia | amd | intel: which GPU encoder ffmpeg uses for exports (and, on Windows, for the recording). NVIDIA is the tested one.</summary>
+    public string Gpu { get; set; } = "nvidia";
     /// <summary>Record the sources below as separate audio tracks after the mix. Off = one track, the sources in `audio`.</summary>
     public bool Multitrack { get; set; } = false;
     /// <summary>The separate tracks, in file order after the mix. Only used with multitrack = true.</summary>
@@ -291,6 +300,17 @@ public sealed class FeedbackConfig
     public double Volume { get; set; } = 0.5;
 }
 
+/// <summary>
+/// Windows only: system-wide hotkeys, "ctrl+alt+m" style (ctrl, alt, shift, win; a letter, digit, F-key or a key
+/// name like space, home, pause). Empty disables one. On Linux hotkeys are the desktop's own, bound to the kairec CLI.
+/// </summary>
+public sealed class HotkeysConfig
+{
+    public string Mark { get; set; } = "ctrl+alt+m";
+    public string Save { get; set; } = "ctrl+alt+s";
+    public string Ui { get; set; } = "ctrl+alt+k";
+}
+
 public sealed class DaemonConfig
 {
     public int GsiPort { get; set; } = 3555;
@@ -346,6 +366,7 @@ public static class Paths
 {
     public static string ConfigDir()
     {
+        if (Platform.IsWindows) return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "kairec");
         var xdg = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME");
         var baseDir = string.IsNullOrEmpty(xdg) ? Path.Combine(Home(), ".config") : xdg;
         return Path.Combine(baseDir, "kairec");
@@ -355,6 +376,7 @@ public static class Paths
 
     public static string DataDir()
     {
+        if (Platform.IsWindows) return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "kairec");
         var xdg = Environment.GetEnvironmentVariable("XDG_DATA_HOME");
         var baseDir = string.IsNullOrEmpty(xdg) ? Path.Combine(Home(), ".local", "share") : xdg;
         return Path.Combine(baseDir, "kairec");
@@ -362,8 +384,16 @@ public static class Paths
 
     public static string Home() => Environment.GetEnvironmentVariable("HOME") ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
 
-    public static string Expand(string p) =>
-        p.StartsWith("~/") ? Path.Combine(Home(), p[2..]) : p == "~" ? Home() : p;
+    public static string Expand(string p)
+    {
+        // "~/Videos/..." is the user's Videos folder on both systems, wherever Windows keeps it.
+        if (Platform.IsWindows && (p == "~/Videos" || p.StartsWith("~/Videos/")))
+        {
+            var videos = Environment.GetFolderPath(Environment.SpecialFolder.MyVideos);
+            if (videos.Length > 0) return p.Length > 8 ? Path.Combine(videos, p[9..]) : videos;
+        }
+        return p.StartsWith("~/") ? Path.Combine(Home(), p[2..]) : p == "~" ? Home() : p;
+    }
 }
 
 public static class ConfigLoader
@@ -394,7 +424,7 @@ public static class ConfigLoader
         if (!File.Exists(path))
         {
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-            File.WriteAllText(path, DefaultConfig.Toml);
+            File.WriteAllText(path, DefaultConfig.ForThisSystem());
         }
         return Parse(File.ReadAllText(path));
     }
@@ -445,5 +475,9 @@ public static class ConfigLoader
             throw new InvalidOperationException($"auto_games.quality: unknown preset '{cfg.AutoGames.Quality}' (known: {string.Join(", ", cfg.Quality.Select(q => q.Name))})");
         if (cfg.Capture.Codec is not ("h264" or "hevc" or "av1"))
             throw new InvalidOperationException($"capture.codec must be h264, hevc or av1 (got '{cfg.Capture.Codec}')");
+        if (cfg.Capture.Gpu.ToLowerInvariant() is not ("nvidia" or "amd" or "intel"))
+            throw new InvalidOperationException($"capture.gpu must be nvidia, amd or intel (got '{cfg.Capture.Gpu}')");
+        foreach (var (name, combo) in new[] { ("mark", cfg.Hotkeys.Mark), ("save", cfg.Hotkeys.Save), ("ui", cfg.Hotkeys.Ui) })
+            if (!string.IsNullOrWhiteSpace(combo) && Hotkey.TryParse(combo) is null) throw new InvalidOperationException($"hotkeys.{name}: cannot read '{combo}' (try \"ctrl+alt+m\")");
     }
 }

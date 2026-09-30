@@ -82,7 +82,7 @@ public sealed class ThumbService(KairecConfig cfg, ILogger<ThumbService> log)
 
     private static async Task<(int Code, string Err)> RunAsync(IEnumerable<string> args, CancellationToken ct)
     {
-        var psi = new ProcessStartInfo("ffmpeg") { UseShellExecute = false, RedirectStandardError = true, RedirectStandardOutput = true };
+        var psi = new ProcessStartInfo(Kairec.Core.Recording.Ffmpeg.Exe) { UseShellExecute = false, RedirectStandardError = true, RedirectStandardOutput = true, CreateNoWindow = true };
         foreach (var a in (string[])["-hide_banner", "-loglevel", "error", "-y", .. args]) psi.ArgumentList.Add(a);
         using var p = Process.Start(psi)!;
         try { p.PriorityClass = ProcessPriorityClass.BelowNormal; } catch { }   // a game comes first

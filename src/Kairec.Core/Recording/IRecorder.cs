@@ -1,0 +1,36 @@
+using Kairec.Core.Config;
+using Microsoft.Extensions.Logging;
+
+namespace Kairec.Core.Recording;
+
+/// <summary>
+/// One running capture process. The coordinator drives it the same way on both systems: wait until it is
+/// ready, stop it, and (buffer mode, Linux only) ask it to dump its replay buffer.
+/// </summary>
+public interface IRecorder : IAsyncDisposable
+{
+    int Pid { get; }
+    bool HasExited { get; }
+    Task Exited { get; }
+    string Executable { get; }
+    /// <summary>Waits until the recorder is capturing (its IPC socket exists, or ffmpeg reports frames).</summary>
+    Task WaitForReadyAsync(TimeSpan timeout, CancellationToken ct);
+    /// <summary>Stop and save (record mode) or stop without saving the buffer. Returns the saved path in record mode.</summary>
+    Task<IpcReply> StopAsync(CancellationToken ct);
+    Task<IpcReply> SaveReplayAsync(int? seconds, CancellationToken ct);
+    /// <summary>Waits for a clean exit, escalating to a signal and then a kill.</summary>
+    Task WaitForExitAsync(TimeSpan grace, CancellationToken ct);
+}
+
+public static class Recorder
+{
+    public static string Name => Platform.IsWindows ? "ffmpeg" : "gpu-screen-recorder";
+
+    /// <summary>Starts the capture for a profile: gpu-screen-recorder on Linux, ffmpeg with Desktop Duplication on Windows.</summary>
+    public static IRecorder Start(KairecConfig cfg, EffectiveProfile profile, string mediaDir, string bufferOutDir, string ipcSocket, ILogger log)
+    {
+        if (Platform.IsWindows) return FfmpegRecorder.Start(cfg, profile, mediaDir, log);
+        var args = GsrArguments.Build(cfg, profile, mediaDir, bufferOutDir, ipcSocket);
+        return GsrProcess.Start(args, ipcSocket, log);
+    }
+}

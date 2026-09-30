@@ -58,11 +58,25 @@ public partial class ProtocolJson : JsonSerializerContext { }
 
 public static class ControlPaths
 {
+    /// <summary>Where the daemon keeps its data: XDG_DATA_HOME/kairec on Linux, local app data on Windows.</summary>
+    public static string DataDir()
+    {
+        if (OperatingSystem.IsWindows()) return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "kairec");
+        var xdg = Environment.GetEnvironmentVariable("XDG_DATA_HOME");
+        var home = Environment.GetEnvironmentVariable("HOME") ?? "/tmp";
+        return Path.Combine(string.IsNullOrEmpty(xdg) ? Path.Combine(home, ".local", "share") : xdg, "kairec");
+    }
+
+    /// <summary>How to start the daemon on this system, for error messages.</summary>
+    public static string StartHint => OperatingSystem.IsWindows() ? "start kairec-daemon.exe" : "systemctl --user start kairec";
+
     /// <summary>Control socket. KAIREC_SOCKET overrides it so a test daemon never touches the real one.</summary>
     public static string SocketPath()
     {
         var env = Environment.GetEnvironmentVariable("KAIREC_SOCKET");
         if (!string.IsNullOrEmpty(env)) return env;
+        if (OperatingSystem.IsWindows())   // Unix sockets work on Windows 10+, in the user's local app data
+            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "kairec", "kairec.sock");
         var runtime = Environment.GetEnvironmentVariable("XDG_RUNTIME_DIR");
         if (string.IsNullOrEmpty(runtime)) runtime = Path.GetTempPath();
         return Path.Combine(runtime, "kairec.sock");

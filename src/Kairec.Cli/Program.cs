@@ -3,8 +3,9 @@ using System.Text;
 using System.Text.Json;
 using Kairec.Protocol;
 
-// kairec: tiny NativeAOT client for the daemon's Unix socket. Meant to be bound to a KDE shortcut,
-// so it must start fast and never open a window. The one exception is `kairec ui`, which is asked to.
+// kairec: tiny client for the daemon's Unix socket (NativeAOT on Linux, where it is bound to a KDE shortcut;
+// a plain exe on Windows, where the daemon registers its own hotkeys). It must start fast and never open a
+// window. The one exception is `kairec ui`, which is asked to.
 
 if (args.Length == 0 || args[0] is "-h" or "--help" or "help") return Usage();
 
@@ -38,7 +39,7 @@ switch (req.Cmd)
         var mode = rest.Contains("--browser") ? "browser" : rest.Contains("--app") ? "app" : st?.UiWindow;
         var did = UiLauncher.Open(st?.UiUrl ?? UiLauncher.DefaultUrl, mode);
         Console.WriteLine(did switch { "window" => "opened the kairec window", "focused" => "the kairec window is already open; brought it to the front", "browser" => "opened in the default browser", _ => did });
-        if (st is null) Console.Error.WriteLine("note: the daemon is not running, so the page will not load until it is (systemctl --user start kairec)");
+        if (st is null) Console.Error.WriteLine($"note: the daemon is not running, so the page will not load until it is ({ControlPaths.StartHint})");
         return did is "window" or "focused" or "browser" ? 0 : 1;
     }
     case "top":
@@ -83,7 +84,7 @@ try
 }
 catch (SocketException)
 {
-    Console.Error.WriteLine($"daemon not running (no socket at {ControlPaths.SocketPath()}). Start it with: systemctl --user start kairec");
+    Console.Error.WriteLine($"daemon not running (no socket at {ControlPaths.SocketPath()}). Start it with: {ControlPaths.StartHint}");
     return 3;
 }
 

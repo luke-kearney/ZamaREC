@@ -16,6 +16,8 @@ public sealed record ProcessScan(GameProcess? Match, IReadOnlyList<SteamLaunch> 
 /// Finds game processes by scanning /proc. This is the only polling the daemon does: a CPU-side directory
 /// listing once a second, reading /proc/PID/comm (and cmdline only for profiles that need it, and for Steam's
 /// launch wrapper). It never touches the GPU, the driver, or any hardware counters.
+/// On Windows the same scan reads the process table, and Steam's running game comes from the registry as a
+/// launch with a negative pid (-appId), which <see cref="IsAlive"/> understands.
 /// </summary>
 public sealed class ProcessWatcher
 {
@@ -40,6 +42,7 @@ public sealed class ProcessWatcher
     /// <summary>Stops at the first profile match, since that wins over anything Steam has running.</summary>
     public ProcessScan Scan(int selfPid, bool steam = true)
     {
+        if (Platform.IsWindows) return ScanWindows(selfPid, steam);
         var launches = new List<SteamLaunch>();
         foreach (var dir in Directory.EnumerateDirectories(_proc))
         {
@@ -62,10 +65,70 @@ public sealed class ProcessWatcher
         return new ProcessScan(null, launches);
     }
 
+    private ProcessScan ScanWindows(int selfPid, bool steam)
+    {
+        var launches = steam ? SteamLaunches() : new List<SteamLaunch>();
+        var procs = WindowsProcesses.List(selfPid);
+        var needCmd = _matchers.Any(m => m.Cmdline is not null);
+        if (needCmd) WindowsProcesses.ForgetGone(procs.Select(p => p.Pid).ToHashSet());
+        foreach (var (pid, name) in procs)
+        {
+            string? cmdline = null;
+            foreach (var (profile, commRe, cmdRe) in _matchers)
+            {
+                if (commRe is not null && commRe.IsMatch(name)) return new ProcessScan(new GameProcess(profile, pid, name), launches);
+                if (cmdRe is null) continue;
+                cmdline ??= WindowsProcesses.CommandLine(pid);
+                if (cmdline.Length > 0 && cmdRe.IsMatch(cmdline)) return new ProcessScan(new GameProcess(profile, pid, name), launches);
+            }
+        }
+        return new ProcessScan(null, launches);
+    }
+
+    /// <summary>Every process, for the profile picker in Settings. On demand only.</summary>
+    public static List<(int Pid, string Comm, string Cmdline)> ListAll(int selfPid)
+    {
+        var list = new List<(int, string, string)>();
+        if (Platform.IsWindows)
+        {
+            foreach (var (pid, name) in WindowsProcesses.List(selfPid)) list.Add((pid, name, WindowsProcesses.CommandLine(pid)));
+            return list;
+        }
+        foreach (var dir in Directory.EnumerateDirectories("/proc"))
+        {
+            if (!int.TryParse(Path.GetFileName(dir), out var pid) || pid == selfPid) continue;
+            try
+            {
+                var comm = File.ReadAllText(Path.Combine(dir, "comm")).TrimEnd('\n');
+                var cmd = ReadCmdline(dir).Trim();
+                if (cmd.Length == 0) continue;   // kernel threads
+                var uid = File.ReadLines(Path.Combine(dir, "status")).FirstOrDefault(l => l.StartsWith("Uid:"))?.Split('\t', StringSplitOptions.RemoveEmptyEntries)[1];
+                if (uid != OwnUid()) continue;   // only my own processes
+                list.Add((pid, comm, cmd));
+            }
+            catch { }
+        }
+        return list;
+    }
+
+    private static string? _uid;
+    private static string OwnUid()
+    {
+        if (_uid is not null) return _uid;
+        try { _uid = File.ReadLines("/proc/self/status").First(l => l.StartsWith("Uid:")).Split('\t', StringSplitOptions.RemoveEmptyEntries)[1]; } catch { _uid = ""; }
+        return _uid;
+    }
+
     /// <summary>Every Steam launch running right now, whether or not a profile matches something.</summary>
     public List<SteamLaunch> SteamLaunches()
     {
         var launches = new List<SteamLaunch>();
+        if (Platform.IsWindows)
+        {
+            var app = WindowsProcesses.RunningSteamApp();
+            if (app > 0 && app <= int.MaxValue) launches.Add(new SteamLaunch((int)-app, app));
+            return launches;
+        }
         foreach (var dir in Directory.EnumerateDirectories(_proc))
         {
             if (!int.TryParse(Path.GetFileName(dir), out var pid)) continue;
@@ -81,6 +144,7 @@ public sealed class ProcessWatcher
 
     public static bool IsAlive(int pid)
     {
+        if (Platform.IsWindows) return WindowsProcesses.IsAlive(pid);
         try
         {
             // A zombie still has a /proc entry; treat it as gone.

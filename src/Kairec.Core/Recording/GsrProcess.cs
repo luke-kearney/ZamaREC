@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 namespace Kairec.Core.Recording;
 
 /// <summary>One running gpu-screen-recorder process, driven over its -ipc JSON socket.</summary>
-public sealed class GsrProcess : IAsyncDisposable
+public sealed class GsrProcess : IRecorder
 {
     private readonly Process _proc;
     private readonly string _socketPath;
@@ -56,7 +56,7 @@ public sealed class GsrProcess : IAsyncDisposable
     private static string Quote(string s) => s.Contains(' ') ? $"\"{s}\"" : s;
 
     /// <summary>Waits until the recorder has created its socket (it does so after initialising capture).</summary>
-    public async Task WaitForSocketAsync(TimeSpan timeout, CancellationToken ct)
+    public async Task WaitForReadyAsync(TimeSpan timeout, CancellationToken ct)
     {
         var sw = Stopwatch.StartNew();
         while (sw.Elapsed < timeout)

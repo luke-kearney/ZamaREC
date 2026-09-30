@@ -24,11 +24,23 @@ public sealed class ControlSocketServer : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
         var path = ControlPaths.SocketPath();
-        if (File.Exists(path)) File.Delete(path);
-        using var listener = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
-        listener.Bind(new UnixDomainSocketEndPoint(path));
-        listener.Listen(16);
-        File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        Socket listener;
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            if (File.Exists(path)) File.Delete(path);
+            listener = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+            listener.Bind(new UnixDomainSocketEndPoint(path));
+            listener.Listen(16);
+            if (!Core.Platform.IsWindows) File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);   // Windows: the user's profile folder is already private
+        }
+        catch (Exception ex) when (Core.Platform.IsWindows)
+        {
+            // Windows before 10 1803 (and Wine) have no Unix sockets. The tray, hotkeys and UI still work; only the kairec.exe CLI does not.
+            _log.LogError(ex, "control socket unavailable at {path}; the kairec.exe command line will not reach this daemon", path);
+            return;
+        }
+        using var owned = listener;
         _log.LogInformation("control socket at {path}", path);
         ct.Register(() => { try { listener.Close(); } catch { } });
 

@@ -7,7 +7,7 @@
 
 *kairec*, from *kairos* (καιρός): the opportune moment.
 
-A Linux game session recorder built around a marker timeline. It records on its own when a game
+A game session recorder for Linux (and, from the same source, Windows) built around a marker timeline. It records on its own when a game
 starts, marks moments from a hotkey or from the game itself, and cuts clips from those markers
 afterwards. Steam's recorder needs the overlay, which doesn't reach native Wayland games; replay
 buffers give you a save key and nothing more. kairec is the part after the save.
@@ -39,7 +39,8 @@ buffers give you a save key and nothing more. kairec is the part after the save.
 > pull requests are welcome.
 
 Anything with systemd, PipeWire and a working gpu-screen-recorder should run it; other GPUs and
-desktops are untested.
+desktops are untested. There is also a Windows build, one exe plus ffmpeg, that records through
+Desktop Duplication instead of gpu-screen-recorder: see [Windows](docs/windows.md).
 
 ## Screenshots
 
@@ -100,6 +101,7 @@ its own clip and retention settings.
 - [CS2 events](docs/cs2-gsi.md): what Game State Integration gives you and how it is used.
 - [HTTP API](docs/http-api.md): everything the UI talks to, for scripting.
 - [Troubleshooting](docs/troubleshooting.md): the things that go wrong and what they mean.
+- [Windows](docs/windows.md): the Windows build, how it differs, and how to make the bundle.
 - [Development](docs/development.md) and [CONTRIBUTING](CONTRIBUTING.md).
 
 ## Requirements
@@ -111,6 +113,9 @@ its own clip and retention settings.
 | ffmpeg 6+ | clip export, probing; nvenc for frame-exact exports |
 | .NET 10 SDK | to build; the CLI is NativeAOT, so clang too |
 | a Wayland or X11 desktop with a StatusNotifier tray | for the tray icon, optional |
+
+On Windows: Windows 10 1803 or newer, a GPU with an ffmpeg encoder (NVIDIA tested; AMD and Intel wired up, untested),
+and the bundled ffmpeg. Nothing to install: `packaging/windows/build.sh` makes a zip with everything in it.
 
 ## Status
 

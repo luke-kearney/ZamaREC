@@ -39,6 +39,7 @@ public static class SteamLibrary
     /// <summary>The Steam app a process was launched for (SteamAppId in its environment), read once when a session starts.</summary>
     public static long? AppIdOfProcess(int pid, string procRoot = "/proc")
     {
+        if (Platform.IsWindows) { var app = WindowsProcesses.RunningSteamApp(); return app > 0 ? app : null; }   // the client says which app it is running
         try
         {
             foreach (var kv in File.ReadAllText(Path.Combine(procRoot, pid.ToString(), "environ")).Split('\0'))
@@ -52,7 +53,9 @@ public static class SteamLibrary
     public static List<string> Libraries(string? home = null)
     {
         home ??= Paths.Home();
-        var roots = new[] { Path.Combine(home, ".local/share/Steam"), Path.Combine(home, ".steam/steam"), Path.Combine(home, ".var/app/com.valvesoftware.Steam/.local/share/Steam") };
+        var roots = Platform.IsWindows
+            ? (WindowsProcesses.SteamPath() is { } sp ? new[] { sp } : Array.Empty<string>())
+            : new[] { Path.Combine(home, ".local/share/Steam"), Path.Combine(home, ".steam/steam"), Path.Combine(home, ".var/app/com.valvesoftware.Steam/.local/share/Steam") };
         var libs = new List<string>();
         foreach (var r in roots)
         {

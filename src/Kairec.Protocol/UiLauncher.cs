@@ -24,20 +24,29 @@ public static class UiLauncher
     private static readonly string[] Browsers =
         ["google-chrome-stable", "google-chrome", "chromium", "chromium-browser", "brave", "brave-browser", "microsoft-edge-stable", "vivaldi-stable"];
 
-    /// <summary>The browser used for the app window: KAIREC_UI_BROWSER, or the first Chromium-family one on PATH.</summary>
+    /// <summary>Windows: Chrome, then Edge (which every Windows 10/11 has), then Brave, under their usual install folders.</summary>
+    private static IEnumerable<string> WindowsBrowsers()
+    {
+        var roots = new[] { Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData) }
+            .Where(r => r.Length > 0).Distinct();
+        foreach (var r in roots)
+        {
+            yield return Path.Combine(r, "Google", "Chrome", "Application", "chrome.exe");
+            yield return Path.Combine(r, "Microsoft", "Edge", "Application", "msedge.exe");
+            yield return Path.Combine(r, "BraveSoftware", "Brave-Browser", "Application", "brave.exe");
+        }
+    }
+
+    /// <summary>The browser used for the app window: KAIREC_UI_BROWSER, or the first Chromium-family one on PATH (Windows: in its install folder).</summary>
     public static string? FindBrowser()
     {
         var forced = Environment.GetEnvironmentVariable("KAIREC_UI_BROWSER");
         if (!string.IsNullOrEmpty(forced)) return OnPath(forced) ?? (File.Exists(forced) ? forced : null);
+        if (OperatingSystem.IsWindows()) return WindowsBrowsers().FirstOrDefault(File.Exists) ?? new[] { "chrome.exe", "msedge.exe" }.Select(OnPath).FirstOrDefault(p => p is not null);
         return Browsers.Select(OnPath).FirstOrDefault(p => p is not null);
     }
 
-    public static string ProfileDir()
-    {
-        var xdg = Environment.GetEnvironmentVariable("XDG_DATA_HOME");
-        var home = Environment.GetEnvironmentVariable("HOME") ?? "/tmp";
-        return Path.Combine(string.IsNullOrEmpty(xdg) ? Path.Combine(home, ".local", "share") : xdg, "kairec", "ui-profile");
-    }
+    public static string ProfileDir() => Path.Combine(ControlPaths.DataDir(), "ui-profile");
 
     /// <summary>The Wayland app id (X11 class) Chromium gives an --app window: chrome-HOST_PATH-Default, "/" written as "_".</summary>
     public static string WindowClassSuffix(string url)
@@ -52,14 +61,21 @@ public static class UiLauncher
         if (!string.Equals(mode, "browser", StringComparison.OrdinalIgnoreCase) && FindBrowser() is { } browser)
         {
             var profile = ProfileDir();
-            if (IsRunning(profile) && Raise(url)) return "focused";
+            if (OperatingSystem.IsWindows() && WindowsRaise.Raise("kairec")) return "focused";
+            if (!OperatingSystem.IsWindows() && IsRunning(profile) && Raise(url)) return "focused";
             Directory.CreateDirectory(profile);
             string[] args = [$"--app={url}", $"--user-data-dir={profile}", $"--window-size={WindowWidth},{WindowHeight}", "--class=kairec", "--no-first-run", "--no-default-browser-check"];
+            if (OperatingSystem.IsWindows()) return SpawnDetached(browser, args) ? "window" : "could not start the browser";
             // Through systemd-run where there is one: started from the tray, the window would otherwise live in the
             // tray service's cgroup and close whenever that service restarts.
             if (OnPath("systemd-run") is { } sd
                 ? Spawn(sd, ["--user", "--quiet", "--collect", "-E", "WAYLAND_DISPLAY", "-E", "DISPLAY", "-E", "XDG_CURRENT_DESKTOP", "--", browser, .. args], wait: true) || SpawnDetached(browser, args)
                 : SpawnDetached(browser, args)) return "window";
+        }
+        if (OperatingSystem.IsWindows())
+        {
+            try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); return "browser"; }
+            catch { return "could not open a browser"; }
         }
         return Spawn("xdg-open", [url]) ? "browser" : "could not start a browser (no Chromium-family browser and no xdg-open)";
     }
@@ -103,8 +119,8 @@ public static class UiLauncher
 
     private static string? OnPath(string exe)
     {
-        if (exe.Contains('/')) return File.Exists(exe) ? exe : null;
-        foreach (var dir in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(':', StringSplitOptions.RemoveEmptyEntries))
+        if (exe.Contains('/') || exe.Contains('\\')) return File.Exists(exe) ? exe : null;
+        foreach (var dir in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
         {
             var p = Path.Combine(dir, exe);
             if (File.Exists(p)) return p;
@@ -128,8 +144,18 @@ public static class UiLauncher
     }
 
     // A browser outlives us and keeps writing to its output: hand it /dev/null, not a pipe that closes when we exit.
-    private static bool SpawnDetached(string exe, IEnumerable<string> args) =>
-        Spawn("sh", ["-c", "exec \"$@\" >/dev/null 2>&1 </dev/null &", "sh", exe, .. args]);
+    private static bool SpawnDetached(string exe, IEnumerable<string> args)
+    {
+        if (!OperatingSystem.IsWindows()) return Spawn("sh", ["-c", "exec \"$@\" >/dev/null 2>&1 </dev/null &", "sh", exe, .. args]);
+        try
+        {
+            var psi = new ProcessStartInfo(exe) { UseShellExecute = false };
+            foreach (var a in args) psi.ArgumentList.Add(a);
+            using var p = Process.Start(psi);
+            return p is not null;
+        }
+        catch { return false; }
+    }
 
     private static (int Code, string Out) Run(string exe, IEnumerable<string> args)
     {

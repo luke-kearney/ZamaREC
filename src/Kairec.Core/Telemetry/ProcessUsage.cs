@@ -1,6 +1,6 @@
 namespace Kairec.Core.Telemetry;
 
-/// <summary>CPU and memory of a set of processes, from /proc only. CPU% is per core, averaged since the previous sample.</summary>
+/// <summary>CPU and memory of a set of processes, from /proc (Windows: the process's own counters). CPU% is per core, averaged since the previous sample.</summary>
 public sealed class ProcessUsage
 {
     private readonly Dictionary<int, (long Cpu, long At)> _last = new();
@@ -17,6 +17,15 @@ public sealed class ProcessUsage
         {
             try
             {
+                if (Platform.IsWindows)
+                {
+                    using var proc = System.Diagnostics.Process.GetProcessById(pid);
+                    var ms = (long)proc.TotalProcessorTime.TotalMilliseconds;
+                    rss += proc.WorkingSet64;
+                    if (_last.TryGetValue(pid, out var lw) && now > lw.At) cpu += (ms - lw.Cpu) * 100.0 / (now - lw.At);
+                    _last[pid] = (ms, now); seen.Add(pid); n++;
+                    continue;
+                }
                 var stat = File.ReadAllText($"/proc/{pid}/stat");
                 var f = stat[(stat.LastIndexOf(')') + 2)..].Split(' ');
                 var ticks = long.Parse(f[11]) + long.Parse(f[12]);
@@ -34,6 +43,7 @@ public sealed class ProcessUsage
     public static List<int> Children(int parent)
     {
         var list = new List<int>();
+        if (Platform.IsWindows) return list;   // ffmpeg has no helper process
         foreach (var dir in Directory.EnumerateDirectories("/proc"))
         {
             if (!int.TryParse(Path.GetFileName(dir), out var pid)) continue;

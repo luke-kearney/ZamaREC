@@ -4,7 +4,11 @@
 dotnet build                    # everything
 dotnet test tests/Kairec.Tests  # config, segment index, GSI detector
 ./install.sh                    # publish + install services for this user
+./packaging/windows/build.sh    # the Windows bundle: dist/windows/kairec-windows-x64.zip (cross-published from Linux)
 ```
+
+Both builds come from the same source; the Windows one swaps the recorder and a few system calls at run time
+(`Platform.IsWindows`). See [windows.md](windows.md) for the mapping and what has and has not been verified there.
 
 Run a second daemon against a scratch config without disturbing the installed one:
 
@@ -25,7 +29,10 @@ See [architecture](architecture.md). The interesting files:
 - `Kairec.Core/Sessions/SegmentIndex.cs`: playlist parsing and the segment index.
 - `Kairec.Core/Export/ClipExporter.cs`: ffmpeg concat and the keyframe snapping.
 - `Kairec.Core/Gsi/GsiEventDetector.cs`: pure function from snapshots to events.
-- `Kairec.Daemon/RecordingCoordinator.cs`: the state machine; everything that touches the recorder.
+- `Kairec.Daemon/RecordingCoordinator.cs`: the state machine; everything that touches the recorder, through `IRecorder`.
+- `Kairec.Core/Recording/FfmpegRecorder.cs` + `AudioPipe.cs`: the Windows recorder (ffmpeg ddagrab, WASAPI over named pipes) and its time base.
+- `Kairec.Daemon/WindowsShell.cs`: the Windows tray icon and hotkeys, plain Win32.
+- `Kairec.Core/Processes/WindowsProcesses.cs`: process table, command lines from the PEB, Steam's `RunningAppID`.
 - `tools/screenshots/`: the README screenshots. `demo-data.py <dir>` builds a demo library of made-up
   games with generated footage and a config for a daemon that never records; `shoot.mjs` drives a
   headless Chrome over that daemon's UI and saves the shots. See "Screenshots" below.

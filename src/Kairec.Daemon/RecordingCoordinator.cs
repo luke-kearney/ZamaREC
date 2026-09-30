@@ -27,7 +27,7 @@ public sealed class RecordingCoordinator : IAsyncDisposable
     {
         public required EffectiveProfile Profile { get; init; }
         public required SessionStore Session { get; init; }
-        public required GsrProcess Recorder { get; init; }
+        public required IRecorder Recorder { get; init; }
         public required string Trigger { get; init; }
         public int? GamePid { get; init; }
         /// <summary>A Steam game with no profile, recorded with the [auto_games] defaults.</summary>
@@ -105,20 +105,20 @@ public sealed class RecordingCoordinator : IAsyncDisposable
             var sock = ControlPaths.SocketPath().Replace(".sock", "") + "-gsr.sock";   // next to the control socket, so test daemons stay isolated
             var incoming = Path.Combine(_cfg.ClipsDir, ".incoming");
             Directory.CreateDirectory(incoming);
-            var args = GsrArguments.Build(_cfg, profile, session.MediaDir, incoming, sock);
-            GsrProcess rec;
+            IRecorder rec;
             try
             {
-                rec = GsrProcess.Start(args, sock, _log);
-                await rec.WaitForSocketAsync(TimeSpan.FromSeconds(15), ct);
+                rec = Recorder.Start(_cfg, profile, session.MediaDir, incoming, sock, _log);
+                try { await rec.WaitForReadyAsync(TimeSpan.FromSeconds(15), ct); }
+                catch { await rec.DisposeAsync(); throw; }
             }
             catch (Exception ex)
             {
-                _log.LogError(ex, "could not start gpu-screen-recorder");
+                _log.LogError(ex, "could not start {recorder}", Recorder.Name);
                 TryDeleteSession(session.Dir);
                 _sound.Play("error");
-                _events.Write("error", "could not start gpu-screen-recorder: " + ex.Message, profile.Name, level: "error");
-                return Fail("could not start gpu-screen-recorder: " + ex.Message);
+                _events.Write("error", $"could not start {Recorder.Name}: " + ex.Message, profile.Name, level: "error");
+                return Fail($"could not start {Recorder.Name}: " + ex.Message);
             }
 
             _active = new Active

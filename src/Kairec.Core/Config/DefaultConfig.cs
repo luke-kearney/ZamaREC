@@ -2,6 +2,9 @@ namespace Kairec.Core.Config;
 
 public static class DefaultConfig
 {
+    /// <summary>The default file for the system this runs on: the same text, with the monitor named the way its recorder wants.</summary>
+    public static string ForThisSystem() => Platform.IsWindows ? Toml.Replace("monitor = \"DP-1\" ", "monitor = \"0\"    ") : Toml;
+
     public const string Toml = """
         # Kairec configuration. After editing by hand run:
         #   kairec reload      (or use Settings in the web UI)
@@ -10,7 +13,8 @@ public static class DefaultConfig
         root = "~/Videos/kairec"          # sessions/ and clips/ live under here
 
         [capture]
-        monitor = "DP-1"                  # gpu-screen-recorder --list-monitors
+        monitor = "DP-1"                  # gpu-screen-recorder --list-monitors (Windows: the display number, 0 = first)
+        gpu = "nvidia"                    # nvidia | amd | intel: whose encoder ffmpeg uses (Windows: also for recording)
         quality = "high"                  # default preset (see [[quality]]); profiles may pick another
         audio = ["default_output"]        # add "default_input" to record the microphone
         cursor = false
@@ -63,6 +67,11 @@ public static class DefaultConfig
         [share]
         # discord_webhook = "https://discord.com/api/webhooks/..."   # a clip's Share menu can post to this channel; keep it secret
         discord_max_mb = 10               # the channel's upload limit; bigger clips are re-encoded to fit first
+
+        [hotkeys]                         # Windows only: system-wide keys the daemon registers itself.
+        mark = "ctrl+alt+m"               # Linux binds the kairec CLI to desktop shortcuts instead.
+        save = "ctrl+alt+s"
+        ui = "ctrl+alt+k"
 
         [feedback]
         sound = true                      # short tone on mark/save. Never a popup, never focus.

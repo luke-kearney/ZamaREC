@@ -36,6 +36,7 @@
       ${field('monitor', sel('capture.monitor', c.capture.monitor, monitors), false, 'the screen the game runs on')}
       ${field('default quality preset', sel('capture.quality', c.capture.quality ?? '', [{ v: '', l: '(built-in defaults: 60 fps h264 20000 kbps)' }, ...presetOpts]), false, 'used by every profile that does not pick its own')}
       ${field('show cursor', chk('capture.cursor', c.capture.cursor), false, 'draw the mouse pointer into the recording')}
+      ${field('GPU', sel('capture.gpu', c.capture.gpu ?? 'nvidia', [{ v: 'nvidia', l: 'NVIDIA (NVENC)' }, { v: 'amd', l: 'AMD (AMF, untested)' }, { v: 'intel', l: 'Intel (Quick Sync, untested)' }]), false, meta.platform === 'windows' ? 'whose encoder records and exports' : 'whose encoder exports use; recording always goes through gpu-screen-recorder')}
       <div class="field wide"><span>audio sources</span><small class="hint">pick what goes into the recording. "Default output" is the game audio; add the mic if you want your voice</small>
         ${audioHtml}
         <label class="other"><span class="muted">other, comma separated (e.g. app:cs2)</span><input type="text" id="audioExtra" value="${audioExtra.join(', ')}"></label>
@@ -74,9 +75,18 @@
       ${field('bind address (restart needed)', inp('daemon.bind', c.daemon.bind))}
     </div></div>`;
 
+    if (meta.platform === 'windows') {
+      const hk = c.hotkeys || (c.hotkeys = { mark: 'ctrl+alt+m', save: 'ctrl+alt+s', ui: 'ctrl+alt+k' });
+      h += `<div class="card"><h3>Hotkeys</h3><div class="help">System-wide keys kairec registers itself: ctrl, alt, shift or win plus a letter, digit, F-key or a key name (space, home, pause, numpad0). Blank turns one off. Applied straight away.</div><div class="fields">
+      ${field('mark', inp('hotkeys.mark', hk.mark), false, 'drops a marker on the current session')}
+      ${field('save', inp('hotkeys.save', hk.save), false, 'saves the last N seconds as a clip')}
+      ${field('open kairec', inp('hotkeys.ui', hk.ui), false, 'opens or raises this window')}
+    </div></div>`;
+    }
+
     const ag = c.autoGames || (c.autoGames = { enabled: true, ramGb: 2, quality: null, ignore: [] });
     const agKbps = ((c.quality || []).find(q => q.name === (ag.quality || c.capture.quality)) || {}).bitrateKbps ?? c.capture.bitrateKbps;
-    h += `<div class="card"><h3>Unconfirmed games</h3><div class="help">A Steam game with no profile is still recorded, to RAM only, with these settings. Nothing reaches the disk unless you mark or save. Keep or ignore such games on the Games page.</div><div class="fields">
+    h += `<div class="card"><h3>Unconfirmed games</h3><div class="help">${meta.platform === 'windows' ? 'A Steam game with no profile is still recorded, a rolling window sized by the RAM figure below, with these settings.' : 'A Steam game with no profile is still recorded, to RAM only, with these settings. Nothing reaches the disk unless you mark or save.'} Keep or ignore such games on the Games page.</div><div class="fields">
       ${field('record Steam games without a profile', chk('autoGames.enabled', ag.enabled))}
       ${field('RAM budget GB', inp('autoGames.ramGb', ag.ramGb, 'number', 'min="0.5" step="0.5"'), false, `about ${Math.max(1, Math.floor((ag.ramGb || 0) * 1e9 / 1.1 / (agKbps * 125) / 60))} min of rolling window at ${agKbps} kbps`)}
       ${field('quality preset', sel('autoGames.quality', ag.quality ?? '', [{ v: '', l: '(capture default)' }, ...presetOpts]))}
@@ -342,6 +352,7 @@
       if (/^capture\.tracks\.\d+\.sources$/.test(path)) v = (v || '').split(',').map(x => x.trim()).filter(Boolean);
       if (/^capture\.tracks\.\d+\.name$/.test(path)) v = v || '';
       if (path === 'autoGames.ignore') v = (v || '').split(',').map(x => +x.trim()).filter(x => x > 0);
+      if (path.startsWith('hotkeys.')) v = v ?? '';   // blank means off, and has to be written out as such
       setPath(cfg, path, v);
     });
     if ($('audioExtra')) {   // only the Settings view has the audio pickers

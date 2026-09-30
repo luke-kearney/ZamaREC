@@ -12,7 +12,7 @@ public static class VideoProbe
     {
         try
         {
-            var psi = new ProcessStartInfo("ffprobe") { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
+            var psi = new ProcessStartInfo(Ffmpeg.Probe) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true };
             foreach (var a in new[] { "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height,r_frame_rate", "-of", "csv=p=0", path }) psi.ArgumentList.Add(a);
             using var p = Process.Start(psi)!;
             var output = await p.StandardOutput.ReadToEndAsync(ct);
@@ -30,7 +30,7 @@ public static class VideoProbe
     {
         try
         {
-            var psi = new ProcessStartInfo("ffprobe") { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
+            var psi = new ProcessStartInfo(Ffmpeg.Probe) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true };
             foreach (var a in new[] { "-v", "error", "-show_entries", "format=duration", "-of", "default=nw=1:nk=1", path }) psi.ArgumentList.Add(a);
             using var p = Process.Start(psi)!;
             var output = await p.StandardOutput.ReadToEndAsync(ct);

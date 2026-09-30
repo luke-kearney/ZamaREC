@@ -5,9 +5,13 @@ using Microsoft.Extensions.Logging;
 
 namespace Kairec.Core.Export;
 
-/// <summary>Cuts clips out of a timeline session with ffmpeg. Stream copy by default; nvenc re-encode for frame-exact cuts.</summary>
+/// <summary>Cuts clips out of a timeline session with ffmpeg. Stream copy by default; a GPU re-encode for frame-exact cuts.</summary>
 public static class ClipExporter
 {
+    /// <summary>The GPU vendor whose decoder and encoder exports use (capture.gpu); the daemon points this at its live config.</summary>
+    public static Func<string> GpuSource { get; set; } = () => "nvidia";
+    private static string Gpu => GpuSource();
+
     public sealed record Result(bool Ok, string? Path, double? Duration, string? Error);
 
     /// <summary>
@@ -41,16 +45,16 @@ public static class ClipExporter
                     Path.Combine(index.MediaDir, first.File), end - start, cap, outputPath, tracks, mix, log, ct);
             }
             var args = new List<string> { "-hide_banner", "-loglevel", "error", "-y" };
-            if (exact) args.AddRange(["-hwaccel", "cuda"]);
+            if (exact) args.AddRange(Recording.HwCodec.Decode(Gpu, keepOnGpu: false));
             args.AddRange(["-f", "concat", "-safe", "0", "-i", listFile, "-ss", F(seekInto), "-t", F(duration)]);
             args.AddRange(Tracks(tracks, mix));
-            if (exact) args.AddRange(["-c:v", "h264_nvenc", "-preset", "p4", "-rc", "vbr", "-cq", "21", "-b:v", "0", "-c:a", "copy"]);
+            if (exact) args.AddRange(["-c:v", Recording.HwCodec.Encoder("h264", Gpu), .. Recording.HwCodec.ExactEncode(Gpu), "-c:a", "copy"]);
             else args.AddRange(["-c", "copy"]);
             args.AddRange(MixCodec(tracks, mix));
             args.AddRange(["-avoid_negative_ts", "make_zero", "-movflags", "+faststart", outputPath]);
 
             Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
-            var (code, stderr) = await RunAsync("ffmpeg", args, ct);
+            var (code, stderr) = await RunAsync(Recording.Ffmpeg.Exe, args, ct);
             if (code != 0)
             {
                 log.LogError("ffmpeg failed ({code}): {err}", code, stderr);
@@ -69,19 +73,19 @@ public static class ClipExporter
         if (maxBytes is long cap)
             return await ShareAsync(["-ss", F(start), "-i", sourcePath, "-t", F(end - start)], sourcePath, end - start, cap, outputPath, tracks, mix, log, ct);
         var args = new List<string> { "-hide_banner", "-loglevel", "error", "-y" };
-        if (exact) args.AddRange(["-hwaccel", "cuda"]);
+        if (exact) args.AddRange(Recording.HwCodec.Decode(Gpu, keepOnGpu: false));
         // A stream copy starts on the keyframe at or before "start", up to a keyframe interval early. Copied audio
         // comes along from there; a remade mix would begin only at "start" and leave that lead-in silent. So for
         // a mix, start the cut on the whole second, where the keyframe is (as ExportAsync assumes too).
         if (!exact && Mixes(tracks, mix) && Math.Floor(start) + 0.02 < start) start = Math.Floor(start) + 0.02;
         args.AddRange(["-ss", F(start), "-i", sourcePath, "-t", F(end - start)]);
         args.AddRange(Tracks(tracks, mix));
-        if (exact) args.AddRange(["-c:v", "h264_nvenc", "-preset", "p4", "-rc", "vbr", "-cq", "21", "-b:v", "0", "-c:a", "copy"]);
+        if (exact) args.AddRange(["-c:v", Recording.HwCodec.Encoder("h264", Gpu), .. Recording.HwCodec.ExactEncode(Gpu), "-c:a", "copy"]);
         else args.AddRange(["-c", "copy"]);
         args.AddRange(MixCodec(tracks, mix));
         args.AddRange(["-avoid_negative_ts", "make_zero", "-movflags", "+faststart", outputPath]);
         Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
-        var (code, stderr) = await RunAsync("ffmpeg", args, ct);
+        var (code, stderr) = await RunAsync(Recording.Ffmpeg.Exe, args, ct);
         if (code != 0)
         {
             log.LogError("ffmpeg failed ({code}): {err}", code, stderr);
@@ -145,10 +149,9 @@ public static class ClipExporter
             args.AddRange(["-filter_complex", mixed[1], "-map", "0:v:0", "-map", "[mix]"]);   // only the new mix: a shared clip carries one track
         }
         else args.AddRange(["-map", "0:v:0", "-map", "0:a:0?"]);
-        if (plan.Height < srcHeight) args.AddRange(["-vf", $"scale_cuda=-2:{plan.Height}"]);
-        args.AddRange(["-r", plan.Fps.ToString(), "-c:v", "h264_nvenc", "-preset", "p6", "-tune", "hq", "-rc", "vbr", "-multipass", "fullres",
-            "-b:v", $"{v}k", "-maxrate", $"{v}k", "-bufsize", $"{v * 2}k", "-c:a", "aac", "-b:a", $"{plan.AudioKbps}k", "-ac", "2",
-            "-movflags", "+faststart"]);
+        if (plan.Height < srcHeight) args.AddRange(["-vf", Recording.HwCodec.Scale(Gpu, plan.Height)]);
+        args.AddRange(["-r", plan.Fps.ToString(), "-c:v", Recording.HwCodec.Encoder("h264", Gpu), .. Recording.HwCodec.ShareEncode(Gpu, v),
+            "-c:a", "aac", "-b:a", $"{plan.AudioKbps}k", "-ac", "2", "-movflags", "+faststart"]);
         return args;
     }
 
@@ -169,11 +172,12 @@ public static class ClipExporter
         double scale = 1;
         for (int attempt = 0; ; attempt++)
         {
-            var args = new List<string> { "-hide_banner", "-loglevel", "error", "-y", "-hwaccel", "cuda", "-hwaccel_output_format", "cuda" };
+            var args = new List<string> { "-hide_banner", "-loglevel", "error", "-y" };
+            args.AddRange(Recording.HwCodec.Decode(Gpu, keepOnGpu: true));
             args.AddRange(input);
             args.AddRange(ShareArgs(plan, src.Height, tracks, mix, scale));
             args.Add(outputPath);
-            var (code, stderr) = await RunAsync("ffmpeg", args, ct);
+            var (code, stderr) = await RunAsync(Recording.Ffmpeg.Exe, args, ct);
             if (code != 0)
             {
                 log.LogError("ffmpeg (share) failed ({code}): {err}", code, stderr);
@@ -224,7 +228,7 @@ public static class ClipExporter
 
     private static async Task<(int Code, string Stderr)> RunAsync(string exe, IEnumerable<string> args, CancellationToken ct)
     {
-        var psi = new ProcessStartInfo(exe) { UseShellExecute = false, RedirectStandardError = true, RedirectStandardOutput = true };
+        var psi = new ProcessStartInfo(exe) { UseShellExecute = false, RedirectStandardError = true, RedirectStandardOutput = true, CreateNoWindow = true };
         foreach (var a in args) psi.ArgumentList.Add(a);
         using var p = Process.Start(psi)!;
         var err = p.StandardError.ReadToEndAsync(ct);

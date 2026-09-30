@@ -35,15 +35,15 @@ public sealed class SessionStore
         }
         var info = new SessionInfo
         {
-            Id = id, Profile = profile.Name, Mode = profile.Mode.ToLowerInvariant(), Trigger = trigger,
+            Id = id, Profile = profile.Name, Mode = eff.Mode.ToString().ToLowerInvariant(), Trigger = trigger,
             StartedAt = now, SpawnMonoUs = MonotonicClock.NowMicros(), GamePid = gamePid, SteamAppId = steamAppId,
-            Playlist = profile.CaptureMode == CaptureMode.Timeline ? Recording.GsrArguments.PlaylistName : null,
+            Playlist = eff.Mode == CaptureMode.Timeline ? Recording.GsrArguments.PlaylistName : null,
             MediaDir = mediaDir,
             AudioTracks = cfg.Capture.EffectiveTracks() is { Count: > 0 } tracks ? tracks.Select(t => t.Name).ToList() : null,
         };
         // Buffer sessions never get a first-frame stamp (nothing is written until a save), so their
         // timeline origin is the recorder spawn. Clip offsets are computed against the same origin.
-        if (profile.CaptureMode == CaptureMode.Buffer) info.FirstFrameMonoUs = info.SpawnMonoUs;
+        if (eff.Mode == CaptureMode.Buffer) info.FirstFrameMonoUs = info.SpawnMonoUs;
         var store = new SessionStore(dir, info, new MarkerFile());
         store.Save();
         return store;
