@@ -39,6 +39,13 @@ Retention still counts an export's age from the day it was cut.
 - Transport bar: previous marker, back 10 s, play/pause, forward 10 s, next marker, clock, then the
   range tools (set in, set out, jump to in, play range, the current range, and the save icon that
   opens the export panel), mute, volume, fullscreen.
+- **Mixer** (the sliders button left of mute; only on recordings made with separate audio tracks):
+  a panel with one row per track: level from 0 to 200%, mute (M) and solo (S). With *mix from the
+  separate tracks* off, playback is the mix as it was recorded. Switched on, each track is played
+  on its own at its level, in step with the video, and the volume slider and mute act as the
+  master. Levels, mutes and the switch are remembered by the browser per track name, so they
+  apply to every recording. A live session plays the recorded mix until it has ended. Double-click
+  a level to put it back to 100%.
 - The bar: ruler, markers colour-coded by type, playhead, window (purged part hatched). Click to
   seek. Ctrl+wheel zooms around the mouse, wheel pans; the zoom buttons and `+`/`-`/`0` zoom centred on the playhead. The view
   follows the playhead while playing.

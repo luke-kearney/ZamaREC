@@ -42,6 +42,8 @@ localhost. Everything the web UI does goes through these.
 | GET | `/sessions/{id}` | details: segments with availability, window start/end, markers, clip details |
 | GET | `/sessions/{id}/playlist.m3u8` | HLS playlist of the segments on disk (live or VOD) |
 | GET | `/sessions/{id}/seg/{file}` | a segment, with range support |
+| GET | `/sessions/{id}/audio/{n}/playlist.m3u8` | the same playlist for audio track `n` alone (0 is the mix); its segments are audio-only, remuxed on request |
+| GET | `/sessions/{id}/audio/{n}/seg/{file}` | track `n` of one segment as MPEG-TS |
 | POST | `/sessions/{id}/markers/{mid}/star` | toggle |
 | POST | `/sessions/{id}/export` | `{ "start": s, "end": s, "label": "", "exact": false }` |
 | POST | `/sessions/{id}/export-around` | `{ "markerId": "", "before": 10, "after": 5, "label": "", "exact": false }` |
@@ -53,6 +55,7 @@ localhost. Everything the web UI does goes through these.
 |---|---|---|
 | GET | `/clips` | all clips with their sidecar data, newest footage first. `recordedAt` is when the footage was recorded, `createdAt` when the file was written; they differ for exports |
 | GET | `/clips/{profile}/{file}` | the MP4, with range support |
+| GET | `/clips/{profile}/{file}/audio/{n}` | audio track `n` alone as an audio-only MP4, with range support; made on first request and kept a few hours under the RAM dir |
 | POST | `/clips/{profile}/{file}/star` | toggle; starring clears the expiry |
 | DELETE | `/clips/{profile}/{file}` | |
 | POST | `/clips/{profile}/{file}/export` | cut a clip out of a clip: `{ "start", "end", "label", "exact" }` |

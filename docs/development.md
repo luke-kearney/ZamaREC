@@ -26,7 +26,7 @@ See [architecture](architecture.md). The interesting files:
 - `Kairec.Core/Export/ClipExporter.cs`: ffmpeg concat and the keyframe snapping.
 - `Kairec.Core/Gsi/GsiEventDetector.cs`: pure function from snapshots to events.
 - `Kairec.Daemon/RecordingCoordinator.cs`: the state machine; everything that touches the recorder.
-- `Kairec.Daemon/wwwroot/`: the UI, no build step; `app.js` player and timeline (and `icon()`, the inline SVG icons), `settings.js` (the Settings and Games views),
+- `Kairec.Daemon/wwwroot/`: the UI, no build step; `app.js` player and timeline (and `icon()`, the inline SVG icons), `mixer.js` (levels of separate audio tracks), `settings.js` (the Settings and Games views),
   `pages.js` stats and log.
 - `Kairec.Tray/`: StatusNotifierItem and dbusmenu by hand over Tmds.DBus.Protocol.
 

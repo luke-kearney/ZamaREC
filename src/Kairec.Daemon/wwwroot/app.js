@@ -462,7 +462,7 @@ $('starClip').onclick = async () => {
 };
 // export panel: floats over the bottom of the video; the save icon toggles it, Escape or a click outside closes it
 const exportPop = $('exportPop');
-function showExportPop(on) { exportPop.hidden = !on; $('saveBtn').classList.toggle('on', on); if (on) $('exportLabel').focus(); }
+function showExportPop(on) { if (on && window.closeMixer) window.closeMixer(); exportPop.hidden = !on; $('saveBtn').classList.toggle('on', on); if (on) $('exportLabel').focus(); }
 $('saveBtn').onclick = e => { e.stopPropagation(); showExportPop(exportPop.hidden); };
 exportPop.onclick = e => e.stopPropagation();
 exportPop.addEventListener('keydown', e => { if (e.key === 'Escape') { showExportPop(false); $('video').focus(); } });
@@ -639,5 +639,5 @@ document.addEventListener('keydown', e => {
   show(window.kairecTheme.get());
   b.onclick = () => show(window.kairecTheme.set(order[(order.indexOf(b.dataset.theme) + 1) % 3]));
 }
-window.state = state; window.toast = toast;
+window.state = state; window.toast = toast; window.showExportPop = showExportPop;
 refreshStatus(); refreshList(); setInterval(refreshStatus, 3000);

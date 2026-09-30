@@ -163,6 +163,12 @@
             </div>
           </div>
         </div>
+        <div id="mixPop" class="export-pop mix-pop" hidden>
+          <div class="row"><span class="lbl">Mixer</span><span class="spacer"></span>
+            <label class="chk"><span class="toggle"><input type="checkbox" id="mixOn"><span class="track"><span class="knob"></span></span></span>mix from the separate tracks</label></div>
+          <div id="mixRows"></div>
+          <div class="row"><span class="muted" id="mixNote"></span><span class="spacer"></span><button class="btn small" id="mixReset" title="every track back to 100%, nothing muted">Reset</button></div>
+        </div>
         <div class="transport">
           <button class="tbtn" id="tPrev" title="previous marker  [">
             <svg viewBox="0 0 24 24"><path d="M6 5v14M19 5l-10 7 10 7z"/></svg></button>
@@ -189,6 +195,8 @@
           <button class="tbtn tsm" id="saveBtn" title="export…">
             <svg viewBox="0 0 24 24"><path d="M5 4h11l3 3v13H5zM8 4v5h7V4M8 20v-6h8v6"/></svg></button>
           <span class="spacer"></span>
+          <button class="tbtn" id="mixBtn" title="mixer: levels of the separate audio tracks" hidden>
+            <svg viewBox="0 0 24 24"><path d="M6 4v5M6 13v7M12 4v10M12 18v2M18 4v2M18 10v10M3.5 11h5M9.5 16h5M15.5 8h5"/></svg></button>
           <button class="tbtn" id="tMute" title="mute">
             <svg class="ic-vol" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9zM16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></svg>
             <svg class="ic-muted" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9zM16 9l5 6M21 9l-5 6"/></svg></button>
@@ -240,6 +248,7 @@
 <div id="toast" class="toast" hidden></div>
 <script src="hls.min.js"></script>
 <script src="app.js"></script>
+<script src="mixer.js"></script>
 <script src="settings.js"></script>
 <script src="pages.js"></script>
 </body>

@@ -269,7 +269,7 @@ public static class WebApi
         });
 
         // Playlist of the segments currently on disk. hls.js plays this like a live stream while recording.
-        api.MapGet("/sessions/{id}/playlist.m3u8", (string id, SessionCatalog cat, RecordingCoordinator rec) =>
+        IResult Playlist(string id, SessionCatalog cat, RecordingCoordinator rec)
         {
             var dir = cat.SessionDir(id);
             if (dir is null) return Results.NotFound();
@@ -285,6 +285,20 @@ public static class WebApi
                 sb.Append("#EXTINF:").Append(s.Duration.ToString("0.000000", System.Globalization.CultureInfo.InvariantCulture)).Append(",\n").Append("seg/").Append(s.File).Append('\n');
             if (!live) sb.Append("#EXT-X-ENDLIST\n");
             return Results.Text(sb.ToString(), "application/vnd.apple.mpegurl");
+        }
+        api.MapGet("/sessions/{id}/playlist.m3u8", Playlist);
+
+        // One audio track on its own, for the mixer: the same playlist, its "seg/" entries resolving to the
+        // audio-only segments below. Track 0 is the mix, which the video already carries.
+        api.MapGet("/sessions/{id}/audio/{track:int}/playlist.m3u8", (string id, int track, SessionCatalog cat, RecordingCoordinator rec) => Playlist(id, cat, rec));
+        api.MapGet("/sessions/{id}/audio/{track:int}/seg/{file}", async (string id, int track, string file, SessionCatalog cat, RecordingCoordinator rec, StemService stems, CancellationToken ct) =>
+        {
+            var dir = cat.SessionDir(id);
+            if (dir is null || track is < 0 or > 15 || file.Contains('/') || file.Contains("..")) return Results.NotFound();
+            var mediaDir = dir == rec.ActiveSessionDir ? rec.ActiveSession!.MediaDir : SessionStore.Load(dir).MediaDir;
+            var path = Path.Combine(mediaDir, file);
+            if (!File.Exists(path)) return Results.NotFound();
+            return await stems.SegmentAsync(path, track, ct) is { } bytes ? Results.Bytes(bytes, "video/mp2t") : Results.NotFound();
         });
 
         api.MapGet("/sessions/{id}/seg/{file}", (string id, string file, SessionCatalog cat, RecordingCoordinator rec) =>
@@ -356,6 +370,14 @@ public static class WebApi
         {
             var p = cat.ClipPath(profile, file);
             return p is null ? Results.NotFound() : Results.File(p, "video/mp4", enableRangeProcessing: true);
+        });
+
+        // One audio track of a clip on its own, for the mixer. Seekable, like the clip.
+        api.MapGet("/clips/{profile}/{file}/audio/{track:int}", async (string profile, string file, int track, SessionCatalog cat, StemService stems, CancellationToken ct) =>
+        {
+            var p = cat.ClipPath(profile, file);
+            if (p is null || track is < 0 or > 15) return Results.NotFound();
+            return await stems.ClipAsync(p, profile, track, ct) is { } path ? Results.File(path, "audio/mp4", enableRangeProcessing: true) : Results.NotFound();
         });
 
         api.MapPost("/clips/{profile}/{file}/star", (string profile, string file, SessionCatalog cat) =>

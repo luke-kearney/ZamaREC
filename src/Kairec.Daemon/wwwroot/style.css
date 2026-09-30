@@ -178,7 +178,7 @@ kbd { display: inline-block; min-width: 20px; padding: 1px 6px; border-radius: 5
 .title-acts { display: flex; gap: 6px; align-items: center; }
 .btn.danger.arm { background: var(--red-bg2); border-color: var(--red-line2); color: var(--red-text); }
 /* the stage grows with the video and shrinks so the timeline below always stays in view */
-.stage { border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); border: 1px solid var(--line); background: #000; display: flex; flex-direction: column; flex: 0 1 auto; min-height: 0; }
+.stage { position: relative; border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); border: 1px solid var(--line); background: #000; display: flex; flex-direction: column; flex: 0 1 auto; min-height: 0; }
 .player { background: #000; position: relative; flex: 1 1 auto; min-height: 160px; display: flex; justify-content: center; }
 video { width: 100%; max-height: 100%; aspect-ratio: auto 16 / 9; display: block; background: #000; cursor: pointer; }
 .transport { flex: 0 0 auto; display: flex; align-items: center; gap: 2px; padding: 6px 10px; background: linear-gradient(180deg, var(--bar1), var(--bar2)); border-top: 1px solid var(--line); }
@@ -196,6 +196,16 @@ video { width: 100%; max-height: 100%; aspect-ratio: auto 16 / 9; display: block
 .player-msg .t { font-size: 17px; font-weight: 600; color: var(--text); }
 .player-msg .s { font-size: 13px; max-width: 420px; }
 .export-pop { position: absolute; right: 10px; bottom: 10px; z-index: 3; width: min(560px, calc(100% - 20px)); display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; background: color-mix(in srgb, var(--bg2) 94%, transparent); border: 1px solid var(--line2); border-radius: var(--radius); box-shadow: var(--shadow); backdrop-filter: blur(6px); }
+/* the mixer sits above the transport bar's right end, inside the stage so it shows in fullscreen too */
+.mix-pop { position: absolute; right: 10px; bottom: 56px; width: min(440px, calc(100% - 20px)); z-index: 5; }
+.mix-pop .chk { gap: 8px; } .mix-pop .toggle { margin-top: 0; }
+.mixrow { display: grid; grid-template-columns: minmax(70px, 110px) minmax(0, 1fr) 44px auto auto; gap: 8px; align-items: center; padding: 3px 0; }
+.mixrow.off { opacity: .45; }
+.mixname { font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mixrow .vol { width: 100%; margin: 0; }
+.mixval { font-size: 12px; color: var(--muted); text-align: right; }
+.mixrow .tbtn.sm { font-size: 11px; border: 1px solid var(--line2); }
+.mixrow .tbtn.sm.on { color: #fff; background: var(--brand); border-color: var(--brand); }
 .export-pop .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .export-pop .row.batch { border-top: 1px solid var(--line); padding-top: 8px; }
 .export-pop .lbl { color: var(--muted); font-size: 12px; }

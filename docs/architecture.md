@@ -45,6 +45,21 @@ exact.
 
 Nothing polls the GPU. The only periodic work while idle is a `/proc` directory scan once a second.
 
+## Audio tracks and the mixer
+
+With `capture.multitrack` the recorder gets one `-a` per track: the mix of `capture.audio` first,
+then each configured track. Segments and clips carry all of them; every ordinary player, and the
+viewer by default, plays the first.
+
+A browser cannot select or mix the further tracks of a file, so the viewer's mixer fetches each
+one separately. `StemService` makes them with ffmpeg stream copies, on request only: a timeline
+segment's track is remuxed to audio-only MPEG-TS straight into the response (about 60 ms for a
+5 s segment), a clip's track is copied once to an audio-only MP4 under `<ram_dir>/.stems` and
+dropped after six hours unused. In the page (`mixer.js`) each track is an `<audio>` element fed
+through a Web Audio gain. They follow the video: parked slightly ahead while it is paused or
+seeking, then kept within a few milliseconds by nudging their playback rate. The video's own
+sound is turned to zero once every track can play. None of this runs unless the mixer is on.
+
 ## What starts a session
 
 The scan looks for two things. A process that a profile's `match` or `match_cmdline` fits starts
