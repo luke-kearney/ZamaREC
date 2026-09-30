@@ -30,7 +30,7 @@ public static class ClipExporter
         var duration = end - (first.Start + seekInto);
 
         var listFile = Path.Combine(Path.GetTempPath(), $"kairec-concat-{Guid.NewGuid():N}.txt");
-        await File.WriteAllLinesAsync(listFile, segs.Select(s => $"file '{Path.Combine(index.MediaDir, s.File).Replace("'", "'\\''")}'"), ct);
+        await File.WriteAllLinesAsync(listFile, ConcatList(segs, index.MediaDir), ct);
         try
         {
             if (maxBytes is long cap)
@@ -60,6 +60,22 @@ public static class ClipExporter
             return new Result(true, outputPath, dur, null);
         }
         finally { try { File.Delete(listFile); } catch { } }
+    }
+
+    /// <summary>
+    /// The concat demuxer's list. Each segment gets its playlist duration, because the demuxer otherwise places
+    /// the next file by the probed duration, and that is the span of the file's earliest to latest packet across
+    /// every stream: a separate audio track that drifts late (the mic does, by 0.45 s after an hour) stretches
+    /// it past the real 5 s and leaves a hole at every boundary, the "stutter every 5 seconds". The open-ended
+    /// tail (still being written) gets no duration.
+    /// </summary>
+    public static IEnumerable<string> ConcatList(IEnumerable<SegmentEntry> segs, string mediaDir)
+    {
+        foreach (var s in segs)
+        {
+            yield return $"file '{Path.Combine(mediaDir, s.File).Replace("'", "'\\''")}'";
+            if (s.Duration > 0 && s.Duration < 1e6) yield return $"duration {F(s.Duration)}";
+        }
     }
 
     /// <summary>Cuts [start, end] out of a finished MP4 clip. Input seeking works here, so the cut is keyframe-accurate.</summary>

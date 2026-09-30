@@ -52,3 +52,19 @@ public class SegmentIndexTests
         finally { Directory.Delete(dir, true); }
     }
 }
+
+public class ConcatListTests
+{
+    [Fact]
+    public void EverySegmentGetsItsDurationExceptTheOpenTail()
+    {
+        var segs = new List<SegmentEntry>
+        {
+            new() { Seq = 0, File = "seg_000000.ts", Start = 0, Duration = 5 },
+            new() { Seq = 1, File = "seg_000001.ts", Start = 5, Duration = 4.000011 },
+            new() { Seq = 2, File = "seg_000002.ts", Start = 9, Duration = 1e9 },   // the tail still being written
+        };
+        var lines = Kairec.Core.Export.ClipExporter.ConcatList(segs, "/m").ToList();
+        Assert.Equal(["file '/m/seg_000000.ts'", "duration 5", "file '/m/seg_000001.ts'", "duration 4", "file '/m/seg_000002.ts'"], lines);
+    }
+}
