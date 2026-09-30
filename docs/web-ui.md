@@ -11,7 +11,10 @@ daemon; the only library is hls.js for timeline playback.
 - **cpu / ram / tmpfs**: kairec's own usage, daemon plus recorder, from `/proc`. Click the CPU
   figure to switch between share of all cores and one core. **clear** drops RAM footage of finished
   sessions (asks for a second click).
-- **Games**, **Stats**, **Log**, **Settings**, **Mark**.
+- **Games**, **Settings**, then icon buttons for Stats, Log, the theme and GitHub, then **Mark**.
+- **Theme button**: the page follows the OS or browser light/dark preference and switches with it.
+  The button cycles auto, light, dark; a fixed choice is remembered by the browser. The video area
+  and the fullscreen controls stay dark in both.
 
 ## Sessions and clips
 

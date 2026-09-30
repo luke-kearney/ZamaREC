@@ -609,5 +609,12 @@ document.addEventListener('keydown', e => {
   }
 });
 
+// theme button: auto (follow the OS/browser) → light → dark
+{
+  const b = $('themeBtn'), order = ['auto', 'light', 'dark'];
+  const show = t => { b.dataset.theme = t; b.title = t === 'auto' ? 'theme: follows the system. Click for light' : t === 'light' ? 'theme: light. Click for dark' : 'theme: dark. Click to follow the system'; };
+  show(window.kairecTheme.get());
+  b.onclick = () => show(window.kairecTheme.set(order[(order.indexOf(b.dataset.theme) + 1) % 3]));
+}
 window.state = state; window.toast = toast;
 refreshStatus(); refreshList(); setInterval(refreshStatus, 3000);
