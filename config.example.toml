@@ -66,6 +66,7 @@ volume = 0.5
 gsi_port = 3555                   # CS2 game state integration POSTs here
 ui_port = 3556                    # web timeline
 bind = "127.0.0.1"
+ui_window = "app"                  # app = the UI in its own window (Chrome/Chromium app mode, own profile); browser = a tab
 
 [[profiles]]
 name = "cs2"

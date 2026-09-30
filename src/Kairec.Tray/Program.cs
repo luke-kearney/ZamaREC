@@ -4,7 +4,7 @@ using Kairec.Tray;
 using Tmds.DBus.Protocol;
 
 // kairec-tray: a StatusNotifierItem for Plasma. Shows the daemon state, offers quick actions.
-// It never opens a window of its own; "open web UI" hands the URL to xdg-open on request.
+// It never opens a window of its own accord; "open web UI" opens or raises the UI window on request (UiLauncher).
 
 var conn = new DBusConnection(DBusAddress.Session ?? throw new InvalidOperationException("no session bus"));
 await conn.ConnectAsync();
@@ -18,12 +18,13 @@ conn.AddMethodHandlers([sni, menu]);
 var busName = $"org.kde.StatusNotifierItem-{Environment.ProcessId}-1";
 await conn.RequestNameAsync(busName, RequestNameOptions.None);
 
-string? uiUrl = null; string? rootDir = null;
+string? uiUrl = null; string? uiWindow = null; string? rootDir = null;
 void Open(string target) { try { Process.Start(new ProcessStartInfo("xdg-open", target) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true })?.Dispose(); } catch { } }
 void Cmd(string cmd, string? mode = null, double? hours = null, int? seconds = null) =>
     _ = Task.Run(() => DaemonClient.Send(new ControlRequest { Cmd = cmd, Mode = mode, Hours = hours, Seconds = seconds }));
 
-sni.OnActivate = () => { if (uiUrl is not null) Open(uiUrl); };
+void OpenUi() { if (uiUrl is { } url) { var mode = uiWindow; _ = Task.Run(() => UiLauncher.Open(url, mode)); } }
+sni.OnActivate = OpenUi;
 sni.OnSecondaryActivate = () => Cmd("mark");
 
 MessageBuffer RegisterMessage()
@@ -66,7 +67,7 @@ string lastKey = "";
 while (true)
 {
     var st = DaemonClient.Status();
-    uiUrl = st?.UiUrl ?? uiUrl; rootDir = st?.RootDir ?? rootDir;
+    uiUrl = st?.UiUrl ?? uiUrl; uiWindow = st?.UiWindow ?? uiWindow; rootDir = st?.RootDir ?? rootDir;
     var recording = st?.State == "recording";
     var paused = st?.Paused is not null;
     var key = st is null ? "gone" : $"{st.State}|{st.Profile}|{st.Paused}|{st.MarkerCount}";
@@ -105,7 +106,7 @@ while (true)
             items.Add(new MenuItem { Label = "Stop session", Enabled = recording, Action = () => Cmd("stop") });
             items.Add(MenuItem.Sep());
         }
-        items.Add(new MenuItem { Label = "Open web UI", Enabled = uiUrl is not null, Action = () => { if (uiUrl is not null) Open(uiUrl); } });
+        items.Add(new MenuItem { Label = "Open web UI", Enabled = uiUrl is not null, Action = OpenUi });
         items.Add(new MenuItem { Label = "Open clips folder", Enabled = rootDir is not null, Action = () => { if (rootDir is not null) Open(Path.Combine(rootDir, "clips")); } });
         items.Add(MenuItem.Sep());
         items.Add(new MenuItem { Label = "Quit tray", Action = () => Environment.Exit(0) });

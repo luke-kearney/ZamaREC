@@ -43,6 +43,7 @@ var app = builder.Build();
 var types = new FileExtensionContentTypeProvider();
 types.Mappings[".ts"] = "video/mp2t";
 types.Mappings[".m3u8"] = "application/vnd.apple.mpegurl";
+types.Mappings[".webmanifest"] = "application/manifest+json";
 app.UseDefaultFiles();
 app.UseStaticFiles(new StaticFileOptions
 {

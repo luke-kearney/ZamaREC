@@ -143,6 +143,7 @@ CS2 posts to `/gsi` on `daemon.gsi_port` with a token from the generated cfg.
 
 - No periodic GPU, NVML or driver queries anywhere. The header's CPU/RAM figures and `kairec top`
   read `/proc` only.
-- Nothing opens a window or takes focus. The tray and UI only launch a browser on a click.
+- Nothing opens a window or takes focus by itself. The UI window opens, or comes to the front, only
+  when you ask: the menu entry, a tray click, `kairec ui`.
 - The GPU encoder is the only encoder; CPU fallback is disabled.
 - Hotkeys are the desktop's own global shortcuts running the CLI, not key grabbing.

@@ -45,6 +45,8 @@ public sealed class DaemonStatus
     /// <summary>Empty when auto recording is on, otherwise a description of the pause.</summary>
     [JsonPropertyName("paused")] public string? Paused { get; set; }
     [JsonPropertyName("ui_url")] public string? UiUrl { get; set; }
+    /// <summary>app | browser: how "open the UI" opens it (daemon.ui_window).</summary>
+    [JsonPropertyName("ui_window")] public string? UiWindow { get; set; }
     [JsonPropertyName("save_seconds")] public int? SaveSeconds { get; set; }
     [JsonPropertyName("profiles")] public List<string> Profiles { get; set; } = new();
 }

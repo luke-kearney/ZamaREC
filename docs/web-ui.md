@@ -3,6 +3,24 @@
 <http://127.0.0.1:3556>. Never opened automatically. Plain HTML and JavaScript served by the
 daemon; the only library is hls.js for timeline playback.
 
+## Its own window
+
+The **Kairec** menu entry, a click on the tray icon and `kairec ui` open the UI in a window of its
+own: no tabs, no address bar, its own taskbar entry with the kairec icon. It is Chrome, Chromium,
+Brave, Edge or Vivaldi in app mode with a profile kept in `~/.local/share/kairec/ui-profile`, so
+it shares no extensions, tabs or history with your everyday browser. Theme, volume and mixer
+levels are remembered there, separately from a browser tab. Asking again while the window is open
+brings it to the front (through KWin on Plasma; elsewhere a second window opens). The window
+icon in the title bar and taskbar comes from the menu entry, which `install.sh` installs under
+the window's own id (`chrome-127.0.0.1__-Default.desktop`); with another `daemon.bind` address the
+window works but shows a generic icon. It always opens 1680 × 910: the narrowest at which nothing in the page wraps or is cut off, with the
+video at 16:9 and the timeline under it. Resize it as you like; the next open starts at that size
+again.
+
+Without one of those browsers, or with `daemon.ui_window = "browser"` (Settings → Defaults → *open
+the UI in*), the page opens as a tab in the default browser. `KAIREC_UI_BROWSER` picks the
+browser. The page also has a web app manifest, so a Chromium browser offers to install it.
+
 ## Header
 
 - **On/off switch**: auto recording. Off opens a menu: for the rest of this game, for 1/2/8 hours,

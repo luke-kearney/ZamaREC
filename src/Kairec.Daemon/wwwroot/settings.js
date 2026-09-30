@@ -68,6 +68,7 @@
       ${field('sound feedback', chk('feedback.sound', c.feedback.sound), false, 'a short tone on mark, save, start and stop; never a popup')}
       ${field('sound volume', inp('feedback.volume', c.feedback.volume, 'number', 'min="0" max="1" step="0.1"'))}
       ${field('storage root', inp('storage.root', c.storage.root))}
+      ${field('open the UI in', sel('daemon.uiWindow', c.daemon.uiWindow ?? 'app', [{ v: 'app', l: 'its own window' }, { v: 'browser', l: 'a tab in the default browser' }]), false, 'for the menu entry, the tray and kairec ui. Its own window needs Chrome, Chromium, Brave, Edge or Vivaldi and keeps a separate profile')}
       ${field('UI port (restart needed)', inp('daemon.uiPort', c.daemon.uiPort, 'number'))}
       ${field('GSI port (restart needed)', inp('daemon.gsiPort', c.daemon.gsiPort, 'number'))}
       ${field('bind address (restart needed)', inp('daemon.bind', c.daemon.bind))}

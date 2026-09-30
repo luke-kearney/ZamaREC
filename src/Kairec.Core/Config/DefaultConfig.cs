@@ -68,6 +68,7 @@ public static class DefaultConfig
         gsi_port = 3555                   # CS2 game state integration POSTs here
         ui_port = 3556                    # web timeline
         bind = "127.0.0.1"
+        ui_window = "app"                 # app = the UI gets its own window (Chrome/Chromium app mode, own profile); browser = a tab
 
         # Quality presets. A profile picks one with quality = "high"; blank means the [capture] values.
         # Fields left out fall back to [capture]. scale limits the output size, e.g. "1280x720".

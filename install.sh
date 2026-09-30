@@ -29,7 +29,13 @@ cp packaging/brand/kairec-icon.svg "$ICON_DIR/scalable/apps/kairec.svg"
 for s in 16 24 32 48 64 128 256 512; do
   mkdir -p "$ICON_DIR/${s}x${s}/apps" && cp "packaging/brand/png/kairec-icon-$s.png" "$ICON_DIR/${s}x${s}/apps/kairec.png"
 done
-cp packaging/kairec.desktop "$HOME/.local/share/applications/kairec.desktop"
+# The menu runs entries without the shell's PATH: point it at the CLI by its full path.
+# The entry is installed under the name of the UI window's app id (what Chrome calls an --app window of
+# 127.0.0.1): KWin finds a window's icon by that file name, and shows a generic Wayland "W" without it.
+APP_ID="chrome-127.0.0.1__-Default"
+rm -f "$HOME/.local/share/applications/kairec.desktop"
+sed "s|^Exec=kairec |Exec=$BIN_DIR/kairec |" packaging/kairec.desktop > "$HOME/.local/share/applications/$APP_ID.desktop"
+command -v kbuildsycoca6 >/dev/null && kbuildsycoca6 >/dev/null 2>&1 || true
 command -v gtk-update-icon-cache >/dev/null && gtk-update-icon-cache -q -t "$ICON_DIR" 2>/dev/null || true
 command -v update-desktop-database >/dev/null && update-desktop-database -q "$HOME/.local/share/applications" 2>/dev/null || true
 

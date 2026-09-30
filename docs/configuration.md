@@ -129,6 +129,7 @@ runs one now.
 | `ui_port` | `3556` | web UI and API |
 | `gsi_port` | `3555` | where CS2 posts game state |
 | `bind` | `"127.0.0.1"` | keep it local |
+| `ui_window` | `"app"` | how the menu entry, the tray and `kairec ui` open the UI: `app` for a window of its own, `browser` for a tab in the default browser |
 | `process_scan_seconds` | `1.0` | how often `/proc` is scanned for game processes while idle |
 
 ## `[gsi]`

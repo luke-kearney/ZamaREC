@@ -1,9 +1,10 @@
 [Desktop Entry]
 Type=Application
 Name=Kairec
-Comment=Game session recorder: open the web UI
-Exec=xdg-open http://127.0.0.1:3556/
+Comment=Game session recorder: open the timeline and clips
+Exec=kairec ui
 Icon=kairec
 Terminal=false
 Categories=AudioVideo;Recorder;
 StartupNotify=false
+StartupWMClass=chrome-127.0.0.1__-Default

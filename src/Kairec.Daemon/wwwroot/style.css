@@ -39,7 +39,13 @@ header { display: flex; align-items: center; gap: 16px; height: 56px; padding: 0
 .wordmark { font: 700 17px/1 "Chakra Petch", Inter, sans-serif; letter-spacing: .02em; }
 .wordmark .rec { color: var(--brand); }
 .spacer { flex: 1; }
+/* Everything in the header keeps its size on one line; only the status text gives way, with an ellipsis, when a long game name meets a narrow window. */
+header > * { flex: none; white-space: nowrap; }
+header > .spacer { flex: 1 1 0; }
 .status { display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px; border-radius: 999px; font-size: 12.5px; background: var(--panel2); color: var(--muted); border: 1px solid var(--line); }
+header > .status { flex: 0 1 auto; min-width: 70px; }
+.status .dot { flex: none; }
+.status .txt { overflow: hidden; text-overflow: ellipsis; }
 .status .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); }
 .status.recording { background: var(--red-bg); color: var(--red-text); border-color: var(--red-line); }
 .status.recording .dot { background: var(--brand); box-shadow: 0 0 0 0 rgba(255,74,43,.6); animation: ping 1.4s infinite; }
@@ -216,7 +222,7 @@ video { width: 100%; max-height: 100%; aspect-ratio: auto 16 / 9; display: block
 .tbtn .tsub { position: absolute; bottom: 1px; right: 4px; font: 600 9px/1 "JetBrains Mono", monospace; }
 .stage:not(.playing) .ic-pause, .stage.playing .ic-play { display: none; }
 .stage:not(.muted) .ic-muted, .stage.muted .ic-vol { display: none; }
-.tclock { color: var(--muted); font-size: 12.5px; margin-left: 8px; }
+.tclock { color: var(--muted); font-size: 12.5px; margin-left: 8px; white-space: nowrap; }
 .vol { width: 90px; accent-color: var(--brand); margin: 0 6px 0 2px; }
 .stage:fullscreen { border: 0; border-radius: 0; color-scheme: dark; }   /* controls float over the video */
 .stage:fullscreen .player { flex: 1; display: flex; align-items: center; }

@@ -286,6 +286,8 @@ public sealed class DaemonConfig
     public int GsiPort { get; set; } = 3555;
     public int UiPort { get; set; } = 3556;
     public string Bind { get; set; } = "127.0.0.1";
+    /// <summary>app | browser. app opens the UI in a window of its own (a Chromium-family browser in app mode, own profile); browser uses the default browser.</summary>
+    public string UiWindow { get; set; } = "app";
     /// <summary>How often the daemon scans /proc while no game is running. CPU only; never touches the GPU.</summary>
     public double ProcessScanSeconds { get; set; } = 1.0;
 }
@@ -415,6 +417,7 @@ public static class ConfigLoader
             if (!trackNames.Add(t.Name)) throw new InvalidOperationException($"capture.tracks: '{t.Name}' is used twice (\"{CaptureConfig.MixName}\" is the first track's name)");
             if (t.Sources.Count == 0 || t.Sources.Any(string.IsNullOrWhiteSpace)) throw new InvalidOperationException($"capture.tracks: track '{t.Name}' needs at least one source");
         }
+        if (cfg.Daemon.UiWindow is not ("app" or "browser")) throw new InvalidOperationException($"daemon.ui_window must be app or browser (got '{cfg.Daemon.UiWindow}')");
         if (cfg.AutoGames.RamGb <= 0) throw new InvalidOperationException("auto_games.ram_gb must be above 0");
         if (!string.IsNullOrEmpty(cfg.AutoGames.Quality) && cfg.FindQuality(cfg.AutoGames.Quality) is null)
             throw new InvalidOperationException($"auto_games.quality: unknown preset '{cfg.AutoGames.Quality}' (known: {string.Join(", ", cfg.Quality.Select(q => q.Name))})");

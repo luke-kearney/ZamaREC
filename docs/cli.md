@@ -11,6 +11,7 @@ kairec stop                       stop the current session
 kairec status                     one line: state, profile, elapsed, window, markers, GSI age
 kairec pause [session|2h|forever] auto recording off; stops the current session
 kairec resume                     auto recording on; a running game is picked up at once
+kairec ui [--browser|--app]       open the web UI in its own window, or bring it to the front if it is open
 kairec top                        live view until Ctrl+C: CPU/RAM per process, storage, write rate
 kairec log [-n 40] [kind]         recent events; kinds: session mark clip export purge config daemon error
 kairec retention                  run the retention pass now and list what it removed
