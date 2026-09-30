@@ -45,6 +45,22 @@ exact.
 
 Nothing polls the GPU. The only periodic work while idle is a `/proc` directory scan once a second.
 
+## What starts a session
+
+The scan looks for two things. A process that a profile's `match` or `match_cmdline` fits starts
+that profile. Otherwise Steam's launch wrapper (`reaper SteamLaunch AppId=N -- ...`, one per
+running game, alive until the game's whole process tree is gone) is matched by app id: a profile
+with that `steam_app_id` and no process match starts at once; an app no profile knows is an
+unconfirmed game and, after a 30 s grace period, records with the `[auto_games]` defaults.
+`SteamLaunchTracker` holds that decision. It leaves alone any launch that was running when a
+session ended (a lingering launcher, a game stopped by hand) and any app a process-matched
+profile has recorded before, which the daemon remembers in `games.json`.
+
+While an unconfirmed session runs, the scan keeps looking for profile processes and hands the
+session over when one appears. During a profiled session only that game's pid is checked.
+Nothing here talks to the Steam client or needs its overlay; it is `/proc` and the library's
+manifest files.
+
 ## Timing
 
 Every marker records the monotonic clock at the moment it was requested, before any lock or I/O.

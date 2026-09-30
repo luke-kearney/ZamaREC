@@ -15,6 +15,15 @@ refusal.
 Check the profile's match regex against the real process name: `pgrep -x cs2` or the process
 picker in Settings. Check the switch in the header is on (`kairec resume`).
 
+**A game I never set up was recorded.** Steam games without a profile are recorded to RAM with the
+`[auto_games]` defaults and show a *new* badge. On the Games page, *Keep as profile* or *Never
+record*; to turn the whole thing off, untick it under Settings → Unconfirmed games.
+
+**My profile's game started as a "new" game.** Its process took longer than 30 s to appear after
+Steam launched it. The session switches to the profile as soon as the process shows up, and from
+then on kairec remembers that Steam app belongs to the profile. Setting `steam_app_id` on the
+profile avoids it from the start.
+
 **No CS2 events.** CS2 reads the cfg only at launch: restart the game. Check the cfg exists in
 `.../Counter-Strike Global Offensive/game/csgo/cfg/` and that `daemon.gsi_port` matches its `uri`.
 `kairec status` shows "gsi Ns ago" once payloads arrive. If Steam is in a non-standard place, set

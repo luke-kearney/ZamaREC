@@ -25,11 +25,20 @@ localhost. Everything the web UI does goes through these.
 | PUT | `/config` | `{ "text": "<toml>" }`; validated, applied now or when the session ends |
 | PUT | `/config/structured` | the structured config object; rewritten as TOML without comments |
 
+## Games
+
+| method | path | notes |
+|---|---|---|
+| GET | `/games` | the `[auto_games]` defaults in effect, and every Steam game seen launched: app id, name, launches, `state` (`profile`, `unconfirmed`, `ignored`), its profile, running/recording |
+| POST | `/games/{appId}/keep` | make the game a profile with the settings it was recorded with, or give the app id to a profile of the same name |
+| POST | `/games/{appId}/ignore` | add it to `auto_games.ignore`; a session recording it is stopped |
+| DELETE | `/games/{appId}/ignore` | take it off the list |
+
 ## Sessions
 
 | method | path | notes |
 |---|---|---|
-| GET | `/sessions` | list with profile, mode, map, times, marker and clip counts, live/ram/gone flags |
+| GET | `/sessions` | list with profile, mode, map, times, marker and clip counts, live/ram/gone flags, `steamAppId`, `unconfirmed` |
 | GET | `/sessions/{id}` | details: segments with availability, window start/end, markers, clip details |
 | GET | `/sessions/{id}/playlist.m3u8` | HLS playlist of the segments on disk (live or VOD) |
 | GET | `/sessions/{id}/seg/{file}` | a segment, with range support |

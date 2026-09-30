@@ -31,6 +31,8 @@ public sealed class SessionInfo
     /// <summary>Timeline mode: total seconds recorded (including footage already purged from the window).</summary>
     [JsonPropertyName("duration_seconds")] public double? DurationSeconds { get; set; }
     [JsonPropertyName("game_pid")] public int? GamePid { get; set; }
+    /// <summary>The Steam app this session recorded, when Steam launched it.</summary>
+    [JsonPropertyName("steam_app_id")] public long? SteamAppId { get; set; }
     [JsonPropertyName("clips")] public List<string> Clips { get; set; } = new();
 }
 

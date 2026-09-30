@@ -20,7 +20,7 @@ public sealed class SessionStore
         Dir = dir; Info = info; _markers = markers;
     }
 
-    public static SessionStore Create(KairecConfig cfg, ProfileConfig profile, string trigger, int? gamePid)
+    public static SessionStore Create(KairecConfig cfg, ProfileConfig profile, string trigger, int? gamePid, long? steamAppId = null)
     {
         var now = DateTimeOffset.Now;
         var id = $"{now:yyyy-MM-dd_HH-mm-ss}_{profile.Name}";
@@ -36,7 +36,7 @@ public sealed class SessionStore
         var info = new SessionInfo
         {
             Id = id, Profile = profile.Name, Mode = profile.Mode.ToLowerInvariant(), Trigger = trigger,
-            StartedAt = now, SpawnMonoUs = MonotonicClock.NowMicros(), GamePid = gamePid,
+            StartedAt = now, SpawnMonoUs = MonotonicClock.NowMicros(), GamePid = gamePid, SteamAppId = steamAppId,
             Playlist = profile.CaptureMode == CaptureMode.Timeline ? Recording.GsrArguments.PlaylistName : null,
             MediaDir = mediaDir,
         };

@@ -101,15 +101,34 @@ runs one now.
 | `cfg_dir` | `""` | CS2's `csgo/cfg` folder. Empty = found through Steam's library list |
 | `capture_raw` | `true` | keep every payload in `gsi.jsonl` inside the session folder |
 
+## `[auto_games]`
+
+A Steam game with no profile (an "unconfirmed" game) is still recorded: a RAM timeline with the
+defaults below, so nothing reaches the disk unless you mark or save. The Games page turns one into
+a real profile or puts it on the ignore list.
+
+| key | default | meaning |
+|---|---|---|
+| `enabled` | `true` | record unconfirmed games. `false` only lists them on the Games page |
+| `ram_gb` | `2` | RAM the rolling window may use; its length follows from the preset's bitrate (24 min at 10000 kbps) |
+| `quality` | unset | a `[[quality]]` name; unset uses `capture.quality` |
+| `ignore` | `[]` | Steam app ids never recorded this way. Runtimes, Proton, SteamVR and Wallpaper Engine are always skipped |
+
+Detection reads Steam's launch wrapper from `/proc` (`reaper SteamLaunch AppId=N`) in the same scan
+that looks for profile processes, and the name from the app's manifest in the Steam library.
+It waits 30 seconds before recording an unconfirmed game, so a profile's process has time to
+appear; if one appears later still, the session switches to that profile. Non-Steam shortcuts are
+not recorded this way.
+
 ## `[[profiles]]`
 
 | key | default | meaning |
 |---|---|---|
 | `name` | | used for the session folder and the clips subfolder |
 | `game` | | id of a built-in game preset (`cs2`, `minecraft`, `black-ops-3`): supplies the banner when nothing else does. A profile whose name equals a preset id or name resolves without it |
-| `steam_app_id` | | the sidebar banner is Steam's header art for this app. Blank: the daemon searches the Steam store for the profile name once and takes the first hit |
+| `steam_app_id` | | the Steam app this profile is for. With no `match` or `match_cmdline`, recording starts when Steam launches the app and stops when its whole process tree is gone. It also supplies the banner (Steam's header art); blank, the daemon uses the app id it saw the game launched with, or searches the Steam store for the profile name once |
 | `banner_url` | | any image URL as the banner, for games not on Steam. An image uploaded on the settings page beats every other source |
-| `match` | | regex against the process name (`/proc/PID/comm`, 15 chars max). Recording starts when it appears and stops when it exits |
+| `match` | | regex against the process name (`/proc/PID/comm`, 15 chars max). Recording starts when it appears and stops when it exits. A profile needs `match`, `match_cmdline` or `steam_app_id` |
 | `match_cmdline` | | regex against the full command line, for games whose process is `java` or similar |
 | `mode` | `"timeline"` | `timeline` or `buffer` |
 | `events` | `"none"` | `none` or `cs2-gsi` |

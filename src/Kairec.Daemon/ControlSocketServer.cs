@@ -112,7 +112,7 @@ public sealed class ControlSocketServer : BackgroundService
                 var ps = _pause.Current; s.Paused = ps.Mode == "off" ? null : PauseControl.Describe(ps);
                 var gsiNote = s.GsiLastSeconds is double g ? $", gsi {g:0}s ago" + (s.GsiMap is null ? "" : $" on {s.GsiMap}") : "";
                 var msg = s.State == "idle" ? "idle" + (s.Paused is null ? "" : $" (auto recording paused {s.Paused})") + gsiNote
-                    : $"{s.State}: {s.Profile} ({s.Mode}) {s.ElapsedSeconds:0}s elapsed"
+                    : $"{s.State}: {s.Profile} ({s.Mode}{(s.Unconfirmed ? ", unconfirmed game" : "")}) {s.ElapsedSeconds:0}s elapsed"
                       + (s.WindowSeconds is double w ? $", {w:0}s in window" : "")
                       + $", {s.MarkerCount} markers" + (s.PendingMarks > 0 ? $" ({s.PendingMarks} pending clip)" : "")
                       + gsiNote + $", {s.SessionDir}";

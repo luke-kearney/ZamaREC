@@ -29,6 +29,7 @@ builder.Services.AddSingleton<RecordingCoordinator>();
 builder.Services.AddSingleton<GsiService>();
 builder.Services.AddSingleton<PauseControl>();
 builder.Services.AddSingleton<SessionCatalog>();
+builder.Services.AddSingleton<SeenGames>();
 builder.Services.AddSingleton<BannerService>();
 builder.Services.AddHostedService<GameWatcherService>();
 builder.Services.AddHostedService<ControlSocketServer>();

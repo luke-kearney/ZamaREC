@@ -35,24 +35,7 @@ public static class GsiConfigFile
     /// <summary>Looks through every Steam library for the CS2 cfg folder.</summary>
     public static string? FindCs2CfgDir()
     {
-        var home = Paths.Home();
-        var roots = new[] { Path.Combine(home, ".local/share/Steam"), Path.Combine(home, ".steam/steam"), Path.Combine(home, ".var/app/com.valvesoftware.Steam/.local/share/Steam") };
-        var libs = new List<string>();
-        foreach (var r in roots)
-        {
-            if (!Directory.Exists(r)) continue;
-            libs.Add(r);
-            var vdf = Path.Combine(r, "steamapps", "libraryfolders.vdf");
-            if (!File.Exists(vdf)) continue;
-            foreach (var line in File.ReadLines(vdf))
-            {
-                var t = line.Trim();
-                if (!t.StartsWith("\"path\"")) continue;
-                var parts = t.Split('"', StringSplitOptions.RemoveEmptyEntries);
-                if (parts.Length >= 2) libs.Add(parts[^1].Trim());
-            }
-        }
-        foreach (var lib in libs.Distinct())
+        foreach (var lib in Processes.SteamLibrary.Libraries())
         {
             var cfg = Path.Combine(lib, "steamapps", "common", "Counter-Strike Global Offensive", "game", "csgo", "cfg");
             if (Directory.Exists(cfg)) return cfg;

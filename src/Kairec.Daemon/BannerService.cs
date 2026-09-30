@@ -7,10 +7,11 @@ namespace Kairec.Daemon;
 /// <summary>
 /// One banner per profile for the web UI, cached under &lt;root&gt;/banners so the page never talks to the internet.
 /// Resolution order: an uploaded image (custom/), the profile's banner_url (url/), its steam_app_id or the preset's
-/// (steam/), then a one-time Steam store search by profile name (search/). Downloads happen once, on first request;
+/// (steam/), the app id Steam launched the game with (learned from a session, or an unconfirmed game of that name), then a one-time Steam store
+/// search by profile name (search/). Downloads happen once, on first request;
 /// a failed download is not retried for an hour, a search that found nothing not for a day.
 /// </summary>
-public sealed class BannerService(KairecConfig cfg, ILogger<BannerService> log)
+public sealed class BannerService(KairecConfig cfg, SeenGames seen, ILogger<BannerService> log)
 {
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(15) };
     private readonly Dictionary<string, DateTime> _failed = new();
@@ -30,6 +31,7 @@ public sealed class BannerService(KairecConfig cfg, ILogger<BannerService> log)
         if (!string.IsNullOrEmpty(p?.BannerUrl)) return "url";
         if (p?.SteamAppId is not null) return "steam";
         if (preset?.BannerUrl is not null || preset?.SteamAppId is not null) return "preset";
+        if ((seen.ByProfile(profile) ?? seen.ByName(profile)) is { } game) return $"steam (launched as app {game.AppId})";
         var s = ReadSearch(profile);
         return s is null ? "search pending" : s.AppId is int id ? $"steam search: {s.Name} ({id})" : "none found";
     }
@@ -73,6 +75,7 @@ public sealed class BannerService(KairecConfig cfg, ILogger<BannerService> log)
         var url = p?.BannerUrl;
         var appId = p?.SteamAppId ?? preset?.SteamAppId;
         if (string.IsNullOrEmpty(url) && appId is null) url = preset?.BannerUrl;
+        if (string.IsNullOrEmpty(url) && appId is null && (seen.ByProfile(profile) ?? seen.ByName(profile)) is { AppId: <= int.MaxValue } game) appId = (int)game.AppId;
 
         if (!string.IsNullOrEmpty(url))
             return await FetchAsync(Path.Combine(Dir, "url", $"{Slug(profile)}-{Hash(url)}.jpg"), url, ct);

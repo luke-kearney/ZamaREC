@@ -15,6 +15,7 @@ public sealed class KairecConfig
     public FeedbackConfig Feedback { get; set; } = new();
     public DaemonConfig Daemon { get; set; } = new();
     public GsiConfig Gsi { get; set; } = new();
+    public AutoGamesConfig AutoGames { get; set; } = new();
     /// <summary>Named quality presets a profile can pick; blank profile.quality means the [capture] values.</summary>
     public List<QualityPreset> Quality { get; set; } = QualityPreset.Defaults();
     public List<ProfileConfig> Profiles { get; set; } = new();
@@ -33,12 +34,31 @@ public sealed class KairecConfig
     public void CopyFrom(KairecConfig o)
     {
         Storage = o.Storage; Capture = o.Capture; Timeline = o.Timeline; Buffer = o.Buffer; Clips = o.Clips;
-        Retention = o.Retention; Feedback = o.Feedback; Daemon = o.Daemon; Gsi = o.Gsi; Quality = o.Quality; Profiles = o.Profiles;
+        Retention = o.Retention; Feedback = o.Feedback; Daemon = o.Daemon; Gsi = o.Gsi; AutoGames = o.AutoGames; Quality = o.Quality; Profiles = o.Profiles;
         Version++;
     }
 
     public ProfileConfig? FindProfile(string name) =>
         Profiles.FirstOrDefault(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>The profile a Steam app belongs to: its steam_app_id, or the app id of its game preset.</summary>
+    public ProfileConfig? ProfileForSteamApp(long appId) =>
+        Profiles.FirstOrDefault(p => (p.SteamAppId ?? GamePresets.Resolve(p)?.SteamAppId) == appId);
+
+    /// <summary>
+    /// The stand-in profile for a Steam game that has none: a RAM timeline sized to [auto_games].ram_gb.
+    /// It is never saved to the config; "keep" in the UI turns it into a real profile.
+    /// </summary>
+    public ProfileConfig AutoProfile(int appId, string name)
+    {
+        var quality = string.IsNullOrEmpty(AutoGames.Quality) ? null : AutoGames.Quality;
+        var q = FindQuality(quality) ?? FindQuality(Capture.Quality);
+        return new ProfileConfig
+        {
+            Name = name, SteamAppId = appId, Mode = "timeline", Quality = quality,
+            Timeline = new ProfileTimelineOverride { Storage = "ram", WindowMinutes = AutoGames.WindowMinutes(q?.BitrateKbps ?? Capture.BitrateKbps) },
+        };
+    }
 
     /// <summary>Effective settings for a profile: profile overrides on top of the global defaults.</summary>
     public EffectiveProfile Effective(ProfileConfig p)
@@ -204,6 +224,25 @@ public sealed class GsiConfig
     public bool CaptureRaw { get; set; } = true;
 }
 
+/// <summary>Steam games without a profile ("unconfirmed"): recorded to RAM with these defaults, never to disk unless you mark.</summary>
+public sealed class AutoGamesConfig
+{
+    /// <summary>Record Steam games that have no profile. Off = they are only listed as seen.</summary>
+    public bool Enabled { get; set; } = true;
+    /// <summary>RAM the rolling window may use. The window length follows from the quality preset's bitrate.</summary>
+    public double RamGb { get; set; } = 2;
+    /// <summary>Name of a [[quality]] preset; empty = the capture default.</summary>
+    public string? Quality { get; set; }
+    /// <summary>Steam app ids that are never recorded this way.</summary>
+    public List<long> Ignore { get; set; } = new();
+
+    public bool Ignores(long appId) => Ignore.Contains(appId) || Processes.SteamLibrary.Tools.Contains(appId);
+
+    /// <summary>Whole minutes of video that fit in ram_gb at this bitrate, leaving the 10% a RAM timeline asks for on top.</summary>
+    public int WindowMinutes(int bitrateKbps) =>
+        Math.Max(1, (int)(RamGb * 1e9 / 1.1 / (Math.Max(1, bitrateKbps) * 125.0) / 60));
+}
+
 public sealed class RetentionConfig
 {
     public double? MaxGb { get; set; } = 100;
@@ -230,7 +269,7 @@ public sealed class ProfileConfig
     public string Name { get; set; } = "";
     /// <summary>Id of a GamePresets entry: display name and banner. Optional; a profile named like a preset resolves too.</summary>
     public string? Game { get; set; }
-    /// <summary>Steam app id: the banner is Steam's header art for it. Found by a store search on the name when unset.</summary>
+    /// <summary>Steam app id: the banner is Steam's header art for it, and a profile with no match of its own starts when Steam launches this app.</summary>
     public int? SteamAppId { get; set; }
     /// <summary>Any image URL to use as the banner instead; an uploaded image beats both.</summary>
     public string? BannerUrl { get; set; }
@@ -329,7 +368,7 @@ public static class ConfigLoader
         {
             if (string.IsNullOrWhiteSpace(p.Name)) throw new InvalidOperationException("Every [[profiles]] entry needs a name");
             if (!names.Add(p.Name)) throw new InvalidOperationException($"Duplicate profile name '{p.Name}'");
-            if (p.Match is null && p.MatchCmdline is null) throw new InvalidOperationException($"Profile '{p.Name}' needs match or match_cmdline");
+            if (p.Match is null && p.MatchCmdline is null && p.SteamAppId is null) throw new InvalidOperationException($"Profile '{p.Name}' needs match, match_cmdline or steam_app_id");
             if (!string.IsNullOrEmpty(cfg.Capture.Quality) && cfg.FindQuality(cfg.Capture.Quality) is null)
                 throw new InvalidOperationException($"capture.quality: unknown preset '{cfg.Capture.Quality}' (known: {string.Join(", ", cfg.Quality.Select(q => q.Name))})");
             if (!string.IsNullOrEmpty(p.Quality) && cfg.FindQuality(p.Quality) is null)
@@ -342,6 +381,9 @@ public static class ConfigLoader
             if (e.SegmentSeconds < 2) throw new InvalidOperationException($"Profile '{p.Name}': timeline segment_seconds must be at least 2");
             if (e.BufferMinutes < 1) throw new InvalidOperationException($"Profile '{p.Name}': buffer minutes must be at least 1");
         }
+        if (cfg.AutoGames.RamGb <= 0) throw new InvalidOperationException("auto_games.ram_gb must be above 0");
+        if (!string.IsNullOrEmpty(cfg.AutoGames.Quality) && cfg.FindQuality(cfg.AutoGames.Quality) is null)
+            throw new InvalidOperationException($"auto_games.quality: unknown preset '{cfg.AutoGames.Quality}' (known: {string.Join(", ", cfg.Quality.Select(q => q.Name))})");
         if (cfg.Capture.Codec is not ("h264" or "hevc" or "av1"))
             throw new InvalidOperationException($"capture.codec must be h264, hevc or av1 (got '{cfg.Capture.Codec}')");
     }

@@ -6,30 +6,42 @@ namespace Kairec.Core.Processes;
 
 public sealed record GameProcess(ProfileConfig Profile, int Pid, string Comm);
 
+/// <summary>A game Steam has launched: the pid of its launch wrapper, which lives until the whole game tree is gone.</summary>
+public sealed record SteamLaunch(int Pid, long AppId);
+
+/// <summary>One pass over /proc: the first process a profile matches, else every Steam launch that is running.</summary>
+public sealed record ProcessScan(GameProcess? Match, IReadOnlyList<SteamLaunch> Launches);
+
 /// <summary>
 /// Finds game processes by scanning /proc. This is the only polling the daemon does: a CPU-side directory
-/// listing once a second, reading /proc/PID/comm (and cmdline only for profiles that need it).
-/// It never touches the GPU, the driver, or any hardware counters.
+/// listing once a second, reading /proc/PID/comm (and cmdline only for profiles that need it, and for Steam's
+/// launch wrapper). It never touches the GPU, the driver, or any hardware counters.
 /// </summary>
 public sealed class ProcessWatcher
 {
     private readonly ILogger _log;
+    private readonly string _proc;
     private readonly List<(ProfileConfig Profile, Regex? Comm, Regex? Cmdline)> _matchers = new();
 
-    public ProcessWatcher(IEnumerable<ProfileConfig> profiles, ILogger log)
+    public ProcessWatcher(IEnumerable<ProfileConfig> profiles, ILogger log, string procRoot = "/proc")
     {
-        _log = log;
+        _log = log; _proc = procRoot;
         foreach (var p in profiles)
         {
+            if (p.Match is null && p.MatchCmdline is null) continue;   // matched by steam_app_id instead
             _matchers.Add((p,
                 p.Match is null ? null : new Regex(p.Match, RegexOptions.Compiled | RegexOptions.CultureInvariant),
                 p.MatchCmdline is null ? null : new Regex(p.MatchCmdline, RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase)));
         }
     }
 
-    public GameProcess? FindRunning(int selfPid)
+    public GameProcess? FindRunning(int selfPid) => Scan(selfPid, steam: false).Match;
+
+    /// <summary>Stops at the first profile match, since that wins over anything Steam has running.</summary>
+    public ProcessScan Scan(int selfPid, bool steam = true)
     {
-        foreach (var dir in Directory.EnumerateDirectories("/proc"))
+        var launches = new List<SteamLaunch>();
+        foreach (var dir in Directory.EnumerateDirectories(_proc))
         {
             var name = Path.GetFileName(dir);
             if (!int.TryParse(name, out var pid) || pid == selfPid) continue;
@@ -39,13 +51,32 @@ public sealed class ProcessWatcher
             string? cmdline = null;
             foreach (var (profile, commRe, cmdRe) in _matchers)
             {
-                if (commRe is not null && commRe.IsMatch(comm)) return new GameProcess(profile, pid, comm);
+                if (commRe is not null && commRe.IsMatch(comm)) return new ProcessScan(new GameProcess(profile, pid, comm), launches);
                 if (cmdRe is null) continue;
                 cmdline ??= ReadCmdline(dir);
-                if (cmdline.Length > 0 && cmdRe.IsMatch(cmdline)) return new GameProcess(profile, pid, comm);
+                if (cmdline.Length > 0 && cmdRe.IsMatch(cmdline)) return new ProcessScan(new GameProcess(profile, pid, comm), launches);
             }
+            if (steam && comm == SteamLibrary.LaunchComm && SteamLibrary.ParseLaunch(cmdline ?? ReadCmdline(dir)) is long appId)
+                launches.Add(new SteamLaunch(pid, appId));
         }
-        return null;
+        return new ProcessScan(null, launches);
+    }
+
+    /// <summary>Every Steam launch running right now, whether or not a profile matches something.</summary>
+    public List<SteamLaunch> SteamLaunches()
+    {
+        var launches = new List<SteamLaunch>();
+        foreach (var dir in Directory.EnumerateDirectories(_proc))
+        {
+            if (!int.TryParse(Path.GetFileName(dir), out var pid)) continue;
+            try
+            {
+                if (File.ReadAllText(Path.Combine(dir, "comm")).TrimEnd('\n') == SteamLibrary.LaunchComm && SteamLibrary.ParseLaunch(ReadCmdline(dir)) is long appId)
+                    launches.Add(new SteamLaunch(pid, appId));
+            }
+            catch { }
+        }
+        return launches;
     }
 
     public static bool IsAlive(int pid)

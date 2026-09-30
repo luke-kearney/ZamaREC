@@ -31,6 +31,8 @@ public sealed class DaemonStatus
     [JsonPropertyName("elapsed_seconds")] public double? ElapsedSeconds { get; set; }
     [JsonPropertyName("marker_count")] public int MarkerCount { get; set; }
     [JsonPropertyName("game_pid")] public int? GamePid { get; set; }
+    /// <summary>True while recording a Steam game that has no profile.</summary>
+    [JsonPropertyName("unconfirmed")] public bool Unconfirmed { get; set; }
     [JsonPropertyName("recorded_seconds")] public double? RecordedSeconds { get; set; }
     [JsonPropertyName("window_seconds")] public double? WindowSeconds { get; set; }
     [JsonPropertyName("pending_marks")] public int PendingMarks { get; set; }

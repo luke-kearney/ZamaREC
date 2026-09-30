@@ -30,6 +30,8 @@ public sealed class RecordingCoordinator : IAsyncDisposable
         public required GsrProcess Recorder { get; init; }
         public required string Trigger { get; init; }
         public int? GamePid { get; init; }
+        /// <summary>A Steam game with no profile, recorded with the [auto_games] defaults.</summary>
+        public bool Unconfirmed { get; init; }
         public SegmentIndex? Segments { get; init; }
         /// <summary>Marks waiting for their "after" time before the clip is written.</summary>
         public MarkJob? Pending { get; set; }
@@ -69,11 +71,13 @@ public sealed class RecordingCoordinator : IAsyncDisposable
     public SessionStore? ActiveSession => _active?.Session;
     public SegmentIndex? ActiveSegments => _active?.Segments;
     public int? ActiveGamePid => _active?.GamePid;
+    public bool ActiveUnconfirmed => _active?.Unconfirmed ?? false;
+    public long? ActiveSteamAppId => _active?.Session.Info.SteamAppId;
     public bool RecorderDied => _active is { Recorder.HasExited: true };
 
     // ---------------------------------------------------------------- start / stop
 
-    public async Task<ControlResponse> StartAsync(ProfileConfig profileCfg, string trigger, int? gamePid, CancellationToken ct)
+    public async Task<ControlResponse> StartAsync(ProfileConfig profileCfg, string trigger, int? gamePid, CancellationToken ct, long? steamAppId = null, bool unconfirmed = false)
     {
         await _lock.WaitAsync(ct);
         try
@@ -97,7 +101,7 @@ public sealed class RecordingCoordinator : IAsyncDisposable
                     return Fail($"RAM timeline: a {profile.WindowMinutes} min window at {profile.BitrateKbps} kbps needs {need / 1e9:0.0} GB but {ramDir} has {free / 1e9:0.0} GB free. Shorten the window or lower the bitrate.");
                 }
             }
-            var session = SessionStore.Create(_cfg, profileCfg, trigger, gamePid);
+            var session = SessionStore.Create(_cfg, profileCfg, trigger, gamePid, steamAppId);
             var sock = ControlPaths.SocketPath().Replace(".sock", "") + "-gsr.sock";   // next to the control socket, so test daemons stay isolated
             var incoming = Path.Combine(_cfg.ClipsDir, ".incoming");
             Directory.CreateDirectory(incoming);
@@ -119,12 +123,13 @@ public sealed class RecordingCoordinator : IAsyncDisposable
 
             _active = new Active
             {
-                Profile = profile, Session = session, Recorder = rec, Trigger = trigger, GamePid = gamePid,
+                Profile = profile, Session = session, Recorder = rec, Trigger = trigger, GamePid = gamePid, Unconfirmed = unconfirmed,
                 Segments = profile.Mode == CaptureMode.Timeline ? new SegmentIndex(session.Dir, session.MediaDir) : null,
             };
             var detail = (profile.Mode == CaptureMode.Timeline
                 ? (profile.WindowMinutes > 0 ? $"{profile.WindowMinutes} min window" : "unlimited window") + (profile.TimelineStorage == "ram" ? " in RAM" : "")
-                : $"{profile.BufferMinutes} min {profile.BufferStorage} buffer") + (profile.QualityName is null ? "" : $", {profile.QualityName} quality");
+                : $"{profile.BufferMinutes} min {profile.BufferStorage} buffer") + (profile.QualityName is null ? "" : $", {profile.QualityName} quality")
+                + (unconfirmed ? ", unconfirmed game" : "");
             _log.LogInformation("session {id} started ({mode}, {detail}, trigger={trigger}, pid={pid})", session.Info.Id, profile.Mode, detail, trigger, gamePid);
             _events.Write("session", $"session started ({profile.Mode.ToString().ToLower()}, {detail}, {trigger})", profile.Name, session.Info.Id);
             _sound.Play("start");
@@ -520,6 +525,7 @@ public sealed class RecordingCoordinator : IAsyncDisposable
         s.Mode = a.Profile.Mode.ToString().ToLowerInvariant();
         s.SessionDir = a.Session.Dir;
         s.GamePid = a.GamePid;
+        s.Unconfirmed = a.Unconfirmed;
         s.MarkerCount = a.Session.Markers.Count;
         s.ElapsedSeconds = (MonotonicClock.NowMicros() - a.Session.Info.SpawnMonoUs) / 1_000_000.0;
         if (a.Segments is not null)

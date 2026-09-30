@@ -2,6 +2,8 @@ using System.Text;
 using System.Text.Json;
 using Kairec.Core.Config;
 using Kairec.Core.Export;
+using Kairec.Core.Processes;
+using Microsoft.Extensions.Logging.Abstractions;
 using Kairec.Core.Recording;
 using Kairec.Core.Sessions;
 using Kairec.Core.Telemetry;
@@ -27,7 +29,7 @@ public static class WebApi
             var u = rec.Usage();
             var ps = pause.Current;
             var ramDir = Paths.Expand(cfg.Timeline.RamDir);
-            return Results.Ok(new { s.State, s.Profile, s.Mode, SessionId = rec.ActiveSessionId, s.ElapsedSeconds, s.RecordedSeconds, s.WindowSeconds, s.MarkerCount, s.PendingMarks,
+            return Results.Ok(new { s.State, s.Profile, s.Mode, s.Unconfirmed, SessionId = rec.ActiveSessionId, s.ElapsedSeconds, s.RecordedSeconds, s.WindowSeconds, s.MarkerCount, s.PendingMarks,
                 GsiLastSeconds = gsi.SecondsSinceLastPayload, GsiMap = gsi.CurrentMap, GsiCfg = gsi.CfgPath,
                 Usage = new { u.CpuPercent, u.RssBytes, u.Processes, RamFsBytes = ProcessUsage.DirBytes(ramDir), RamFsFree = FreeBytes(ramDir), Cores = Environment.ProcessorCount },
                 Pause = ps.Mode == "off" ? null : new { ps.Mode, ps.Until, Text = PauseControl.Describe(ps) },
@@ -158,12 +160,78 @@ public static class WebApi
         api.MapDelete("/banners/{profile}", (string profile, BannerService banners) => Results.Ok(new { Removed = banners.RemoveCustom(profile) }));
         api.MapPost("/banners/{profile}/research", (string profile, BannerService banners) => { banners.ForgetSearch(profile); return Results.Ok(new { Ok = true }); });
 
+        // ------------------------------------------------------------ steam games: profiled, unconfirmed, ignored
+
+        // Every Steam game seen launched, with what kairec does about it. "running" reads /proc on request only.
+        api.MapGet("/games", (KairecConfig cfg, SeenGames seen, RecordingCoordinator rec) =>
+        {
+            var running = new ProcessWatcher([], NullLogger.Instance).SteamLaunches().Select(l => l.AppId).ToHashSet();
+            var q = cfg.FindQuality(cfg.AutoGames.Quality) ?? cfg.FindQuality(cfg.Capture.Quality);
+            var kbps = q?.BitrateKbps ?? cfg.Capture.BitrateKbps;
+            return Results.Ok(new
+            {
+                Auto = new { cfg.AutoGames.Enabled, cfg.AutoGames.RamGb, Quality = q?.Name, BitrateKbps = kbps, WindowMinutes = cfg.AutoGames.WindowMinutes(kbps) },
+                Games = seen.All.Select(g =>
+                {
+                    var profile = cfg.ProfileForSteamApp(g.AppId) ?? cfg.FindProfile(g.Name) ?? (g.Profile is null ? null : cfg.FindProfile(g.Profile));
+                    return new
+                    {
+                        g.AppId, g.Name, g.FirstSeen, g.LastSeen, g.Launches, Profile = profile?.Name,
+                        State = profile is not null ? "profile" : cfg.AutoGames.Ignores(g.AppId) ? "ignored" : "unconfirmed",
+                        Running = running.Contains(g.AppId), Recording = rec.ActiveSteamAppId == g.AppId,
+                    };
+                }),
+            });
+        });
+
+        // Turns an unconfirmed game into a profile with the settings it has been recorded with, or hands the
+        // app id to an existing profile of the same name.
+        api.MapPost("/games/{appId:long}/keep", (long appId, KairecConfig cfg, SeenGames seen, ConfigService cs, RecordingCoordinator rec) =>
+        {
+            if (seen.Find(appId) is not { } game || appId > int.MaxValue) return Results.NotFound();
+            if ((cfg.ProfileForSteamApp(appId) ?? (game.Profile is null ? null : cfg.FindProfile(game.Profile))) is { } owner) return Results.Ok(new { Ok = true, Profile = owner.Name, Result = "exists" });
+            try
+            {
+                var next = ConfigLoader.Parse(ConfigLoader.Serialize(cfg));
+                if (next.FindProfile(game.Name) is { } same) same.SteamAppId = (int)appId;
+                else next.Profiles.Add(next.AutoProfile((int)appId, game.Name));
+                next.AutoGames.Ignore.Remove(appId);
+                return Results.Ok(new { Ok = true, Profile = game.Name, Result = cs.SaveStructured(next, rec.IsActive) });
+            }
+            catch (Exception ex) { return Results.BadRequest(new { Ok = false, Error = ex.Message }); }
+        });
+
+        // Never record this game on its own. A session recording it right now is stopped.
+        api.MapPost("/games/{appId:long}/ignore", async (long appId, KairecConfig cfg, ConfigService cs, RecordingCoordinator rec, CancellationToken ct) =>
+        {
+            try
+            {
+                if (rec.ActiveUnconfirmed && rec.ActiveSteamAppId == appId) await rec.StopAsync("game ignored", ct);
+                var next = ConfigLoader.Parse(ConfigLoader.Serialize(cfg));
+                if (!next.AutoGames.Ignore.Contains(appId)) next.AutoGames.Ignore.Add(appId);
+                return Results.Ok(new { Ok = true, Result = cs.SaveStructured(next, rec.IsActive) });
+            }
+            catch (Exception ex) { return Results.BadRequest(new { Ok = false, Error = ex.Message }); }
+        });
+
+        api.MapDelete("/games/{appId:long}/ignore", (long appId, KairecConfig cfg, ConfigService cs, RecordingCoordinator rec) =>
+        {
+            try
+            {
+                var next = ConfigLoader.Parse(ConfigLoader.Serialize(cfg));
+                next.AutoGames.Ignore.Remove(appId);
+                return Results.Ok(new { Ok = true, Result = cs.SaveStructured(next, rec.IsActive) });
+            }
+            catch (Exception ex) { return Results.BadRequest(new { Ok = false, Error = ex.Message }); }
+        });
+
         api.MapGet("/sessions", (SessionCatalog cat, RecordingCoordinator rec, KairecConfig cfg) =>
             Results.Ok(cat.Sessions().Select(s => new
             {
                 s.Id, s.Info.Profile, s.Info.Mode, s.Info.Map, s.Info.StartedAt, s.Info.EndedAt, s.Info.DurationSeconds,
                 s.MarkerCount, ClipCount = s.Info.Clips.Count, Live = s.Id == rec.ActiveSessionId,
                 Ram = s.Info.MediaDir is not null, s.Info.FootageGone,
+                s.Info.SteamAppId, Unconfirmed = s.Info.SteamAppId is not null && cfg.FindProfile(s.Info.Profile) is null,
                 Game = GamePresets.ResolveByProfileName(cfg, s.Info.Profile)?.Id,
                 GameName = GamePresets.ResolveByProfileName(cfg, s.Info.Profile)?.Name ?? s.Info.Profile,
             })));
@@ -182,6 +250,7 @@ public static class WebApi
             return Results.Ok(new
             {
                 store.Info.Id, store.Info.Profile, store.Info.Mode, store.Info.Map, store.Info.StartedAt, store.Info.EndedAt, Live = live,
+                store.Info.SteamAppId, Unconfirmed = store.Info.SteamAppId is not null && cfg.FindProfile(store.Info.Profile) is null,
                 Game = GamePresets.ResolveByProfileName(cfg, store.Info.Profile)?.Id,
                 Ram = store.Info.MediaDir is not null, store.Info.FootageGone,
                 RecordedSeconds = recorded,

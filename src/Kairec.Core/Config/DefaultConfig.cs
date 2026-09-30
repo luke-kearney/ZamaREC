@@ -52,6 +52,12 @@ public static class DefaultConfig
         # Never deleted: starred clips, the live session, sessions with starred markers or with clips on disk.
         # Mark clips additionally expire after clips.mark_clip_expire_hours.
 
+        [auto_games]                      # Steam games with no profile are recorded too, to RAM only
+        enabled = true                    # false = such games are only listed as seen
+        ram_gb = 2                        # the rolling window is as long as this much RAM holds at the quality's bitrate
+        # quality = "medium"              # unset = capture.quality
+        ignore = []                       # Steam app ids never to record this way
+
         [feedback]
         sound = true                      # short tone on mark/save. Never a popup, never focus.
         volume = 0.5

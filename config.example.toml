@@ -38,6 +38,12 @@ max_gb = 100
 max_days = 30
 # Starred clips are never deleted.
 
+[auto_games]                      # Steam games with no profile are recorded too, to RAM only
+enabled = true                    # false = such games are only listed on the Games page
+ram_gb = 2                        # the rolling window is as long as this much RAM holds at the quality's bitrate
+# quality = "medium"              # unset = capture.quality
+ignore = []                       # Steam app ids never to record this way
+
 [feedback]
 sound = true                      # short tone on mark/save. Never a popup, never focus.
 volume = 0.5
