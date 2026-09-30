@@ -378,7 +378,7 @@ function renderMarkers() {
 async function exportRange() {
   const cur = state.current; if (!cur) return;
   if (state.inT == null || state.outT == null || state.outT <= state.inT) return toast('set in and out points first', true);
-  let body = { start: state.inT, end: state.outT, label: $('exportLabel').value || null, exact: $('exact').checked };
+  let body = { start: state.inT, end: state.outT, label: $('exportLabel').value || null, exact: $('exact').checked, mix: exportMix() };
   let target = cur.kind === 'session' ? `/sessions/${cur.id}/export` : `/clips/${cur.id}/export`;
   if (clipPlayback(cur)) {
     const c = coverageAt(state.inT);
@@ -395,9 +395,11 @@ async function exportRange() {
     const r = await api(target, { body });
     if (state.current && state.current.kind === cur.kind && state.current.id === cur.id && state.inT === inT && state.outT === outT) { state.inT = state.outT = null; renderSelection(); }
     if ($('exportLabel').value === label) $('exportLabel').value = '';
-    toast(`export complete: ${fmt(r.duration)} → ${r.file}`); if (state.tab === 'clips') refreshList();
+    toast(`export complete${body.mix ? ' with your mix' : ''}: ${fmt(r.duration)} → ${r.file}`); if (state.tab === 'clips') refreshList();
   } catch (e) { toast('export failed: ' + e.message, true); }
 }
+// The mixer's levels, when it is on and the "mixer levels" box is ticked: the export's mix is remade from them.
+function exportMix() { return !$('exportMixWrap').hidden && $('exportMix').checked && window.mixerLevels ? window.mixerLevels() : null; }
 async function exportAround(m) {
   const cur = state.current;
   const before = +$('before').value || 0, after = +$('after').value || 0;
@@ -406,7 +408,7 @@ async function exportAround(m) {
     state.inT = Math.max(c.start, m.t - before); state.outT = Math.min(c.end, m.t + after); renderSelection();
     return exportRange();
   }
-  const body = { markerId: m.id, before, after, label: $('exportLabel').value || null, exact: $('exact').checked };
+  const body = { markerId: m.id, before, after, label: $('exportLabel').value || null, exact: $('exact').checked, mix: exportMix() };
   toast('exporting…');
   try { const r = await api(`/sessions/${cur.id}/export-around`, { body }); toast(`exported ${fmt(r.duration)} → ${r.file}`); }
   catch (e) { toast('export failed: ' + e.message, true); }
@@ -414,7 +416,7 @@ async function exportAround(m) {
 async function exportBatch() {
   const cur = state.current; if (!cur || cur.kind !== 'session') return;
   const type = $('batchType').value; if (!type) return;
-  const body = { type, before: +$('before').value || 0, after: +$('after').value || 0, exact: $('exact').checked };
+  const body = { type, before: +$('before').value || 0, after: +$('after').value || 0, exact: $('exact').checked, mix: exportMix() };
   toast(`exporting every "${type}" marker…`);
   try { const r = await api(`/sessions/${cur.id}/export-batch`, { body }); toast(`${r.filter(x => x.ok).length}/${r.length} clips exported`); }
   catch (e) { toast('batch failed: ' + e.message, true); }

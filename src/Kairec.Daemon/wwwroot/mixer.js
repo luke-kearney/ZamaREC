@@ -72,6 +72,7 @@
   function follow() {
     const src = source();
     btn.hidden = !src;
+    $('exportMixWrap').hidden = !(src && saved.on);   // exports can take the mixer's levels while it is on
     if (!src) { if (!pop.hidden) show(false); }
     const want = saved.on && src && src.key ? src : null;
     if ((want ? want.key : null) !== (loaded ? loaded.key : null)) { want ? load(want) : unload(); if (!pop.hidden) render(); }
@@ -131,5 +132,7 @@
   $('mixReset').onclick = () => { saved.levels = {}; saved.mutes = {}; solo.clear(); persist(); render(); applyGains(); };
   btn.classList.toggle('on', saved.on);
   window.closeMixer = () => show(false);
+  // What each track is set to right now (mute and solo included), for an export that should sound the same.
+  window.mixerLevels = () => { const src = source(); return src && saved.on ? Object.fromEntries(src.stems.map(t => [t.name, audible(t.name) ? level(t.name) : 0])) : null; };
   window.mixerState = () => ({ on: saved.on, lead, loaded: loaded && { key: loaded.key, stems: loaded.stems.map(s => ({ name: s.name, t: s.el.currentTime, ready: s.el.readyState, paused: s.el.paused, gain: s.gain.gain.value, bytes: s.el.webkitAudioDecodedByteCount })) }, ctx: ctx && ctx.state, videoGain: videoGain && videoGain.gain.value, master: master && master.gain.value });
 })();

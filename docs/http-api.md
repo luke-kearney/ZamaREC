@@ -45,7 +45,7 @@ localhost. Everything the web UI does goes through these.
 | GET | `/sessions/{id}/audio/{n}/playlist.m3u8` | the same playlist for audio track `n` alone (0 is the mix); its segments are audio-only, remuxed on request |
 | GET | `/sessions/{id}/audio/{n}/seg/{file}` | track `n` of one segment as MPEG-TS |
 | POST | `/sessions/{id}/markers/{mid}/star` | toggle |
-| POST | `/sessions/{id}/export` | `{ "start": s, "end": s, "label": "", "exact": false }` |
+| POST | `/sessions/{id}/export` | `{ "start": s, "end": s, "label": "", "exact": false }`. Every export call also takes `"mix": { "game": 0.5, "mic": 1.5 }`: remake the first track from the separate tracks at these levels (0 to 4; a track left out counts as 1). Ignored on a single-track recording |
 | POST | `/sessions/{id}/export-around` | `{ "markerId": "", "before": 10, "after": 5, "label": "", "exact": false }` |
 | POST | `/sessions/{id}/export-batch` | `{ "type": "kill", "before": 10, "after": 5, "exact": false }` |
 

@@ -12,9 +12,10 @@ namespace Kairec.Daemon;
 
 public static class WebApi
 {
-    public sealed record ExportRequest(double Start, double End, string? Label, bool Exact);
-    public sealed record AroundRequest(string MarkerId, double Before, double After, string? Label, bool Exact);
-    public sealed record BatchRequest(string Type, double Before, double After, bool Exact);
+    /// <param name="Mix">Track name to level: remake the clip's mix from the separate tracks at these levels.</param>
+    public sealed record ExportRequest(double Start, double End, string? Label, bool Exact, Dictionary<string, double>? Mix = null);
+    public sealed record AroundRequest(string MarkerId, double Before, double After, string? Label, bool Exact, Dictionary<string, double>? Mix = null);
+    public sealed record BatchRequest(string Type, double Before, double After, bool Exact, Dictionary<string, double>? Mix = null);
     public sealed record MarkRequest(string? Label);
     public sealed record ConfigTextRequest(string Text);
     public sealed record PauseRequest(string? Mode, double? Hours);
@@ -326,7 +327,7 @@ public static class WebApi
         {
             var dir = cat.SessionDir(id);
             if (dir is null) return Results.NotFound();
-            var r = await ExportRangeAsync(dir, req.Start, req.End, req.Label, req.Exact, "export", cat, rec, cfg, log, ct);
+            var r = await ExportRangeAsync(dir, req.Start, req.End, req.Label, req.Exact, "export", cat, rec, cfg, log, ct, req.Mix);
             return r.Ok ? Results.Ok(r) : Results.BadRequest(r);
         });
 
@@ -337,7 +338,7 @@ public static class WebApi
             var store = dir == rec.ActiveSessionDir ? rec.ActiveSession! : SessionStore.Load(dir);
             var m = store.Markers.FirstOrDefault(x => x.Id == req.MarkerId);
             if (m?.TVideo is not double t) return Results.NotFound();
-            var r = await ExportRangeAsync(dir, Math.Max(0, t - req.Before), t + req.After, req.Label ?? m.Label ?? m.Type, req.Exact, "export", cat, rec, cfg, log, ct);
+            var r = await ExportRangeAsync(dir, Math.Max(0, t - req.Before), t + req.After, req.Label ?? m.Label ?? m.Type, req.Exact, "export", cat, rec, cfg, log, ct, req.Mix);
             return r.Ok ? Results.Ok(r) : Results.BadRequest(r);
         });
 
@@ -350,7 +351,7 @@ public static class WebApi
             foreach (var m in store.Markers.Where(x => x.Type == req.Type && x.TVideo is not null).ToList())
             {
                 var t = m.TVideo!.Value;
-                var r = await ExportRangeAsync(dir, Math.Max(0, t - req.Before), t + req.After, m.Label ?? m.Type, req.Exact, "export", cat, rec, cfg, log, ct);
+                var r = await ExportRangeAsync(dir, Math.Max(0, t - req.Before), t + req.After, m.Label ?? m.Type, req.Exact, "export", cat, rec, cfg, log, ct, req.Mix);
                 results.Add(new { Marker = m.Id, r.Ok, r.Path, r.Error });
             }
             return Results.Ok(results);
@@ -362,7 +363,7 @@ public static class WebApi
             Results.Ok(cat.Clips().Select(c => new
             {
                 c.Profile, c.File, c.Bytes, c.Info.Label, c.Info.Source, c.Info.SessionId, c.Info.SessionOffset, c.Info.DurationSeconds,
-                c.Info.CreatedAt, RecordedAt = c.At, c.Info.AudioTracks, c.Info.Starred, c.Info.ExpiresAt, Markers = c.Info.Markers,
+                c.Info.CreatedAt, RecordedAt = c.At, c.Info.AudioTracks, c.Info.MixLevels, c.Info.Starred, c.Info.ExpiresAt, Markers = c.Info.Markers,
                 Game = GamePresets.ResolveByProfileName(cfg, c.Profile)?.Id,
             })));
 
@@ -408,12 +409,13 @@ public static class WebApi
             // The new clip is dated by its footage, not by when it was cut: the source's end, less what was left off.
             var recordedAt = cat.FootageTime(src).AddSeconds(src.DurationSeconds is double len ? Math.Min(0, req.End - len) : 0);
             var target = ClipNaming.NewPath(cfg.ClipsDir, profile, req.Label ?? src.Label, at: recordedAt);
-            var r = await ClipExporter.ExportFromFileAsync(p, req.Start, req.End, target, req.Exact, log, ct, src.AudioTracks);
+            var r = await ClipExporter.ExportFromFileAsync(p, req.Start, req.End, target, req.Exact, log, ct, src.AudioTracks, req.Mix);
             if (!r.Ok) return Results.BadRequest(new { r.Ok, r.Error });
             var info = new ClipInfo
             {
                 Profile = profile, Label = req.Label ?? src.Label, Source = "export", SessionId = src.SessionId,
                 SessionOffset = src.SessionOffset is double o ? o + req.Start : null, DurationSeconds = r.Duration, CreatedAt = DateTimeOffset.Now, RecordedAt = recordedAt, AudioTracks = src.AudioTracks,
+                MixLevels = ClipExporter.Mixes(src.AudioTracks, req.Mix) ? req.Mix : null,
                 Markers = src.Markers.Where(m => m.T >= req.Start && m.T <= req.End).Select(m => new ClipMarker { T = m.T - req.Start, Type = m.Type, Label = m.Label, Data = m.Data }).ToList(),
             };
             SessionCatalog.SaveClipInfo(target, info);
@@ -458,7 +460,7 @@ public static class WebApi
     public sealed record ExportResult(bool Ok, string? Path, string? File, double? Duration, string? Error);
 
     private static async Task<ExportResult> ExportRangeAsync(string dir, double start, double end, string? label, bool exact, string source,
-        SessionCatalog cat, RecordingCoordinator rec, KairecConfig cfg, ILogger log, CancellationToken ct)
+        SessionCatalog cat, RecordingCoordinator rec, KairecConfig cfg, ILogger log, CancellationToken ct, Dictionary<string, double>? mix = null)
     {
         var live = dir == rec.ActiveSessionDir;
         var store = live ? rec.ActiveSession! : SessionStore.Load(dir);
@@ -467,13 +469,14 @@ public static class WebApi
         index.Refresh();
         var recordedAt = store.Info.TimeAt(end);   // dated by its footage, not by when it was cut
         var target = ClipNaming.NewPath(cfg.ClipsDir, store.Info.Profile, label, at: recordedAt);
-        var r = await ClipExporter.ExportAsync(dir, index, start, end, target, exact, log, ct, store.Info.AudioTracks);
+        var r = await ClipExporter.ExportAsync(dir, index, start, end, target, exact, log, ct, store.Info.AudioTracks, mix);
         if (!r.Ok) return new ExportResult(false, null, null, null, r.Error);
         var actualStart = end - (r.Duration ?? (end - start));
         var info = new ClipInfo
         {
             Profile = store.Info.Profile, Label = label, Source = source, SessionId = store.Info.Id, SessionOffset = actualStart,
             DurationSeconds = r.Duration, CreatedAt = DateTimeOffset.Now, RecordedAt = recordedAt, AudioTracks = store.Info.AudioTracks,
+            MixLevels = ClipExporter.Mixes(store.Info.AudioTracks, mix) ? mix : null,
             Markers = store.Markers.Where(m => m.TVideo is double t && t >= actualStart && t <= end)
                 .Select(m => new ClipMarker { T = m.TVideo!.Value - actualStart, Type = m.Type, Label = m.Label, Data = m.Data }).ToList(),
         };

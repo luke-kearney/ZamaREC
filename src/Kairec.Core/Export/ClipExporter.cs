@@ -15,7 +15,7 @@ public static class ClipExporter
     /// With stream copy the cut lands on the keyframe at or before <paramref name="start"/>, so the clip may
     /// begin up to one keyframe interval early; the caller can read the exact duration from the result.
     /// </summary>
-    public static async Task<Result> ExportAsync(string sessionDir, SegmentIndex index, double start, double end, string outputPath, bool exact, ILogger log, CancellationToken ct, IReadOnlyList<string>? tracks = null)
+    public static async Task<Result> ExportAsync(string sessionDir, SegmentIndex index, double start, double end, string outputPath, bool exact, ILogger log, CancellationToken ct, IReadOnlyList<string>? tracks = null, IReadOnlyDictionary<string, double>? mix = null)
     {
         if (end <= start) return new Result(false, null, null, "end must be after start");
         var segs = index.Available().Where(s => s.Start + s.Duration > start && s.Start < end).OrderBy(s => s.Seq).ToList();
@@ -36,9 +36,10 @@ public static class ClipExporter
             var args = new List<string> { "-hide_banner", "-loglevel", "error", "-y" };
             if (exact) args.AddRange(["-hwaccel", "cuda"]);
             args.AddRange(["-f", "concat", "-safe", "0", "-i", listFile, "-ss", F(seekInto), "-t", F(duration)]);
-            args.AddRange(AllTracks(tracks));
+            args.AddRange(Tracks(tracks, mix));
             if (exact) args.AddRange(["-c:v", "h264_nvenc", "-preset", "p4", "-rc", "vbr", "-cq", "21", "-b:v", "0", "-c:a", "copy"]);
             else args.AddRange(["-c", "copy"]);
+            args.AddRange(MixCodec(tracks, mix));
             args.AddRange(["-avoid_negative_ts", "make_zero", "-movflags", "+faststart", outputPath]);
 
             Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
@@ -55,15 +56,20 @@ public static class ClipExporter
     }
 
     /// <summary>Cuts [start, end] out of a finished MP4 clip. Input seeking works here, so the cut is keyframe-accurate.</summary>
-    public static async Task<Result> ExportFromFileAsync(string sourcePath, double start, double end, string outputPath, bool exact, ILogger log, CancellationToken ct, IReadOnlyList<string>? tracks = null)
+    public static async Task<Result> ExportFromFileAsync(string sourcePath, double start, double end, string outputPath, bool exact, ILogger log, CancellationToken ct, IReadOnlyList<string>? tracks = null, IReadOnlyDictionary<string, double>? mix = null)
     {
         if (end <= start) return new Result(false, null, null, "end must be after start");
         var args = new List<string> { "-hide_banner", "-loglevel", "error", "-y" };
         if (exact) args.AddRange(["-hwaccel", "cuda"]);
+        // A stream copy starts on the keyframe at or before "start", up to a keyframe interval early. Copied audio
+        // comes along from there; a remade mix would begin only at "start" and leave that lead-in silent. So for
+        // a mix, start the cut on the whole second, where the keyframe is (as ExportAsync assumes too).
+        if (!exact && Mixes(tracks, mix) && Math.Floor(start) + 0.02 < start) start = Math.Floor(start) + 0.02;
         args.AddRange(["-ss", F(start), "-i", sourcePath, "-t", F(end - start)]);
-        args.AddRange(AllTracks(tracks));
+        args.AddRange(Tracks(tracks, mix));
         if (exact) args.AddRange(["-c:v", "h264_nvenc", "-preset", "p4", "-rc", "vbr", "-cq", "21", "-b:v", "0", "-c:a", "copy"]);
         else args.AddRange(["-c", "copy"]);
+        args.AddRange(MixCodec(tracks, mix));
         args.AddRange(["-avoid_negative_ts", "make_zero", "-movflags", "+faststart", outputPath]);
         Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
         var (code, stderr) = await RunAsync("ffmpeg", args, ct);
@@ -88,6 +94,34 @@ public static class ClipExporter
             args.AddRange([$"-metadata:s:a:{i}", "title=" + tracks[i], $"-metadata:s:a:{i}", "handler_name=" + tracks[i]]);
         return args;
     }
+
+    /// <summary>True when the recording has separate tracks to mix and levels were given for them.</summary>
+    public static bool Mixes(IReadOnlyList<string>? tracks, IReadOnlyDictionary<string, double>? mix) => mix is not null && tracks is { Count: >= 2 };
+
+    private static List<string> Tracks(IReadOnlyList<string>? tracks, IReadOnlyDictionary<string, double>? mix) =>
+        Mixes(tracks, mix) ? MixedTracks(tracks!, mix!) : AllTracks(tracks);
+
+    /// <summary>
+    /// Replaces the recorded mix with a new one: every separate track at its level, summed, with a limiter so a
+    /// boosted track cannot clip. The new mix is the first track, which is what players play; the separate
+    /// tracks follow it untouched. A track without a level counts as 1.
+    /// </summary>
+    public static List<string> MixedTracks(IReadOnlyList<string> tracks, IReadOnlyDictionary<string, double> mix)
+    {
+        var stems = Enumerable.Range(1, tracks.Count - 1).ToList();
+        double Level(int i) => Math.Clamp(mix.TryGetValue(tracks[i], out var g) ? g : 1, 0, 4);
+        var graph = string.Join(";", stems.Select(i => $"[0:a:{i}]volume={F(Level(i))}[m{i}]")) + ";"
+            + string.Concat(stems.Select(i => $"[m{i}]")) + $"amix=inputs={stems.Count}:normalize=0,alimiter=limit=0.97[mix]";
+        var args = new List<string> { "-filter_complex", graph, "-map", "0:v:0", "-map", "[mix]" };
+        foreach (var i in stems) args.AddRange(["-map", $"0:a:{i}"]);
+        for (int i = 0; i < tracks.Count; i++)
+            args.AddRange([$"-metadata:s:a:{i}", "title=" + tracks[i], $"-metadata:s:a:{i}", "handler_name=" + tracks[i]]);
+        return args;
+    }
+
+    // The new mix is the only stream that is encoded; it comes after "-c copy" so it wins for that one stream.
+    private static string[] MixCodec(IReadOnlyList<string>? tracks, IReadOnlyDictionary<string, double>? mix) =>
+        Mixes(tracks, mix) ? ["-c:a:0", "aac", "-b:a:0", "192k"] : [];
 
     private static string F(double v) => v.ToString("0.###", CultureInfo.InvariantCulture);
 

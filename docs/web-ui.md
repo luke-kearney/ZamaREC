@@ -46,6 +46,12 @@ Retention still counts an export's age from the day it was cut.
   master. Levels, mutes and the switch are remembered by the browser per track name, so they
   apply to every recording. A live session plays the recorded mix until it has ended. Double-click
   a level to put it back to 100%.
+- **Exporting with the mixer's levels**: while the mixer is on, the export panel has a *mixer
+  levels* box, ticked by default. An export then gets a new mix as its first track: every separate
+  track at the level it has now (a muted one left out, a solo honoured), summed and limited so a
+  boost cannot clip. That first track is what any player plays, so the clip sounds the way you
+  heard it. The separate tracks are kept after it, and the video is still a stream copy. The
+  master volume is not part of it. Applies to *Export range*, the scissors button and *Export all*.
 - The bar: ruler, markers colour-coded by type, playhead, window (purged part hatched). Click to
   seek. Ctrl+wheel zooms around the mouse, wheel pans; the zoom buttons and `+`/`-`/`0` zoom centred on the playhead. The view
   follows the playhead while playing.

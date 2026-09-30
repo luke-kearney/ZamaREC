@@ -66,6 +66,25 @@ public class AudioTrackTests
     }
 
     [Fact]
+    public void AnExportCanRemakeTheMixFromTheTracks()
+    {
+        string[] tracks = ["mix", "game", "mic", "discord"];
+        var args = ClipExporter.MixedTracks(tracks, new Dictionary<string, double> { ["game"] = 0.5, ["mic"] = 1.5, ["discord"] = 9 });
+        // every separate track at its level (clamped), summed without normalising, limited; the old mix is not an input
+        Assert.Equal("[0:a:1]volume=0.5[m1];[0:a:2]volume=1.5[m2];[0:a:3]volume=4[m3];[m1][m2][m3]amix=inputs=3:normalize=0,alimiter=limit=0.97[mix]", args[1]);
+        // the new mix first, then the tracks as they were
+        Assert.Equal(["-map", "0:v:0", "-map", "[mix]", "-map", "0:a:1", "-map", "0:a:2", "-map", "0:a:3"], args.Skip(2).Take(10));
+        Assert.Contains("title=discord", args);
+        // a track with no level given plays at 1
+        Assert.StartsWith("[0:a:1]volume=1[m1]", ClipExporter.MixedTracks(tracks, new Dictionary<string, double>())[1]);
+
+        Assert.True(ClipExporter.Mixes(tracks, new Dictionary<string, double>()));
+        Assert.False(ClipExporter.Mixes(tracks, null));
+        Assert.False(ClipExporter.Mixes(["mix"], new Dictionary<string, double>()));   // nothing to mix from
+        Assert.False(ClipExporter.Mixes(null, new Dictionary<string, double>()));
+    }
+
+    [Fact]
     public void ClipsKeepAndTitleEveryTrack()
     {
         Assert.Equal(["-map", "0:v:0", "-map", "0:a?"], ClipExporter.AllTracks(null));

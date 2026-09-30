@@ -60,6 +60,11 @@ through a Web Audio gain. They follow the video: parked slightly ahead while it 
 seeking, then kept within a few milliseconds by nudging their playback rate. The video's own
 sound is turned to zero once every track can play. None of this runs unless the mixer is on.
 
+An export can carry those levels: ffmpeg scales each separate track, sums them (`amix` without
+normalising, then a limiter) and encodes the result as the clip's first track in place of the
+recorded mix. Video and the separate tracks are still copied, and the clip's sidecar records the
+levels used (`mix_levels`).
+
 ## What starts a session
 
 The scan looks for two things. A process that a profile's `match` or `match_cmdline` fits starts

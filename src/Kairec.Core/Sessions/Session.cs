@@ -108,6 +108,8 @@ public sealed class ClipInfo
     [JsonPropertyName("markers")] public List<ClipMarker> Markers { get; set; } = new();
     /// <summary>Names of the audio tracks in file order ("mix" first). Unset = one track.</summary>
     [JsonPropertyName("audio_tracks")] public List<string>? AudioTracks { get; set; }
+    /// <summary>Set on an export whose mix was remade from the separate tracks: the level each one was given.</summary>
+    [JsonPropertyName("mix_levels")] public Dictionary<string, double>? MixLevels { get; set; }
 }
 
 public sealed class ClipMarker
