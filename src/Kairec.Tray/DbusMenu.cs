@@ -25,14 +25,17 @@ sealed class DbusMenu : IPathMethodHandler
     private MenuItem _root = new();
     private Dictionary<int, MenuItem> _byId = new();
     private uint _revision = 1;
+    private int _nextId = 1;
 
     public void SetItems(List<MenuItem> items)
     {
         lock (_lock)
         {
             _root = new MenuItem { Children = items };
-            _byId = new(); var next = 1;
-            void Assign(MenuItem m) { foreach (var c in m.Children) { c.Id = next++; _byId[c.Id] = c; Assign(c); } }
+            // Ids are never reused. Plasma keeps what it knew about an id, so a plain item that took the id of
+            // the submenu before it ("Turn recording on" after "Turn recording off") showed up greyed out.
+            _byId = new();
+            void Assign(MenuItem m) { foreach (var c in m.Children) { c.Id = _nextId++; _byId[c.Id] = c; Assign(c); } }
             _root.Id = 0; _byId[0] = _root; Assign(_root);
             _revision++;
         }
@@ -153,8 +156,9 @@ sealed class DbusMenu : IPathMethodHandler
         else
         {
             w.WriteDictionaryEntryStart(); w.WriteString("label"); w.VStr(item.Label);
-            if (!item.Enabled) { w.WriteDictionaryEntryStart(); w.WriteString("enabled"); w.VBool(false); }
-            if (item.Children.Count > 0) { w.WriteDictionaryEntryStart(); w.WriteString("children-display"); w.VStr("submenu"); }
+            // Every property is stated, never left to a default the host may have overridden for that id.
+            w.WriteDictionaryEntryStart(); w.WriteString("enabled"); w.VBool(item.Enabled);
+            w.WriteDictionaryEntryStart(); w.WriteString("children-display"); w.VStr(item.Children.Count > 0 ? "submenu" : "");
         }
         w.WriteDictionaryEnd(d);
     }
