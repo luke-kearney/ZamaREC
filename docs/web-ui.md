@@ -11,7 +11,7 @@ daemon; the only library is hls.js for timeline playback.
 - **cpu / ram / tmpfs**: kairec's own usage, daemon plus recorder, from `/proc`. Click the CPU
   figure to switch between share of all cores and one core. **clear** drops RAM footage of finished
   sessions (asks for a second click).
-- **Stats**, **Log**, **Settings**, **Mark**.
+- **Games**, **Stats**, **Log**, **Settings**, **Mark**.
 
 ## Sessions and clips
 
@@ -20,7 +20,8 @@ the footage is gone. A banner is, in order: an image uploaded for the profile in
 profile's `banner_url`, Steam's header art for its `steam_app_id` (own or the preset's), or the
 first hit of a Steam store search for the profile name. The daemon fetches each once into
 `<root>/banners`, so the page never contacts the internet. Badges: LIVE, RAM (segments in tmpfs), gone (RAM footage
-dropped; markers and clips remain), starred, expiring.
+dropped; markers and clips remain), starred, expiring, and *new* for a session of a Steam game that
+has no profile yet.
 
 ## Player and timeline
 
@@ -51,17 +52,32 @@ dropped; markers and clips remain), starred, expiring.
 Keys: space, ←/→ 5 s, shift+←/→ 30 s, J/L 10 s, `,`/`.` one frame, `[`/`]` markers, I/O set
 in/out, shift+I jump to in, P play range, E export panel / export, M mark, F fullscreen, +/−/0 zoom.
 
+## Games
+
+One card per game, with its banner.
+
+- **Your games**: the profiles. A card shows mode, storage, window or buffer length, quality, the
+  RAM or disk it needs, how it is detected (process match or Steam launch) and when it was last
+  played. Clicking it opens the profile's editor beside the grid: every field with helper text, a
+  process picker for the match field, the banner upload, and a footprint line showing what the
+  profile needs against what is available. Overrides shown depend on the mode. *Add profile* offers
+  the game presets (Counter-Strike 2, Minecraft, Black Ops III) or a blank one.
+- **Detected, no profile yet**: Steam games that were launched without a profile. They are recorded
+  to RAM with the `[auto_games]` defaults. *Keep as profile* creates a profile with those settings
+  and opens it; *Never record* puts the game on the ignore list and stops a session recording it.
+- **Never recorded**: the ignore list, with *allow* to take a game off it.
+
+Profile edits are saved with **Save**, like Settings. Keep, Never record and allow apply at once.
+
 ## Settings
 
-Left: capture (monitor, default preset, cursor, audio sources as chips), defaults for timeline,
-buffer, clips, retention, feedback and ports, and the quality presets table with GB/h. Right:
-profiles as collapsible cards with a summary line, *Add profile* offering the game presets
-(Counter-Strike 2, Minecraft, Black Ops III) with their process hooks pre-filled, a process picker for the match field, helper
-text under every field, and a footprint line showing what the profile needs in RAM or disk against
-what is available. Overrides shown depend on the mode.
+Left: capture (monitor, default preset, cursor, audio sources as chips), the defaults for
+unconfirmed games (on/off, RAM budget, quality, ignored app ids), and the quality presets table
+with GB/h. Right: defaults for timeline, buffer, clips, retention, feedback and ports.
 
 Save applies immediately or when the current session ends; the notice says which. **Raw TOML**
-edits the file directly and keeps comments.
+edits the file directly and keeps comments. Settings and Games edit the same config: switching
+between them keeps unsaved edits, and Save on either saves both.
 
 ## Stats
 

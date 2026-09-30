@@ -13,14 +13,15 @@ afterwards. Steam's recorder needs the overlay, which doesn't reach native Wayla
 buffers give you a save key and nothing more. kairec is the part after the save.
 
 - Records automatically when a profiled game starts, on the GPU encoder, via
-  [gpu-screen-recorder](https://git.dec05eba.com/gpu-screen-recorder/).
+  [gpu-screen-recorder](https://git.dec05eba.com/gpu-screen-recorder/). Steam games you never
+  set up are recorded too, to RAM only, until you keep or ignore them.
 - **Timeline mode** keeps a rolling window of the last N minutes you can scrub through any time,
   even mid-session. **Buffer mode** keeps a ring buffer in RAM and writes nothing until you act.
 - Markers from a hotkey, the tray, the web UI, or CS2 itself (kills with the round count, deaths,
   round results, MVPs, map changes) through Valve's Game State Integration.
 - Clips around markers and events, saves of the last N seconds, and range exports, all as stream
   copies with no re-encode, or frame-exact on nvenc if you ask.
-- A web UI with a timeline, a settings page, stats and a log. A tray icon. A CLI.
+- A web UI with a timeline, a games page, settings, stats and a log. A tray icon. A CLI.
 - Stays out of the way while you play: no popups, no windows opened on their own, nothing that
   takes focus from the game. Feedback is a short tone.
 

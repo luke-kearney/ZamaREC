@@ -125,6 +125,7 @@ main { min-width: 0; display: flex; flex-direction: column; min-height: 0; overf
 .badge.star { color: var(--accent); border-color: #4a3a12; background: #241c0a; }
 .badge.exp { color: #d9a441; }
 .badge.ram { color: #9ad0ff; border-color: #274a66; background: #0f2233; }
+.badge.new { color: var(--accent); border-color: #4a3a12; background: #241c0a; }
 .badge.gone { color: var(--dim); text-decoration: line-through; }
 .list .empty { padding: 30px 10px; }
 .list-head { flex: none; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); padding: 10px 6px 2px; }
@@ -258,6 +259,30 @@ video { width: 100%; max-height: 100%; aspect-ratio: auto 16 / 9; display: block
 .toast.err { border-color: var(--danger); color: #ffd0d0; }
 @keyframes rise { from { transform: translate(-50%, 8px); opacity: 0; } }
 
+/* ---------- games: a card per profile and per detected game, the editor beside them */
+.games { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; align-items: start; }
+.games.editing { grid-template-columns: minmax(0, 1fr) minmax(0, 620px); }
+.games .geditor { position: sticky; top: 62px; max-height: calc(100vh - 140px); overflow: auto; }
+@media (max-width: 1250px) { .games.editing { grid-template-columns: 1fr; } .games .geditor { position: static; max-height: none; order: -1; } }
+.gsec { margin-bottom: 20px; }
+.gsec h3 { margin: 0 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); display: flex; gap: 8px; }
+.gsec .help { color: var(--muted); font-size: 12.5px; margin: -4px 0 10px; max-width: 760px; }
+.ggrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.gcard { display: flex; flex-direction: column; text-align: left; padding: 0; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; cursor: pointer; transition: border-color .12s, transform .12s; }
+.gcard:hover { border-color: var(--line2); transform: translateY(-1px); }
+.gcard.sel { border-color: var(--brand); box-shadow: 0 0 0 1px var(--brand); }
+.gcard.static { cursor: default; } .gcard.static:hover { transform: none; }
+.gcard .gbanner { position: relative; width: 100%; aspect-ratio: 460 / 215; display: grid; place-items: center; background: var(--bg2); }
+.gcard .gbanner img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.gcard .ginit { font: 700 34px "Chakra Petch", Inter, sans-serif; color: var(--line2); }
+.gcard .gbody { display: flex; flex-direction: column; gap: 5px; padding: 10px 12px 12px; min-width: 0; }
+.gcard .gname { font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gcard .gbadges { display: flex; gap: 5px; flex-wrap: wrap; }
+.gcard .gline { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gcard .gacts { display: flex; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
+.gchips { display: flex; flex-wrap: wrap; gap: 8px; }
+.gchip { display: inline-flex; align-items: center; gap: 8px; padding: 4px 6px 4px 11px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); font-size: 12.5px; color: var(--muted); }
+
 /* ---------- settings */
 .settings { padding: 14px 22px 40px; max-width: 1700px; width: 100%; margin: 0 auto; }
 .settings-cols { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 14px; align-items: start; }
@@ -302,7 +327,7 @@ video { width: 100%; max-height: 100%; aspect-ratio: auto 16 / 9; display: block
 .qgrid input, .qgrid select { background: var(--bg2); border: 1px solid var(--line2); border-radius: 8px; padding: 5px 8px; color: var(--text); font-size: 13px; min-width: 0; width: 100%; }
 .qgrid input:focus, .qgrid select:focus { outline: none; border-color: var(--cyan); }
 .profile { border-left: 3px solid var(--brand); }
-.profile h3.ph { cursor: pointer; user-select: none; margin: 0; }
+.profile h3.ph { margin: 0; }
 .profile.open h3.ph { margin-bottom: 8px; }
 .profile.closed .body { display: none; }
 .profile .chev { color: var(--muted); width: 12px; }
