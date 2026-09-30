@@ -56,6 +56,8 @@ recorded cannot be ticked). Delete asks for a second click.
 
 ## Player and timeline
 
+![The timeline with game markers and a selected range](screenshots/timeline.webp)
+
 - Timeline sessions play through hls.js, including the live one, a few seconds behind. Buffer
   sessions show their clips as bands on the bar; clicking inside a band plays that clip at the right
   offset. Hatched areas have no footage.
@@ -69,6 +71,7 @@ recorded cannot be ticked). Delete asks for a second click.
   master. Levels, mutes and the switch are remembered by the browser per track name, so they
   apply to every recording. A live session plays the recorded mix until it has ended. Double-click
   a level to put it back to 100%.
+  ![The mixer panel](screenshots/mixer.webp)
 - **Exporting with the mixer's levels**: while the mixer is on, the export panel has a *mixer
   levels* box, ticked by default. An export then gets a new mix as its first track: every separate
   track at the level it has now (a muted one left out, a solo honoured), summed and limited so a
@@ -116,6 +119,8 @@ Keys: space, ←/→ 5 s, shift+←/→ 30 s, J/L 10 s, `,`/`.` one frame, `[`/`
 in/out, shift+I jump to in, P play range, E export panel / export, M mark, F fullscreen, +/−/0 zoom.
 
 ## Games
+
+![The Games page](screenshots/games.webp)
 
 One card per game, with its banner.
 

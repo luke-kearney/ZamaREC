@@ -12,6 +12,8 @@ starts, marks moments from a hotkey or from the game itself, and cuts clips from
 afterwards. Steam's recorder needs the overlay, which doesn't reach native Wayland games; replay
 buffers give you a save key and nothing more. kairec is the part after the save.
 
+![A recorded match on the timeline: markers from the game, a selected range, the marker list](docs/screenshots/timeline.webp)
+
 - Records automatically when a profiled game starts, on the GPU encoder, via
   [gpu-screen-recorder](https://git.dec05eba.com/gpu-screen-recorder/). Steam games you never
   set up are recorded too, to RAM only, until you keep or ignore them.
@@ -38,6 +40,17 @@ buffers give you a save key and nothing more. kairec is the part after the save.
 
 Anything with systemd, PipeWire and a working gpu-screen-recorder should run it; other GPUs and
 desktops are untested.
+
+## Screenshots
+
+| | |
+|---|---|
+| ![The mixer: a level, mute and solo for each audio track](docs/screenshots/mixer.webp) | ![The Share menu: send to Discord, or a copy under a size](docs/screenshots/share.webp) |
+| The mixer sets the level of each separate audio track on playback, and on export. | Share posts a clip to Discord or makes a copy small enough to upload. |
+| ![The Games page: a card per game and the profile editor](docs/screenshots/games.webp) | ![The light theme, on a buffer-mode session](docs/screenshots/light.webp) |
+| Games: one card per profile, plus Steam games seen without one. | The light theme, here on a buffer-mode session with a hover preview. |
+
+The games and footage in these are made up: generated gradients, no real recordings.
 
 ## Quick start
 

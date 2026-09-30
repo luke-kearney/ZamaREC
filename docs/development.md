@@ -26,6 +26,9 @@ See [architecture](architecture.md). The interesting files:
 - `Kairec.Core/Export/ClipExporter.cs`: ffmpeg concat and the keyframe snapping.
 - `Kairec.Core/Gsi/GsiEventDetector.cs`: pure function from snapshots to events.
 - `Kairec.Daemon/RecordingCoordinator.cs`: the state machine; everything that touches the recorder.
+- `tools/screenshots/`: the README screenshots. `demo-data.py <dir>` builds a demo library of made-up
+  games with generated footage and a config for a daemon that never records; `shoot.mjs` drives a
+  headless Chrome over that daemon's UI and saves the shots. See "Screenshots" below.
 - `Kairec.Daemon/wwwroot/`: the UI, no build step; `app.js` player and timeline (and `icon()`, the inline SVG icons), `mixer.js` (levels of separate audio tracks), `settings.js` (the Settings and Games views),
   `pages.js` stats and log.
 - `Kairec.Tray/`: StatusNotifierItem and dbusmenu by hand over Tmds.DBus.Protocol.
@@ -52,3 +55,22 @@ source's name to the profile `events` values. Marker types are free-form; add a 
 `tests/Kairec.Tests/Fixtures/gsi_match.json` is a hand-written match: kills, a headshot, a death, a
 spectating stretch where a teammate gets kills and dies, round results, MVP, game over. Real
 captures from `gsi.jsonl` make better fixtures; keep the spectating case.
+
+## Screenshots
+
+The images in `docs/screenshots/` come from a throwaway daemon, never from real recordings:
+
+```
+D=$(mktemp -d)
+python3 tools/screenshots/demo-data.py $D                       # about a minute; needs ffmpeg with NVENC
+KAIREC_SOCKET=$D/kairec.sock XDG_DATA_HOME=$D/data \
+  src/Kairec.Daemon/bin/Debug/net10.0/Kairec.Daemon $D/config.toml &     # ports 4555/4556
+google-chrome-stable --headless=new --mute-audio --autoplay-policy=no-user-gesture-required \
+  --user-data-dir=$D/chrome --remote-debugging-port=9335 --window-size=1680,910 about:blank &
+node tools/screenshots/shoot.mjs 9335 http://127.0.0.1:4556/ $D/shots
+for f in $D/shots/*.png; do magick $f -quality 92 -define webp:method=6 docs/screenshots/$(basename $f .png).webp; done
+```
+
+Run `dotnet build src/Kairec.Daemon` first so the daemon serves the current UI, and stop both
+background processes afterwards. The demo daemon uses its own socket, data dir and ports, so it
+can run beside the real one.

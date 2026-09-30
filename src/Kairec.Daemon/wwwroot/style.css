@@ -123,11 +123,11 @@ main { grid-column: 2; }
 main { min-width: 0; display: flex; flex-direction: column; min-height: 0; overflow: auto; background: radial-gradient(1200px 500px at 50% -200px, var(--glow) 0%, var(--bg) 60%); }
 
 /* ---------- sidebar */
-.tabs { display: flex; gap: 6px; padding: 12px 10px 10px 8px; border-bottom: 1px solid var(--line); align-items: center; }
+.tabs { display: flex; gap: 4px; padding: 12px 8px 10px 8px; border-bottom: 1px solid var(--line); align-items: center; }
 .tabs .seg { flex: none; }
-.tabs .sel { flex: 1 1 0; min-width: 0; width: 0; text-overflow: ellipsis; overflow: hidden; }
+.tabs .sel { flex: 1 1 0; min-width: 0; width: 0; text-overflow: ellipsis; overflow: hidden; padding: 6px 22px 6px 9px; background-position: right 5px center; }
 .seg { display: inline-flex; background: var(--bg2); border: 1px solid var(--line); border-radius: 9px; padding: 3px; }
-.tab { background: transparent; border: 0; padding: 5px 12px; border-radius: 7px; cursor: pointer; color: var(--muted); font-weight: 500; font-size: 13px; }
+.tab { background: transparent; border: 0; padding: 5px 10px; border-radius: 7px; cursor: pointer; color: var(--muted); font-weight: 500; font-size: 13px; }
 .tab.active { background: var(--panel2); color: var(--text); box-shadow: 0 1px 2px light-dark(rgba(16,24,40,.15), rgba(0,0,0,.4)); }
 #profileFilter { margin-left: auto; max-width: 150px; }
 .list { overflow: auto; flex: 1; padding: 8px; display: flex; flex-direction: column; gap: 6px; }

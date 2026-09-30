@@ -258,7 +258,8 @@ function loadClip(c) {
 }
 function holeMessage() { const d = state.current.data; return d.footageGone ? ['Footage is gone', 'No clip covers this moment. The highlighted bands on the timeline are the clips that were saved.'] : ['No footage here', 'Nothing was saved for this moment. The highlighted bands on the timeline are the saved clips.']; }
 function playerMessage(m) { const box = $('playerMsg'); box.hidden = !m; if (m) { $('playerMsgTitle').textContent = m[0]; $('playerMsgText').textContent = m[1]; } }
-function showViewer() { if ((window.settingsOpen && window.settingsOpen()) || (window.pageOpen && window.pageOpen())) return; $('empty').hidden = true; $('viewer').hidden = false; }
+function showViewer() {
+  $('tlTip').style.display = 'none'; hoverThumb(null); if ((window.settingsOpen && window.settingsOpen()) || (window.pageOpen && window.pageOpen())) return; $('empty').hidden = true; $('viewer').hidden = false; }
 
 // ------------------------------------------------------------------ timeline
 function markersOf() {
@@ -274,7 +275,7 @@ function setZoom(z, anchorT, centre) {
   const old = state.zoom; state.zoom = Math.max(1, Math.min(64, z));
   if (anchorT != null && centre) state.viewStart = anchorT - viewLen() / 2;
   else if (anchorT != null) { const frac = (anchorT - state.viewStart) / (state.total / old); state.viewStart = anchorT - frac * viewLen(); }
-  clampView(); renderTimeline(); $('zoomLbl').textContent = state.zoom === 1 ? 'fit' : state.zoom.toFixed(state.zoom < 4 ? 1 : 0) + '×';
+  clampView(); renderTimeline();
 }
 function followPlayhead(t) {
   if (state.zoom === 1) return;
@@ -282,6 +283,7 @@ function followPlayhead(t) {
 }
 function renderTimeline() {
   const cur = state.current; if (!cur) return;
+  $('zoomLbl').textContent = state.zoom === 1 ? 'fit' : state.zoom.toFixed(state.zoom < 4 ? 1 : 0) + '×';
   const tl = $('timeline');
   if (cur.kind === 'session' && cur.data.mode === 'timeline' && !cur.data.footageGone) {
     $('tlPurged').style.width = pct(cur.data.windowStart);
