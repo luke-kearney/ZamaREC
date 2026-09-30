@@ -6,6 +6,19 @@ const COLORS = {
   death: '#8d99ae', round_win: '#43d17a', round_loss: '#c1121f', mvp: '#c77dff', map_start: '#6c757d', map_end: '#6c757d',
 };
 const colorOf = (t, data) => (t === 'kill' && data && data.count >= 3) ? COLORS.multikill : (COLORS[t] || '#9aa4b2');
+// The UI's small icons, as inline SVG in the same stroke style as the header and transport ones (shapes from
+// Feather/Lucide, ISC licence). No icon font or library to load: icon('star') returns the markup.
+const ICONS = {
+  star: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
+  scissors: '<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4L8.12 15.88M14.47 14.48L20 20M8.12 8.12L12 12"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  x: '<path d="M18 6L6 18M6 6l12 12"/>',
+};
+const icon = name => `<svg class="ic ic-${name}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name]}</svg>`;
+window.icon = icon;
+
+// How long until a mark clip expires, short enough for a badge: 3d, 29h, 40m.
+const timeLeft = iso => { const m = (new Date(iso) - Date.now()) / 60000; return m <= 0 ? 'now' : m >= 2880 ? Math.floor(m / 1440) + 'd' : m >= 60 ? Math.floor(m / 60) + 'h' : Math.ceil(m) + 'm'; };
 const markerName = m => {
   if (m.type === 'kill' && m.data) { const c = m.data.count || 1; return (c >= 2 ? `${c}k` : 'kill') + (m.data.headshot ? ' · HS' : ''); }
   return m.type + (m.label && m.label !== m.type ? ' · ' + m.label : '');
@@ -116,8 +129,8 @@ function renderList() {
       const d = document.createElement('div');
       d.className = 'item' + (state.current && state.current.kind === 'clip' && state.current.id === c.profile + '/' + c.file ? ' active' : '');
       const hasBanner = banner(d, c.profile);
-      const exp = c.expiresAt ? `<span class="badge exp" title="expires ${fmtDate(c.expiresAt)}">⌛</span>` : '';
-      d.innerHTML = `<div class="l1"><span>${c.label || c.file.replace('.mp4', '')}</span><span class="r">${c.starred ? '<span class="badge star">★</span>' : ''}${exp}${hasBanner ? '' : `<span class="badge">${c.profile}</span>`}</span></div>
+      const exp = c.expiresAt ? `<span class="badge exp" title="a mark clip: deleted ${fmtDate(c.expiresAt)} unless you star it">${icon('clock')}${timeLeft(c.expiresAt)}</span>` : '';
+      d.innerHTML = `<div class="l1"><span>${c.label || c.file.replace('.mp4', '')}</span><span class="r">${c.starred ? `<span class="badge star" title="starred: never deleted">${icon('star')}</span>` : ''}${exp}${hasBanner ? '' : `<span class="badge">${c.profile}</span>`}</span></div>
         <div class="l2"><span>${fmtDate(c.recordedAt || c.createdAt)}</span><span class="mono">${fmt(c.durationSeconds)}</span><span>${gb(c.bytes)}</span><span>${c.source}</span></div>`;
       d.onclick = () => { if (window.closePages) window.closePages(); loadClip(c); };
       box.appendChild(d);
@@ -345,7 +358,7 @@ function renderMarkers() {
     const d = document.createElement('div'); d.className = 'mk' + (gone ? ' gone' : '');
     d.innerHTML = `<div class="bar" style="background:${colorOf(m.type, m.data)}"></div>
       <div><div class="name">${markerName(m)}</div><div class="t">${fmt(m.t)}${gone ? (isBuffer ? (cur.data.live && !m.clip ? ' · clip pending' : ' · no footage') : ' · purged') : ''}${m.clip ? ' · ' + m.clip : ''}</div></div>
-      <div class="acts">${cur.kind === 'session' ? `<button title="star" class="${m.starred ? 'on' : ''}" data-star>★</button>` : ''}${(isTimeline || isBuffer) && !gone ? '<button title="clip around this marker" data-clip>✂</button>' : ''}</div>`;
+      <div class="acts">${cur.kind === 'session' ? `<button title="star" class="${m.starred ? 'on' : ''}" data-star>${icon('star')}</button>` : ''}${(isTimeline || isBuffer) && !gone ? `<button title="clip around this marker" data-clip>${icon('scissors')}</button>` : ''}</div>`;
     d.onclick = () => { if (m.t != null && (!gone)) seek(m.t); };
     const st = d.querySelector('[data-star]');
     if (st) st.onclick = async e => { e.stopPropagation(); await api(`/sessions/${cur.id}/markers/${m.id}/star`, { method: 'POST' }); loadSession(cur.id); };

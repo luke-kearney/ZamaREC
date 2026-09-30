@@ -144,7 +144,13 @@ main { min-width: 0; display: flex; flex-direction: column; min-height: 0; overf
 .badge { font-size: 11px; padding: 2px 7px; border-radius: 5px; background: var(--bg2); color: var(--muted); border: 1px solid var(--line); font-weight: 500; }
 .badge.live { background: var(--red-bg2); color: var(--red-text); border-color: var(--red-line2); letter-spacing: .06em; }
 .badge.star { color: var(--accent); border-color: var(--amber-line); background: var(--amber-bg); }
-.badge.exp { color: var(--amber-soft); }
+.badge.exp { color: var(--amber-soft); display: inline-flex; align-items: center; gap: 3px; font-variant-numeric: tabular-nums; }
+/* icon('name') in app.js: sized by the text around it; a star fills when its holder is on */
+.ic { width: 1em; height: 1em; flex: none; vertical-align: -.125em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.badge .ic { width: 11px; height: 11px; stroke-width: 2.2; }
+.badge.star { display: inline-flex; align-items: center; }
+.badge.star .ic, .on > .ic-star { fill: currentColor; }
+.tiny .ic, .btn.small .ic { width: 12px; height: 12px; vertical-align: -2px; }
 .badge.ram { color: var(--blue-text); border-color: var(--blue-line); background: var(--blue-bg); }
 .badge.new { color: var(--accent); border-color: var(--amber-line); background: var(--amber-bg); }
 .badge.gone { color: var(--dim); text-decoration: line-through; }
