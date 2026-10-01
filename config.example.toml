@@ -1,8 +1,8 @@
-# Kairec configuration. After editing by hand run:
-#   kairec reload      (or use Settings in the web UI)
+# ZamaREC configuration. After editing by hand run:
+#   zamarec reload      (or use Settings in the web UI)
 
 [storage]
-root = "~/Videos/kairec"          # sessions/ and clips/ live under here
+root = "~/Videos/zamarec"          # sessions/ and clips/ live under here
 
 [capture]
 monitor = "DP-1"                  # gpu-screen-recorder --list-monitors
@@ -42,7 +42,7 @@ minutes = 30                      # ~150 MB of RAM per minute at 20000 kbps
 storage = "ram"                   # ram | disk
 
 [clips]                           # defaults; profiles override under clips.*
-save_seconds = 30                 # `kairec save` with no --last
+save_seconds = 30                 # `zamarec save` with no --last
 mark_before_seconds = 1500        # buffer mode: 25 min before a mark...
 mark_after_seconds = 300          # ...and 5 min after it
 mark_clip_expire_hours = 30       # mark clips are deleted after this unless starred (0 = never)

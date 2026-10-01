@@ -5,9 +5,9 @@ daemon; the only library is hls.js for timeline playback.
 
 ## Its own window
 
-The **Kairec** menu entry, a click on the tray icon and `kairec ui` open the UI in a window of its
-own: no tabs, no address bar, its own taskbar entry with the kairec icon. It is Chrome, Chromium,
-Brave, Edge or Vivaldi in app mode with a profile kept in `~/.local/share/kairec/ui-profile`, so
+The **ZamaREC** menu entry, a click on the tray icon and `zamarec ui` open the UI in a window of its
+own: no tabs, no address bar, its own taskbar entry with the ZamaREC icon. It is Chrome, Chromium,
+Brave, Edge or Vivaldi in app mode with a profile kept in `~/.local/share/zamarec/ui-profile`, so
 it shares no extensions, tabs or history with your everyday browser. Theme, volume and mixer
 levels are remembered there, separately from a browser tab. Asking again while the window is open
 brings it to the front (through KWin on Plasma; elsewhere a second window opens). The window
@@ -18,15 +18,15 @@ video at 16:9 and the timeline under it. Resize it as you like; the next open st
 again.
 
 Without one of those browsers, or with `daemon.ui_window = "browser"` (Settings → Defaults → *open
-the UI in*), the page opens as a tab in the default browser. `KAIREC_UI_BROWSER` picks the
+the UI in*), the page opens as a tab in the default browser. `ZAMAREC_UI_BROWSER` picks the
 browser. The page also has a web app manifest, so a Chromium browser offers to install it.
 
 ## Header
 
 - **On/off switch**: auto recording. Off opens a menu: for the rest of this game, for 1/2/8 hours,
-  or until turned back on. A running session is stopped. Manual `kairec start` still works.
+  or until turned back on. A running session is stopped. Manual `zamarec start` still works.
 - **Status pill**: idle, recording (profile, mode, elapsed, window), or paused with the reason.
-- **cpu / ram / tmpfs**: kairec's own usage, daemon plus recorder, from `/proc`. Click the CPU
+- **cpu / ram / tmpfs**: ZamaREC's own usage, daemon plus recorder, from `/proc`. Click the CPU
   figure to switch between share of all cores and one core. **clear** drops RAM footage of finished
   sessions (asks for a second click).
 - **Games**, **Settings**, then icon buttons for Stats, Log, the theme and GitHub, then **Mark**.
@@ -157,4 +157,4 @@ sessions and marks, what the folders hold now, free space, and a per-session tab
 ## Log
 
 Everything the daemon did: sessions, marks, clips, exports, purges, config applies, errors.
-Filter chips, live follow. Also `kairec log`.
+Filter chips, live follow. Also `zamarec log`.

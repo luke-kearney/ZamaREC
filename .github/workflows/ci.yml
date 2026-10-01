@@ -13,9 +13,9 @@ jobs:
           dotnet-version: '10.0.x'
       - run: dotnet restore
       - run: dotnet build --no-restore -c Release
-      - run: dotnet test tests/Kairec.Tests --no-build -c Release --logger "trx;LogFileName=results.trx"
+      - run: dotnet test tests/ZamaRec.Tests --no-build -c Release --logger "trx;LogFileName=results.trx"
       - name: publish CLI (NativeAOT smoke)
         run: |
           sudo apt-get install -y clang zlib1g-dev >/dev/null
-          dotnet publish src/Kairec.Cli -c Release -r linux-x64 -o /tmp/cli --nologo -v q
-          /tmp/cli/kairec --help | head -3
+          dotnet publish src/ZamaRec.Cli -c Release -r linux-x64 -o /tmp/cli --nologo -v q
+          /tmp/cli/zamarec --help | head -3

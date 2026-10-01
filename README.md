@@ -1,16 +1,11 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: light)" srcset="packaging/brand/png/kairec-logo-on-light.png">
-    <img src="packaging/brand/png/kairec-logo-on-dark.png" alt="kairec" width="340">
-  </picture>
+  <img src="packaging/brand/lockup/zamarec-lockup-on-paper.png" alt="ZamaREC" width="520">
 </p>
-
-*kairec*, from *kairos* (καιρός): the opportune moment.
 
 A game session recorder for Linux (and, from the same source, Windows) built around a marker timeline. It records on its own when a game
 starts, marks moments from a hotkey or from the game itself, and cuts clips from those markers
 afterwards. Steam's recorder needs the overlay, which doesn't reach native Wayland games; replay
-buffers give you a save key and nothing more. kairec is the part after the save.
+buffers give you a save key and nothing more. ZamaREC is the part after the save.
 
 ![A recorded match on the timeline: markers from the game, a selected range, the marker list](docs/screenshots/timeline.webp)
 
@@ -32,7 +27,7 @@ buffers give you a save key and nothing more. kairec is the part after the save.
 - Stays out of the way while you play: no popups, no windows opened on their own, nothing that
   takes focus from the game. Feedback is a short tone.
 
-> **Early software.** kairec is a few days old and has been used on exactly one machine: CachyOS,
+> **Early software.** ZamaREC is a few days old and has been used on exactly one machine: CachyOS,
 > KDE Plasma 6 on Wayland, an NVIDIA card. It records, it deletes old footage on purpose (see
 > retention), and it has bugs I have not found yet. Use it at your own risk, keep anything you
 > care about starred or copied elsewhere, and read the log when something looks off. Reports and
@@ -57,17 +52,17 @@ The games and footage in these are made up: generated gradients, no real recordi
 
 ```sh
 sudo pacman -S gpu-screen-recorder ffmpeg   # Arch / CachyOS; other distros: docs/install.md
-git clone https://github.com/luke-kearney/kairec.git && cd kairec
+git clone https://github.com/luke-kearney/zamarec.git && cd zamarec
 ./install.sh
 ```
 
-`install.sh` publishes the daemon, the tray and the CLI under `~/.local`, installs the `kairec` and
-`kairec-tray` user services, and starts them. Then:
+`install.sh` publishes the daemon, the tray and the CLI under `~/.local`, installs the `zamarec` and
+`zamarec-tray` user services, and starts them. Then:
 
 1. Open <http://127.0.0.1:3556>, go to **Settings**, check the monitor, and pick or adjust a profile.
    The default config has a `cs2` profile in timeline mode and a `minecraft` profile in buffer mode.
 2. Bind two shortcuts in *System Settings → Keyboard → Shortcuts → Add New → Command*:
-   `~/.local/bin/kairec mark` and `~/.local/bin/kairec save`.
+   `~/.local/bin/zamarec mark` and `~/.local/bin/zamarec save`.
 3. Launch the game. You'll hear the start tone; the tray dot turns red. Press the mark key at a good
    moment. Quit the game and open the session in the UI.
 
@@ -86,7 +81,7 @@ its own clip and retention settings.
   it; marks close together share one clip, and a mark shortly after a written clip extends it.
 - A **mark** is a timestamp on the session timeline, exact to the frame in timeline mode. Manual
   marks come from the hotkey, tray or UI; automatic ones from CS2 events.
-- A **clip** is an MP4 in `~/Videos/kairec/clips/<profile>/` with a sidecar holding its own
+- A **clip** is an MP4 in `~/Videos/zamarec/clips/<profile>/` with a sidecar holding its own
   markers, so it can be opened in the UI and cut down again.
 - **Retention** trims old and oversized sessions and clips per profile, never touching starred
   clips, sessions with starred markers or clips, or the live session.
@@ -96,7 +91,7 @@ its own clip and retention settings.
 - [Installing](docs/install.md): dependencies per distro, gpu-screen-recorder from Flatpak or source.
 - [Configuration reference](docs/configuration.md): every key in `config.toml`, with defaults.
 - [Architecture](docs/architecture.md): components, data on disk, how timing and clips work.
-- [CLI](docs/cli.md): `kairec` commands and hotkey setup.
+- [CLI](docs/cli.md): `zamarec` commands and hotkey setup.
 - [Web UI](docs/web-ui.md): the timeline, editing, settings, stats and log.
 - [CS2 events](docs/cs2-gsi.md): what Game State Integration gives you and how it is used.
 - [HTTP API](docs/http-api.md): everything the UI talks to, for scripting.
@@ -125,5 +120,5 @@ command, real-match GSI fixtures, marker editing in the UI.
 
 ## Licence
 
-[MIT](LICENSE). gpu-screen-recorder and ffmpeg are separate programs that kairec runs; they keep
+[MIT](LICENSE). gpu-screen-recorder and ffmpeg are separate programs that ZamaREC runs; they keep
 their own licences.

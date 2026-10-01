@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ZamaRec.Cli/ZamaRec.Cli.csproj" />
+    <Project Path="src/ZamaRec.Core/ZamaRec.Core.csproj" />
+    <Project Path="src/ZamaRec.Daemon/ZamaRec.Daemon.csproj" />
+    <Project Path="src/ZamaRec.Protocol/ZamaRec.Protocol.csproj" />
+    <Project Path="src/ZamaRec.Tray/ZamaRec.Tray.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ZamaRec.Tests/ZamaRec.Tests.csproj" />
+  </Folder>
+</Solution>

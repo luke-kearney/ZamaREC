@@ -6,16 +6,16 @@ code, with runtime branches where the system differs (`Platform.IsWindows`). Nei
 
 ## The bundle
 
-`packaging/windows/build.sh` publishes from Linux (or Git Bash) and produces `dist/windows/kairec-windows-x64.zip`:
+`packaging/windows/build.sh` publishes from Linux (or Git Bash) and produces `dist/windows/zamarec-windows-x64.zip`:
 
 | file | what |
 |---|---|
-| `kairec-daemon.exe` | daemon, tray icon, hotkeys; self-contained single file (no .NET install), no console, logs to a file |
-| `kairec.exe` | the command line; optional |
-| `ffmpeg.exe`, `ffprobe.exe` | gyan.dev's "essentials" build (NVENC, AMF, QSV, ddagrab), downloaded once into `~/.cache/kairec` |
+| `zamarec-daemon.exe` | daemon, tray icon, hotkeys; self-contained single file (no .NET install), no console, logs to a file |
+| `zamarec.exe` | the command line; optional |
+| `ffmpeg.exe`, `ffprobe.exe` | gyan.dev's "essentials" build (NVENC, AMF, QSV, ddagrab), downloaded once into `~/.cache/zamarec` |
 | `README.txt` | the friend-facing instructions |
 
-The daemon looks for ffmpeg next to itself (also `ffmpeg\bin`), then `KAIREC_FFMPEG_DIR`, then PATH.
+The daemon looks for ffmpeg next to itself (also `ffmpeg\bin`), then `ZAMAREC_FFMPEG_DIR`, then PATH.
 Double-clicking the exe while a daemon is running opens the UI instead of starting a second one.
 
 ## How the pieces map
@@ -31,12 +31,12 @@ Double-clicking the exe while a daemon is running opens the UI instead of starti
 | `SteamAppId` in the game's environment | `RunningAppID` again |
 | Steam libraries under `~/.local/share/Steam` | `SteamPath` from the registry plus `libraryfolders.vdf` |
 | `pw-play` | `winmm PlaySound` (no volume control, so the files are written at the configured volume) |
-| KDE shortcuts → `kairec` CLI | `[hotkeys]` in the config, registered by the daemon with `RegisterHotKey` |
-| StatusNotifierItem tray (`Kairec.Tray`) | `Shell_NotifyIcon` tray inside the daemon (`WindowsShell.cs`): open, mark, save, recording on/off, folder, start with Windows, quit |
-| journal | `%LOCALAPPDATA%\kairec\daemon.log`, rolled at 5 MB |
-| `~/.config/kairec`, `~/.local/share/kairec` | `%APPDATA%\kairec`, `%LOCALAPPDATA%\kairec` |
+| KDE shortcuts → `zamarec` CLI | `[hotkeys]` in the config, registered by the daemon with `RegisterHotKey` |
+| StatusNotifierItem tray (`ZamaRec.Tray`) | `Shell_NotifyIcon` tray inside the daemon (`WindowsShell.cs`): open, mark, save, recording on/off, folder, start with Windows, quit |
+| journal | `%LOCALAPPDATA%\zamarec\daemon.log`, rolled at 5 MB |
+| `~/.config/zamarec`, `~/.local/share/zamarec` | `%APPDATA%\zamarec`, `%LOCALAPPDATA%\zamarec` |
 | Chrome `--app` window raised through a KWin script | Chrome, Edge or Brave `--app` window; raised by title with `SetForegroundWindow` |
-| Unix socket in `$XDG_RUNTIME_DIR` | Unix socket in `%LOCALAPPDATA%\kairec` (Windows 10 1803+); if it cannot be made the daemon keeps running without the CLI |
+| Unix socket in `$XDG_RUNTIME_DIR` | Unix socket in `%LOCALAPPDATA%\zamarec` (Windows 10 1803+); if it cannot be made the daemon keeps running without the CLI |
 | `-hwaccel cuda`, `scale_cuda` for exports | the same for NVIDIA; `-hwaccel d3d11va` and a CPU `scale` for AMD and Intel (`capture.gpu`) |
 
 ## Time base
@@ -69,10 +69,10 @@ frame of black.
 
 ## Testing on Windows
 
-Unzip the bundle, run `kairec-daemon.exe`, and check `%LOCALAPPDATA%\kairec\daemon.log`. To try a recording without
+Unzip the bundle, run `zamarec-daemon.exe`, and check `%LOCALAPPDATA%\zamarec\daemon.log`. To try a recording without
 a game: add a profile matching `notepad` under Games, open Notepad, wait for the start tone, press Ctrl+Alt+M a
 few times, close Notepad. The session shows on the timeline; check that markers land where the clock says.
-`kairec.exe status` in a terminal in the bundle folder shows the daemon's state.
+`zamarec.exe status` in a terminal in the bundle folder shows the daemon's state.
 
-A scratch daemon (separate config, ports and data) works like on Linux: `kairec-daemon.exe C:\path\config.toml`
-with `KAIREC_SOCKET` set to another path.
+A scratch daemon (separate config, ports and data) works like on Linux: `zamarec-daemon.exe C:\path\config.toml`
+with `ZAMAREC_SOCKET` set to another path.
