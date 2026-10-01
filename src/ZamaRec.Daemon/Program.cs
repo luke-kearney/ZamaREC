@@ -77,6 +77,13 @@ app.Services.GetRequiredService<GsiService>().EnsureConfigFile();
 var log = app.Services.GetRequiredService<ILogger<Program>>();
 log.LogInformation("zamarec daemon starting; config {path}; ui http://{bind}:{port}; profiles: {profiles}",
     configPath, config.Daemon.Bind, config.Daemon.UiPort, string.Join(", ", config.Profiles.Select(p => $"{p.Name} ({p.Mode})")));
+{
+    var found = ZamaRec.Core.Recording.GpuVendor.Detected;
+    var use = ZamaRec.Core.Recording.HwCodec.Normalize(config.Capture.Gpu);
+    if (config.Capture.Gpu.Trim().ToLowerInvariant() is var set && set != "auto" && set != use)
+        log.LogWarning("capture.gpu is {set} but this machine has {found}: using the {use} encoder", set, string.Join(", ", found), use);
+    else log.LogInformation("gpu encoder: {use} (capture.gpu = {set}; found: {found})", use, set, found.Count == 0 ? "nothing" : string.Join(", ", found));
+}
 if (Platform.IsWindows && !ZamaRec.Core.Recording.Ffmpeg.Available())
 {
     log.LogError("ffmpeg.exe was not found next to the daemon or on PATH: nothing can be recorded or exported until it is");

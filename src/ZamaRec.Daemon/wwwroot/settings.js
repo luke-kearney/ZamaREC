@@ -36,7 +36,7 @@
       ${field('monitor', sel('capture.monitor', c.capture.monitor, monitors), false, 'the screen the game runs on')}
       ${field('default quality preset', sel('capture.quality', c.capture.quality ?? '', [{ v: '', l: '(built-in defaults: 60 fps h264 20000 kbps)' }, ...presetOpts]), false, 'used by every profile that does not pick its own')}
       ${field('show cursor', chk('capture.cursor', c.capture.cursor), false, 'draw the mouse pointer into the recording')}
-      ${field('GPU', sel('capture.gpu', c.capture.gpu ?? 'nvidia', [{ v: 'nvidia', l: 'NVIDIA (NVENC)' }, { v: 'amd', l: 'AMD (AMF, untested)' }, { v: 'intel', l: 'Intel (Quick Sync, untested)' }]), false, meta.platform === 'windows' ? 'whose encoder records and exports' : 'whose encoder exports use; recording always goes through gpu-screen-recorder')}
+      ${field('GPU', sel('capture.gpu', c.capture.gpu ?? 'auto', [{ v: 'auto', l: 'automatic' }, { v: 'nvidia', l: 'NVIDIA (NVENC)' }, { v: 'amd', l: 'AMD (AMF, untested)' }, { v: 'intel', l: 'Intel (Quick Sync, untested)' }]), false, meta.platform === 'windows' ? 'whose encoder records and exports' : 'whose encoder exports use; recording always goes through gpu-screen-recorder')}
       <div class="field wide"><span>audio sources</span><small class="hint">pick what goes into the recording. "Default output" is the game audio; add the mic if you want your voice</small>
         ${audioHtml}
         <label class="other"><span class="muted">other, comma separated (e.g. app:cs2)</span><input type="text" id="audioExtra" value="${audioExtra.join(', ')}"></label>

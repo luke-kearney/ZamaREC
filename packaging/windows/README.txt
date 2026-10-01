@@ -14,9 +14,10 @@ Setting it up
 3. Right-click the tray icon -> Open ZamaREC. That is the timeline, the clips,
    and Settings. Tick "Start with Windows" in the same menu if you want it
    to always be there.
-4. In Settings, check the monitor to record and pick your GPU (nvidia is the
-   default; amd and intel are wired up but untested). Add your games under
-   Games: a game is matched by its process name (cs2, valheim, ...).
+4. In Settings, check the monitor to record. The GPU is found by itself
+   (NVIDIA is the tested one; AMD and Intel are wired up but untested, and
+   can be set by hand under Capture). Add your games under Games: a game
+   is matched by its process name (cs2, valheim, ...).
 
 Using it
 --------

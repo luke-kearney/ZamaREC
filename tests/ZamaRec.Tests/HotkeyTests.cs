@@ -33,7 +33,7 @@ public class HotkeyTests
         Assert.NotNull(Hotkey.TryParse(cfg.Hotkeys.Mark));
         Assert.NotNull(Hotkey.TryParse(cfg.Hotkeys.Save));
         Assert.NotNull(Hotkey.TryParse(cfg.Hotkeys.Ui));
-        Assert.Equal("nvidia", cfg.Capture.Gpu);
+        Assert.Equal("auto", cfg.Capture.Gpu);
     }
 
     [Fact]

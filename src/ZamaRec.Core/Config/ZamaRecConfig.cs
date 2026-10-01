@@ -185,8 +185,8 @@ public sealed class CaptureConfig
     /// <summary>gpu-screen-recorder audio sources: default_output, default_input, device:NAME, app:NAME.</summary>
     public List<string> Audio { get; set; } = new() { "default_output" };
     public bool Cursor { get; set; } = false;
-    /// <summary>nvidia | amd | intel: which GPU encoder ffmpeg uses for exports (and, on Windows, for the recording). NVIDIA is the tested one.</summary>
-    public string Gpu { get; set; } = "nvidia";
+    /// <summary>auto | nvidia | amd | intel: which GPU encoder ffmpeg uses for exports (and, on Windows, for the recording). auto takes the machine's own (GpuVendor). NVIDIA is the tested one.</summary>
+    public string Gpu { get; set; } = "auto";
     /// <summary>Record the sources below as separate audio tracks after the mix. Off = one track, the sources in `audio`.</summary>
     public bool Multitrack { get; set; } = false;
     /// <summary>The separate tracks, in file order after the mix. Only used with multitrack = true.</summary>
@@ -475,8 +475,8 @@ public static class ConfigLoader
             throw new InvalidOperationException($"auto_games.quality: unknown preset '{cfg.AutoGames.Quality}' (known: {string.Join(", ", cfg.Quality.Select(q => q.Name))})");
         if (cfg.Capture.Codec is not ("h264" or "hevc" or "av1"))
             throw new InvalidOperationException($"capture.codec must be h264, hevc or av1 (got '{cfg.Capture.Codec}')");
-        if (cfg.Capture.Gpu.ToLowerInvariant() is not ("nvidia" or "amd" or "intel"))
-            throw new InvalidOperationException($"capture.gpu must be nvidia, amd or intel (got '{cfg.Capture.Gpu}')");
+        if (cfg.Capture.Gpu.ToLowerInvariant() is not ("auto" or "nvidia" or "amd" or "intel"))
+            throw new InvalidOperationException($"capture.gpu must be auto, nvidia, amd or intel (got '{cfg.Capture.Gpu}')");
         foreach (var (name, combo) in new[] { ("mark", cfg.Hotkeys.Mark), ("save", cfg.Hotkeys.Save), ("ui", cfg.Hotkeys.Ui) })
             if (!string.IsNullOrWhiteSpace(combo) && Hotkey.TryParse(combo) is null) throw new InvalidOperationException($"hotkeys.{name}: cannot read '{combo}' (try \"ctrl+alt+m\")");
     }

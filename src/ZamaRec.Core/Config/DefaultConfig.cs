@@ -14,7 +14,7 @@ public static class DefaultConfig
 
         [capture]
         monitor = "DP-1"                  # gpu-screen-recorder --list-monitors (Windows: the display number, 0 = first)
-        gpu = "nvidia"                    # nvidia | amd | intel: whose encoder ffmpeg uses (Windows: also for recording)
+        gpu = "auto"                      # auto | nvidia | amd | intel: whose encoder ffmpeg uses (Windows: also for recording)
         quality = "high"                  # default preset (see [[quality]]); profiles may pick another
         audio = ["default_output"]        # add "default_input" to record the microphone
         cursor = false

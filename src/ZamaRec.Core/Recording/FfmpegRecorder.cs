@@ -77,7 +77,10 @@ public sealed class FfmpegRecorder : IRecorder
 
         var graph = new StringBuilder();
         graph.Append($"ddagrab=output_idx={MonitorIndex(c.Monitor, log)}:framerate={p.Fps}:draw_mouse={(c.Cursor ? 1 : 0)}");
-        if (gpu == "intel") graph.Append(",hwdownload,format=bgra,format=nv12");   // QSV takes system-memory NV12; the conversion is the one CPU step
+        // NVENC takes ddagrab's BGRA textures as they are. AMF refuses them (SubmitInput() failed with error 18,
+        // AMF_DIRECTX_FAILED, on the first AMD machine tried) and QSV wants system memory, so for those two the frame
+        // is downloaded and converted to NV12: the one CPU step.
+        if (gpu is "intel" or "amd") graph.Append(",hwdownload,format=bgra,format=nv12");
         graph.Append(",setpts=(RTCTIME-").Append(baseReal.ToString(CultureInfo.InvariantCulture)).Append(")/(1000000*TB)[v]");
         if (!string.IsNullOrWhiteSpace(p.Scale)) log.LogWarning("scale {scale} is ignored on Windows: the capture is recorded at the monitor's size", p.Scale);
 

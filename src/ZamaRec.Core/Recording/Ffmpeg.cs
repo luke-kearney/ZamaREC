@@ -46,12 +46,13 @@ public static class Ffmpeg
 }
 
 /// <summary>
-/// The GPU encoder and decoder names ffmpeg uses for the configured GPU vendor. NVIDIA is the tested path on
+/// The GPU encoder and decoder names ffmpeg uses for the GPU vendor (configured, or detected). NVIDIA is the tested path on
 /// both systems; AMD and Intel are wired the way ffmpeg documents them and have not been tried on real hardware.
 /// </summary>
 public static class HwCodec
 {
-    public static string Normalize(string? gpu) => (gpu ?? "").Trim().ToLowerInvariant() switch { "amd" => "amd", "intel" => "intel", _ => "nvidia" };
+    /// <summary>capture.gpu as the vendor whose codecs to use: "auto", or a vendor this machine lacks, becomes the detected one.</summary>
+    public static string Normalize(string? gpu) => GpuVendor.Resolve(gpu, GpuVendor.Detected);
 
     public static string Encoder(string codec, string gpu) => (codec.ToLowerInvariant(), Normalize(gpu)) switch
     {

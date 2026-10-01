@@ -9,7 +9,7 @@ namespace ZamaRec.Core.Export;
 public static class ClipExporter
 {
     /// <summary>The GPU vendor whose decoder and encoder exports use (capture.gpu); the daemon points this at its live config.</summary>
-    public static Func<string> GpuSource { get; set; } = () => "nvidia";
+    public static Func<string> GpuSource { get; set; } = () => "auto";
     private static string Gpu => GpuSource();
 
     public sealed record Result(bool Ok, string? Path, double? Duration, string? Error);

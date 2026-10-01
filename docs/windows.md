@@ -22,7 +22,7 @@ Double-clicking the exe while a daemon is running opens the UI instead of starti
 
 | Linux | Windows |
 |---|---|
-| gpu-screen-recorder, `-ipc` socket | ffmpeg: `ddagrab` (Desktop Duplication, D3D11 textures) straight into `h264_nvenc` / `_amf` / `_qsv`; stop = `q` on stdin |
+| gpu-screen-recorder, `-ipc` socket | ffmpeg: `ddagrab` (Desktop Duplication, D3D11 textures) straight into `h264_nvenc`; for `_amf` and `_qsv` the frame is downloaded and converted to NV12 on the CPU first, since neither takes the textures as they are; stop = `q` on stdin |
 | `-write-first-frame-ts` | see "Time base" below |
 | PipeWire sources (`default_output`, `app:NAME`, …) | WASAPI through NAudio: `default_output` (loopback), `default_input`, `device:NAME`; no per-application audio |
 | replay buffer (buffer mode) | none: a buffer profile records a timeline as long as the buffer would be; marks and saves cut clips from it |
