@@ -6,7 +6,7 @@
  game process ──▶ GameWatcherService ──▶ RecordingCoordinator ──▶ gpu-screen-recorder (child)
                      (/proc scan)              │  state machine        │ KMS capture, NVENC
                                                │                       ▼
- kairec CLI / tray ──▶ ControlSocketServer ────┤              segments / RAM ring
+ zamarec CLI / tray ──▶ ControlSocketServer ────┤              segments / RAM ring
    (Unix socket)                               │
  CS2 ──▶ POST /gsi ──▶ GsiService ─────────────┤
                                                ▼
@@ -15,14 +15,14 @@
 
 | project | role |
 |---|---|
-| `Kairec.Protocol` | request/response types for the control socket. No dependencies, AOT-safe |
-| `Kairec.Core` | config (TOML), sessions and markers, segment index, recorder wrapper and its IPC, process watcher, clip exporter, GSI parser and detector, telemetry, sounds |
-| `Kairec.Daemon` | the service: coordinator, watcher, socket, web API, GSI endpoint, retention, pause control, config hot reload, static web UI |
-| `Kairec.Cli` | `kairec`, NativeAOT so a hotkey costs milliseconds |
-| `Kairec.Tray` | StatusNotifierItem and dbusmenu over D-Bus |
-| `Kairec.Tests` | xunit: config, segment index, GSI detector over fixture payloads |
+| `ZamaRec.Protocol` | request/response types for the control socket. No dependencies, AOT-safe |
+| `ZamaRec.Core` | config (TOML), sessions and markers, segment index, recorder wrapper and its IPC, process watcher, clip exporter, GSI parser and detector, telemetry, sounds |
+| `ZamaRec.Daemon` | the service: coordinator, watcher, socket, web API, GSI endpoint, retention, pause control, config hot reload, static web UI |
+| `ZamaRec.Cli` | `zamarec`, NativeAOT so a hotkey costs milliseconds |
+| `ZamaRec.Tray` | StatusNotifierItem and dbusmenu over D-Bus |
+| `ZamaRec.Tests` | xunit: config, segment index, GSI detector over fixture payloads |
 
-The daemon runs as the `kairec` systemd user service, the tray as `kairec-tray`.
+The daemon runs as the `zamarec` systemd user service, the tray as `zamarec-tray`.
 
 ## Capture
 
@@ -126,7 +126,7 @@ clip may begin up to one keyframe interval early. Frame-exact exports re-encode 
 ## Data on disk
 
 ```
-~/Videos/kairec/
+~/Videos/zamarec/
   sessions/<date>_<time>_<profile>[_<map>]/
     session.json      profile, mode, timings, first-frame stamp, media_dir for RAM sessions
     markers.json      markers with t_video (seconds into the session)
@@ -134,25 +134,25 @@ clip may begin up to one keyframe interval early. Frame-exact exports re-encode 
     live.m3u8, live.m3u8.ts, seg_NNNNNN.ts   (timeline mode, disk storage)
     gsi.jsonl         raw CS2 payloads (if gsi.capture_raw)
   clips/<profile>/<date>_<time>[_label].mp4 (+ .json sidecar)
-~/.local/share/kairec/
+~/.local/share/zamarec/
   events.jsonl      the event log     stats.json   lifetime counters
   gsi-token         the GSI shared secret          pause.json   pause state
   sounds/           generated tones
-~/.config/kairec/config.toml
-$XDG_RUNTIME_DIR/kairec.sock, kairec-gsr.sock
+~/.config/zamarec/config.toml
+$XDG_RUNTIME_DIR/zamarec.sock, zamarec-gsr.sock
 ```
 
 ## Control paths
 
-The CLI and tray talk newline-delimited JSON over `$XDG_RUNTIME_DIR/kairec.sock`
-(`KAIREC_SOCKET` overrides it). The web UI and any script use the HTTP API on `daemon.ui_port`.
+The CLI and tray talk newline-delimited JSON over `$XDG_RUNTIME_DIR/zamarec.sock`
+(`ZAMAREC_SOCKET` overrides it). The web UI and any script use the HTTP API on `daemon.ui_port`.
 CS2 posts to `/gsi` on `daemon.gsi_port` with a token from the generated cfg.
 
 ## Constraints the design keeps
 
-- No periodic GPU, NVML or driver queries anywhere. The header's CPU/RAM figures and `kairec top`
+- No periodic GPU, NVML or driver queries anywhere. The header's CPU/RAM figures and `zamarec top`
   read `/proc` only.
 - Nothing opens a window or takes focus by itself. The UI window opens, or comes to the front, only
-  when you ask: the menu entry, a tray click, `kairec ui`.
+  when you ask: the menu entry, a tray click, `zamarec ui`.
 - The GPU encoder is the only encoder; CPU fallback is disabled.
 - Hotkeys are the desktop's own global shortcuts running the CLI, not key grabbing.

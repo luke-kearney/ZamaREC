@@ -7,11 +7,11 @@ memory reading. Tournament HUDs and streaming overlays use it.
 ## Setup
 
 Set `events = "cs2-gsi"` on the profile (the default `cs2` profile has it). On startup the daemon
-writes `gamestate_integration_kairec.cfg` into CS2's `game/csgo/cfg` folder, found through Steam's
+writes `gamestate_integration_zamarec.cfg` into CS2's `game/csgo/cfg` folder, found through Steam's
 library list or `gsi.cfg_dir`. CS2 reads it at launch, so restart the game once. The cfg carries a
-random token stored in `~/.local/share/kairec/gsi-token`; payloads without it are rejected.
+random token stored in `~/.local/share/zamarec/gsi-token`; payloads without it are rejected.
 
-`kairec status` shows "gsi Ns ago on de_map" once payloads arrive.
+`zamarec status` shows "gsi Ns ago on de_map" once payloads arrive.
 
 ## Events
 

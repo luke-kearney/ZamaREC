@@ -1,7 +1,7 @@
 # Configuration reference
 
-The file is `~/.config/kairec/config.toml`. It is created with defaults on first start. Edit it in
-the web UI's **Settings** page or by hand; after a hand edit run `kairec reload`. Changes apply
+The file is `~/.config/zamarec/config.toml`. It is created with defaults on first start. Edit it in
+the web UI's **Settings** page or by hand; after a hand edit run `zamarec reload`. Changes apply
 immediately, or when the current session ends if one is running. Only `daemon.*` ports and bind
 address need a daemon restart.
 
@@ -12,7 +12,7 @@ Every key below is optional. Profiles override the global sections under the sam
 
 | key | default | meaning |
 |---|---|---|
-| `root` | `"~/Videos/kairec"` | holds `sessions/` and `clips/` |
+| `root` | `"~/Videos/zamarec"` | holds `sessions/` and `clips/` |
 
 ## `[capture]`
 
@@ -82,7 +82,7 @@ Named encoder presets. Four ship by default: `low` (720p30, 6000 kbps), `medium`
 | `window_minutes` | `120` | how far back you can scrub; older segments are deleted as you play. `0` keeps everything |
 | `segment_seconds` | `5` | segment length. A save waits for the current segment to close, so keep it short |
 | `storage` | `"disk"` | `disk` or `ram`. RAM puts the segments on tmpfs; needs window × bitrate of memory |
-| `ram_dir` | `"/dev/shm/kairec"` | where RAM segments go |
+| `ram_dir` | `"/dev/shm/zamarec"` | where RAM segments go |
 | `ram_keep_hours` | `6` | RAM footage of a finished session is dropped after this, or when the next session starts |
 
 ## `[buffer]` (defaults; profiles override under `buffer.*`)
@@ -96,7 +96,7 @@ Named encoder presets. Four ship by default: `low` (720p30, 6000 kbps), `medium`
 
 | key | default | meaning |
 |---|---|---|
-| `save_seconds` | `30` | what `kairec save` writes when `--last` is not given |
+| `save_seconds` | `30` | what `zamarec save` writes when `--last` is not given |
 | `mark_before_seconds` | `1500` | a mark clip starts this long before the mark |
 | `mark_after_seconds` | `300` | and ends this long after it. Marks inside that time join the same clip |
 | `mark_clip_expire_hours` | `30` | mark clips are deleted after this unless starred. `0` = never |
@@ -112,7 +112,7 @@ Named encoder presets. Four ship by default: `low` (720p30, 6000 kbps), `medium`
 
 Always deleted, regardless of the caps: a finished session with no footage left, no markers and
 no clips. Never deleted: starred clips, the live session, sessions with starred markers, sessions whose
-clips are still on disk. A pass runs a minute after start and every ten minutes; `kairec retention`
+clips are still on disk. A pass runs a minute after start and every ten minutes; `zamarec retention`
 runs one now.
 
 ## `[feedback]`
@@ -129,7 +129,7 @@ runs one now.
 | `ui_port` | `3556` | web UI and API |
 | `gsi_port` | `3555` | where CS2 posts game state |
 | `bind` | `"127.0.0.1"` | keep it local |
-| `ui_window` | `"app"` | how the menu entry, the tray and `kairec ui` open the UI: `app` for a window of its own, `browser` for a tab in the default browser |
+| `ui_window` | `"app"` | how the menu entry, the tray and `zamarec ui` open the UI: `app` for a window of its own, `browser` for a tab in the default browser |
 | `process_scan_seconds` | `1.0` | how often `/proc` is scanned for game processes while idle |
 
 ## `[gsi]`

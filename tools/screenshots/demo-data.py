@@ -7,13 +7,13 @@ Everything lands under <dir>: a config for a daemon on ports 4555/4556 that reco
 match, and it scans for games once a day), its recordings root, and its data dir. No screen is captured and nothing real
 is read: the video is ffmpeg's gradient generator with a caption, the audio is quiet noise.
 Run the daemon on it with:
-    KAIREC_SOCKET=<dir>/kairec.sock XDG_DATA_HOME=<dir>/data Kairec.Daemon <dir>/config.toml
+    ZAMAREC_SOCKET=<dir>/zamarec.sock XDG_DATA_HOME=<dir>/data ZamaRec.Daemon <dir>/config.toml
 """
 import json, os, random, subprocess, sys, uuid
 from datetime import datetime, timedelta, timezone
 
 OUT = os.path.abspath(sys.argv[1])
-ROOT, DATA = f"{OUT}/root", f"{OUT}/data/kairec"
+ROOT, DATA = f"{OUT}/root", f"{OUT}/data/zamarec"
 FONT = subprocess.run(["fc-match", "-f", "%{file}", "sans:bold"], capture_output=True, text=True).stdout
 TZ = datetime.now().astimezone().tzinfo
 NOW = datetime.now(TZ).replace(microsecond=0)

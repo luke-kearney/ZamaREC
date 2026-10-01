@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=ZamaREC
+Comment=Game session recorder: open the timeline and clips
+Exec=zamarec ui
+Icon=zamarec
+Terminal=false
+Categories=AudioVideo;Recorder;
+StartupNotify=false
+StartupWMClass=chrome-127.0.0.1__-Default

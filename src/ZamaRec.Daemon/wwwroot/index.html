@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ZamaREC</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0b0e14" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" type="image/svg+xml" href="zamarec-icon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="zamarec-icon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&family=Zilla+Slab:wght@700&display=swap" rel="stylesheet">
+<script>
+  // Theme: follows the OS/browser unless the theme button picked light or dark (kept in localStorage).
+  // Runs before the stylesheet so the page never flashes the wrong one.
+  (() => {
+    const mq = matchMedia('(prefers-color-scheme: light)');
+    const apply = () => {
+      let t = 'auto'; try { t = localStorage.getItem('theme') || 'auto'; } catch {}
+      document.documentElement.dataset.scheme = t === 'auto' ? (mq.matches ? 'light' : 'dark') : t;
+      return t;
+    };
+    mq.addEventListener('change', apply); apply();
+    // Header logo: the lockup, or the bottle illustration once the logo has been clicked (kept in localStorage too).
+    const logo = v => { if (v) { try { v === 'bottle' ? localStorage.setItem('logo', v) : localStorage.removeItem('logo'); } catch {} } else { try { v = localStorage.getItem('logo'); } catch {} }
+      return document.documentElement.dataset.logo = v === 'bottle' ? 'bottle' : 'lockup'; };
+    logo(); window.zamarecLogo = { get: () => document.documentElement.dataset.logo, set: logo };
+    window.zamarecTheme = { get: apply, set: t => { try { t === 'auto' ? localStorage.removeItem('theme') : localStorage.setItem('theme', t); } catch {} return apply(); } };
+  })();
+</script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <button class="brand" id="brandLogo" type="button">
+    <img class="lockup on-light" src="zamarec-lockup.svg" alt="ZamaREC">
+    <img class="lockup on-dark" src="zamarec-lockup-on-dark.svg" alt="ZamaREC">
+    <img class="bottle" src="zamarec-bottle-704.png" alt="ZamaREC" loading="lazy">
+  </button>
+  <div class="switch-wrap">
+    <button id="powerBtn" class="switch on" title="auto recording on/off"><span class="knob"></span></button>
+    <div id="pauseMenu" class="menu" hidden>
+      <div class="menu-title">Turn off recording</div>
+      <button data-pause="session">for the rest of this game</button>
+      <button data-pause="until" data-hours="1">for 1 hour</button>
+      <button data-pause="until" data-hours="2">for 2 hours</button>
+      <button data-pause="until" data-hours="8">for 8 hours</button>
+      <button data-pause="forever">until I turn it back on</button>
+      <div class="menu-note">A running session is stopped. Manual <code>zamarec start</code> still works.</div>
+    </div>
+  </div>
+  <div id="status" class="status idle"><span class="dot"></span><span class="txt">idle</span></div>
+  <div class="usage" id="usage" title="ZamaREC's own CPU (per core) and memory: daemon + recorder">
+    <span class="u" id="uCpuWrap" title="click to switch between share of all cores and share of one core" style="cursor:pointer"><span class="k" id="uCpuK">cpu</span><span class="v mono" id="uCpu">–</span></span>
+    <span class="u"><span class="k">ram</span><span class="v mono" id="uRss">–</span></span>
+    <span class="u"><span class="k">tmpfs</span><span class="v mono" id="uFs">–</span><button class="tiny" id="clearRam" title="drop RAM footage of finished sessions">clear</button></span>
+  </div>
+  <div class="spacer"></div>
+  <button id="gamesBtn" class="btn ghost" title="Games: profiles and detected games">
+    <svg viewBox="0 0 24 24"><path d="M7 8h10a5 5 0 0 1 5 5v1a3.5 3.5 0 0 1-6.2 2.2L14.5 15h-5l-1.3 1.2A3.5 3.5 0 0 1 2 14v-1a5 5 0 0 1 5-5zM7 11v3M5.5 12.5h3M16 12h.01M18 14h.01" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Games</span></button>
+  <button id="settingsBtn" class="btn ghost" title="Settings">
+    <svg viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+    <span>Settings</span>
+  </button>
+  <button id="statsBtn" class="btn ghost icon" title="Stats" aria-label="Stats">
+    <svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+  <button id="logBtn" class="btn ghost icon" title="Log" aria-label="Log">
+    <svg viewBox="0 0 24 24"><path d="M5 6h14M5 12h14M5 18h9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+  <button id="themeBtn" class="btn ghost icon" data-theme="auto">
+    <svg class="ic-auto" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor"/></svg>
+    <svg class="ic-light" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M18.7 5.3l-1.8 1.8M7.1 16.9l-1.8 1.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    <svg class="ic-dark" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+  </button>
+  <a class="btn ghost icon" href="https://github.com/luke-kearney/zamarec" target="_blank" rel="noopener" title="ZamaREC on GitHub">
+    <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.9 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.56-1.11-4.56-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.6 9.6 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2z" fill="currentColor"/></svg></a>
+  <button id="markBtn" class="btn accent" title="M"><span class="pulse"></span>Mark</button>
+</header>
+
+<div class="layout">
+  <aside id="aside">
+    <div class="tabs">
+      <button class="tbtn pin on" id="asideToggle" title="unpin sidebar: it collapses and shows on hover" aria-pressed="true">
+        <svg viewBox="0 0 24 24"><path d="M9 3h6l-1 6 3 3v2H7v-2l3-3zM12 14v7"/></svg>
+      </button>
+      <div class="seg">
+        <button class="tab active" data-tab="sessions">Sessions</button>
+        <button class="tab" data-tab="clips">Clips</button>
+      </div>
+      <select id="profileFilter" class="sel" title="show one game's sessions and clips"><option value="">all games</option></select>
+      <button class="tbtn pin" id="selectBtn" title="select several, to star or delete them together">
+        <svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg>
+      </button>
+    </div>
+    <div class="pane-tab" id="asideTab" title="expand sidebar"><span id="asideTabLabel">Sessions</span></div>
+    <div id="list" class="list"></div>
+    <div id="selectBar" class="select-bar" hidden>
+      <span id="selectCount" class="muted"></span><span class="spacer"></span>
+      <button class="btn small" id="selAll">All</button>
+      <button class="btn small" id="selStar" title="star the selected clips">Star</button>
+      <button class="btn small" id="selUnstar" title="unstar the selected clips">Unstar</button>
+      <button class="btn small danger" id="selDelete"><span>Delete</span></button>
+      <button class="tiny" id="selDone" title="leave select mode"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+    </div>
+  </aside>
+
+  <main>
+    <div id="settings" class="settings" hidden>
+      <div class="settings-head">
+        <div class="title" id="cfgTitle">Settings</div>
+        <div id="cfgNotice" class="notice" hidden></div>
+        <div class="spacer"></div>
+        <span id="gamesAdd"></span>
+        <button class="btn ghost" id="cfgRawToggle">Raw TOML</button>
+        <button class="btn primary" id="cfgSave">Save</button>
+        <button class="btn ghost" id="cfgClose">Close</button>
+      </div>
+      <div id="cfgForm"></div>
+      <div id="cfgRaw" hidden>
+        <p class="muted">The file as it is on disk. Saving here keeps your comments; saving from the form rewrites the file without them.</p>
+        <textarea id="cfgText" spellcheck="false"></textarea>
+        <div class="group"><button class="btn primary" id="cfgSaveRaw">Save raw</button><span class="muted mono" id="cfgPath"></span></div>
+      </div>
+    </div>
+
+    <div id="stats" class="page" hidden>
+      <div class="page-head"><div class="title">Stats</div><div class="spacer"></div><span class="muted" id="statsNote"></span><button class="btn ghost" id="statsClose">Close</button></div>
+      <div class="tiles" id="tiles"></div>
+      <div class="card"><h3>Sessions</h3><div class="tablewrap"><table class="tbl" id="statsTable"></table></div></div>
+    </div>
+    <div id="log" class="page" hidden>
+      <div class="page-head"><div class="title">Log</div><div class="chips inline" id="logChips"></div><div class="spacer"></div><label class="chk"><input type="checkbox" id="logFollow" checked> follow</label><button class="btn ghost" id="logClose">Close</button></div>
+      <div class="card logcard"><div id="logList"></div></div>
+    </div>
+    <div id="empty" class="empty">
+      <img class="empty-icon" src="zamarec-cap.svg" alt="">
+      <div class="empty-title">Pick a session or clip</div>
+      <div class="empty-hint">Sessions record themselves when a profiled game starts. Press <kbd>M</kbd> or your hotkey to drop a marker.</div>
+      <div class="keys">
+        <span><kbd>space</kbd> play</span><span><kbd>←</kbd><kbd>→</kbd> 5 s</span><span><kbd>J</kbd><kbd>L</kbd> 10 s</span>
+        <span><kbd>,</kbd><kbd>.</kbd> frame</span><span><kbd>[</kbd><kbd>]</kbd> markers</span><span><kbd>I</kbd><kbd>O</kbd> in / out</span><span><kbd>P</kbd> play range</span><span><kbd>E</kbd> export</span><span><kbd>F</kbd> fullscreen</span><span><kbd>+</kbd><kbd>-</kbd> zoom</span>
+      </div>
+      <div class="slogan" role="img" aria-label="Enjoy the moment with a ZamaREC"></div>
+    </div>
+
+    <div id="viewer" hidden>
+      <div class="titlebar">
+        <div>
+          <div id="title" class="title"></div>
+          <div id="subtitle" class="subtitle"></div>
+        </div>
+        <div class="title-acts">
+          <button class="btn ghost icon" id="renameClip" title="rename this clip" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4"/></svg></button>
+          <button class="btn ghost icon" id="revealClip" title="show this clip in the file manager" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></button>
+          <span class="switch-wrap" id="shareWrap" hidden>
+            <button class="btn ghost" id="shareClip" title="send this clip somewhere, or make a copy small enough to post"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 3L10 14M21 3l-7 18-4-7-7-4z"/></svg><span>Share</span></button>
+            <div id="shareMenu" class="menu right" hidden>
+              <button id="shareDiscord">Send to Discord<span class="sub" id="shareDiscordSub"></span></button>
+              <div class="menu-title">A copy small enough to post</div>
+              <button data-share-mb="10">under 10 MB<span class="sub">Discord without Nitro</span></button>
+              <button data-share-mb="25">under 25 MB</button>
+              <button data-share-mb="50">under 50 MB</button>
+              <button data-share-mb="100">under 100 MB</button>
+              <div class="menu-note">Re-encoded on the GPU to fit, smaller picture if it has to be. The original is kept.</div>
+            </div>
+          </span>
+          <button class="btn ghost star" id="starClip" title="star this clip: it is never deleted by retention" hidden><svg class="ic ic-star" viewBox="0 0 24 24" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><span>Star</span></button>
+          <button class="btn ghost danger" id="deleteClip" title="delete this clip" hidden><span>Delete</span></button>
+        </div>
+      </div>
+      <div class="stage" id="stage">
+        <div class="player"><video id="video" preload="metadata" playsinline></video>
+          <div id="playerMsg" class="player-msg" hidden>
+            <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M4 5l16 14M20 5L4 19"/></svg>
+            <div class="t" id="playerMsgTitle"></div>
+            <div class="s" id="playerMsgText"></div>
+          </div>
+          <div id="exportPop" class="export-pop" hidden>
+            <div class="row">
+              <span class="lbl">range</span>
+              <input id="inVal" class="num mono" type="number" step="0.1" min="0" placeholder="in" title="in (s)">
+              <span class="unit">→</span>
+              <input id="outVal" class="num mono" type="number" step="0.1" min="0" placeholder="out" title="out (s)">
+              <span class="lbl">len</span><input id="rangeLen" class="num mono short" type="number" min="1" value="30" title="default range length in seconds"><span class="unit">s</span>
+            </div>
+            <div class="row">
+              <input id="exportLabel" class="text" placeholder="clip label (optional)">
+              <select id="exportSize" class="sel" title="original: a stream copy, as recorded. A size: re-encoded on the GPU to fit under it, for posting where uploads are limited">
+                <option value="">original size</option><option value="10">under 10 MB</option><option value="25">under 25 MB</option><option value="50">under 50 MB</option><option value="100">under 100 MB</option>
+              </select>
+              <label class="chk"><input type="checkbox" id="exact"> frame-exact</label>
+              <label class="chk" id="exportMixWrap" title="remake the clip's mix from the separate tracks at the mixer's levels, so it sounds like what you hear now. The tracks themselves are kept" hidden><input type="checkbox" id="exportMix" checked> mixer levels</label>
+              <button class="btn primary" id="exportBtn" title="E">Export range</button>
+            </div>
+            <div class="row batch">
+              <span class="lbl">around markers</span>
+              <input id="before" class="num mono short" type="number" value="10" min="0"><span class="unit">s before</span>
+              <input id="after" class="num mono short" type="number" value="5" min="0"><span class="unit">s after</span>
+              <select id="batchType" class="sel"></select>
+              <button class="btn" id="batchBtn">Export all</button>
+            </div>
+          </div>
+        </div>
+        <div id="mixPop" class="export-pop mix-pop" hidden>
+          <div class="row"><span class="lbl">Mixer</span><span class="spacer"></span>
+            <label class="chk"><span class="toggle"><input type="checkbox" id="mixOn"><span class="track"><span class="knob"></span></span></span>mix from the separate tracks</label></div>
+          <div id="mixRows"></div>
+          <div class="row"><span class="muted" id="mixNote"></span><span class="spacer"></span><button class="btn small" id="mixReset" title="every track back to 100%, nothing muted">Reset</button></div>
+        </div>
+        <div class="transport">
+          <button class="tbtn" id="tPrev" title="previous marker  [">
+            <svg viewBox="0 0 24 24"><path d="M6 5v14M19 5l-10 7 10 7z"/></svg></button>
+          <button class="tbtn" id="tBack" title="back 10 s  J / ←">
+            <svg viewBox="0 0 24 24"><path d="M11 5L4 12l7 7M20 5l-7 7 7 7"/></svg><span class="tsub">10</span></button>
+          <button class="tbtn big" id="tPlay" title="play / pause  space">
+            <svg class="ic-play" viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z"/></svg>
+            <svg class="ic-pause" viewBox="0 0 24 24"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg></button>
+          <button class="tbtn" id="tFwd" title="forward 10 s  L / →">
+            <svg viewBox="0 0 24 24"><path d="M13 5l7 7-7 7M4 5l7 7-7 7"/></svg><span class="tsub">10</span></button>
+          <button class="tbtn" id="tNext" title="next marker  ]">
+            <svg viewBox="0 0 24 24"><path d="M18 5v14M5 5l10 7-10 7z"/></svg></button>
+          <span class="tclock mono" id="tClock">0:00 / 0:00</span>
+          <span class="tsep"></span>
+          <button class="tbtn tsm" id="inBtn" title="set in  I">
+            <svg viewBox="0 0 24 24"><path d="M5 4v16M9 12h10M15 8l4 4-4 4"/></svg></button>
+          <button class="tbtn tsm" id="outBtn" title="set out  O">
+            <svg viewBox="0 0 24 24"><path d="M19 4v16M15 12H5M9 8l-4 4 4 4"/></svg></button>
+          <button class="tbtn tsm" id="goIn" title="jump to in  shift+I">
+            <svg viewBox="0 0 24 24"><path d="M5 5v14M19 12H8M12 8l-4 4 4 4"/></svg></button>
+          <button class="tbtn tsm" id="playRange" title="play in → out  P">
+            <svg viewBox="0 0 24 24"><path d="M4 5v14M20 5v14M9 8l7 4-7 4z"/></svg></button>
+          <span class="trange mono" id="tRange"></span>
+          <button class="tbtn tsm" id="saveBtn" title="export…">
+            <svg viewBox="0 0 24 24"><path d="M5 4h11l3 3v13H5zM8 4v5h7V4M8 20v-6h8v6"/></svg></button>
+          <span class="spacer"></span>
+          <button class="tbtn" id="mixBtn" title="mixer: levels of the separate audio tracks" hidden>
+            <svg viewBox="0 0 24 24"><path d="M6 4v5M6 13v7M12 4v10M12 18v2M18 4v2M18 10v10M3.5 11h5M9.5 16h5M15.5 8h5"/></svg></button>
+          <button class="tbtn" id="tMute" title="mute">
+            <svg class="ic-vol" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9zM16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></svg>
+            <svg class="ic-muted" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9zM16 9l5 6M21 9l-5 6"/></svg></button>
+          <input type="range" id="tVol" class="vol" min="0" max="1" step="0.02" value="1" title="volume">
+          <button class="tbtn" id="tFull" title="fullscreen  F">
+            <svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+        </div>
+      </div>
+
+      <div class="tl-wrap">
+        <div id="tlThumb" class="tl-thumb" hidden><img alt=""></div>
+        <div id="timeline" class="timeline">
+          <div id="tlPurged" class="tl-purged"></div>
+          <div id="tlWindow" class="tl-window"></div>
+          <div id="tlRuler" class="tl-ruler"></div>
+          <div id="tlSel" class="tl-sel"><div class="handle l" data-h="in"></div><div class="handle r" data-h="out"></div></div>
+          <div id="tlMarkers"></div>
+          <div id="tlHead" class="tl-head"><div class="bubble" id="tlHeadT">0:00</div></div>
+          <div id="tlTip" class="tl-tip"></div>
+        </div>
+        <div class="tl-foot">
+          <div class="tl-legend" id="legend"></div>
+          <div class="spacer"></div>
+          <div class="zoom">
+            <button class="tbtn sm" id="zoomOut" title="zoom out  −">−</button>
+            <span class="mono" id="zoomLbl">fit</span>
+            <button class="tbtn sm" id="zoomIn" title="zoom in  +">+</button>
+            <button class="tbtn sm" id="zoomFit" title="fit  0">fit</button>
+          </div>
+          <span class="time mono" id="curTime">0:00</span>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <section id="markersPane" class="markers">
+    <div class="pane-head">
+      <button class="tbtn collapse" id="markersToggle" title="collapse markers" aria-expanded="true">
+        <svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+      </button>
+      <span class="pane-title">Markers</span>
+      <select id="typeFilter" class="sel" hidden><option value="">all</option></select>
+    </div>
+    <div class="pane-tab" id="markersTab" title="expand markers">Markers<span id="markersCount" class="n"></span></div>
+    <div id="typeChips" class="chips"></div>
+    <div id="markerList"></div>
+  </section>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+<script src="hls.min.js"></script>
+<script src="app.js"></script>
+<script src="mixer.js"></script>
+<script src="settings.js"></script>
+<script src="pages.js"></script>
+</body>
+</html>

@@ -14,5 +14,5 @@ Before a PR: `dotnet build` and `dotnet test` pass, UI changes were looked at in
 anything that touches the recorder was tried against a real session (`docs/development.md` shows
 how to run a scratch daemon). Keep commits focused and say what you verified.
 
-Bug reports: include `kairec log -n 50`, `kairec status`, the profile from your config, and the
+Bug reports: include `zamarec log -n 50`, `zamarec status`, the profile from your config, and the
 gpu-screen-recorder and ffmpeg versions.

@@ -1,0 +1,13 @@
+[Unit]
+Description=ZamaREC tray icon
+After=graphical-session.target zamarec.service
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/share/zamarec/tray/zamarec-tray
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=graphical-session.target

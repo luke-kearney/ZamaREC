@@ -1,6 +1,6 @@
 # Installing
 
-kairec has been used on one machine: CachyOS (Arch), KDE Plasma 6 on Wayland, an NVIDIA GPU. Everything
+ZamaREC has been used on one machine: CachyOS (Arch), KDE Plasma 6 on Wayland, an NVIDIA GPU. Everything
 below the Arch section is a best-effort guide from package listings, not from testing. If you get it
 running elsewhere, a note in an issue with what you did would be welcome.
 
@@ -12,22 +12,22 @@ machine that runs it. At run time the daemon finds its helpers on `PATH` by name
 
 | what | why | version |
 |---|---|---|
-| systemd user sessions | the `kairec` and `kairec-tray` user services | any recent |
+| systemd user sessions | the `zamarec` and `zamarec-tray` user services | any recent |
 | PipeWire | audio capture (`default_output`, `default_input`, per-app), and `pw-play` for the feedback tones | any recent |
-| gpu-screen-recorder | capture and GPU encoding. kairec uses its `-ipc` socket and `-write-first-frame-ts`, which need 6.x | 6.1 or newer |
+| gpu-screen-recorder | capture and GPU encoding. ZamaREC uses its `-ipc` socket and `-write-first-frame-ts`, which need 6.x | 6.1 or newer |
 | ffmpeg | clip export and probing; nvenc, vaapi or similar for frame-exact exports | 6 or newer |
 | .NET 10 SDK | building the daemon, tray and CLI | 10.0 |
 | clang and zlib headers | the CLI is NativeAOT, which links with clang | any recent |
 | a StatusNotifier tray | the tray icon; KDE, GNOME with an extension, most others. Optional | |
 
 The GPU side is whatever gpu-screen-recorder supports on your machine: NVIDIA with the proprietary
-driver, AMD and Intel through VAAPI. Only NVIDIA has been tried with kairec.
+driver, AMD and Intel through VAAPI. Only NVIDIA has been tried with ZamaREC.
 
 ## Arch, CachyOS, EndeavourOS, Manjaro
 
 ```sh
 sudo pacman -S gpu-screen-recorder ffmpeg pipewire dotnet-sdk clang
-git clone https://github.com/luke-kearney/kairec.git && cd kairec
+git clone https://github.com/luke-kearney/zamarec.git && cd zamarec
 ./install.sh
 ```
 
@@ -74,7 +74,7 @@ has not been done.
 
 ## gpu-screen-recorder from Flatpak or source
 
-**Flatpak.** The app id is `com.dec05eba.gpu_screen_recorder`. kairec runs the plain
+**Flatpak.** The app id is `com.dec05eba.gpu_screen_recorder`. ZamaREC runs the plain
 `gpu-screen-recorder` command, so give it one: a wrapper on `PATH` that hands everything to the
 Flatpak.
 
@@ -88,7 +88,7 @@ EOF
 chmod +x ~/.local/bin/gpu-screen-recorder
 ```
 
-Untested. The recorder has to reach kairec's IPC socket under `$XDG_RUNTIME_DIR`, the session folders
+Untested. The recorder has to reach ZamaREC's IPC socket under `$XDG_RUNTIME_DIR`, the session folders
 under the storage root, and `/dev/shm` for RAM timelines, all from inside the sandbox. If recording
 starts and stops at once, the log will say which of those it could not open, and
 `flatpak override --user --filesystem=...` for that path is the fix.
@@ -99,12 +99,22 @@ route to prefer on a machine you control.
 
 ## After installing
 
-`install.sh` publishes the daemon and tray to `~/.local/share/kairec`, the CLI to `~/.local/bin/kairec`,
+`install.sh` publishes the daemon and tray to `~/.local/share/zamarec`, the CLI to `~/.local/bin/zamarec`,
 installs and starts the two user services, and puts the app icon and a desktop entry in place. Then
-open <http://127.0.0.1:3556>, check the monitor in Settings, and bind `kairec mark` and `kairec save`
+open <http://127.0.0.1:3556>, check the monitor in Settings, and bind `zamarec mark` and `zamarec save`
 to keys. On KDE that is *System Settings → Keyboard → Shortcuts → Add New → Command*; on other
 desktops any global-shortcut mechanism that can run a command works, since the CLI only talks to the
 daemon over a Unix socket.
 
-Nothing in kairec depends on KDE. The tray uses the StatusNotifier protocol over D-Bus, which GNOME
+Nothing in ZamaREC depends on KDE. The tray uses the StatusNotifier protocol over D-Bus, which GNOME
 supports with the AppIndicator extension and most other desktops support natively.
+
+## Coming from kairec
+
+ZamaREC was called kairec until October 2026. Close the UI window and run `install.sh` from the new
+tree: it stops and removes the old services and CLI, renames `~/.config/kairec` and
+`~/.local/share/kairec`, and moves the recordings from `~/Videos/kairec` and `/dev/shm/kairec` if the
+config still has those defaults (a custom `root` or `ram_dir` stays where it is). Shortcuts made as
+desktop entries are pointed at `zamarec`; one typed into a shortcut dialog as a plain command has to
+be changed by hand, as do the `KAIREC_*` environment variables, now `ZAMAREC_*`. The daemon removes
+the old CS2 game state cfg when it writes the new one.

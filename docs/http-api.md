@@ -73,7 +73,7 @@ generated cfg and returns 401 otherwise.
 
 ## Control socket
 
-The CLI's protocol is one JSON object per connection on `$XDG_RUNTIME_DIR/kairec.sock`:
+The CLI's protocol is one JSON object per connection on `$XDG_RUNTIME_DIR/zamarec.sock`:
 `{ "cmd": "mark", "label": "..." }` → `{ "ok": true, "message": "...", "status": {...} }`.
 Commands: `mark`, `save` (`seconds`), `start` (`profile`), `stop`, `status`, `pause` (`mode`,
-`hours`), `resume`, `retention`, `reload`, `config`. Types are in `Kairec.Protocol`.
+`hours`), `resume`, `retention`, `reload`, `config`. Types are in `ZamaRec.Protocol`.
