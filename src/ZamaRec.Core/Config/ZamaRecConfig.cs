@@ -277,6 +277,26 @@ public sealed class ShareConfig
     public string? DiscordWebhook { get; set; }
     /// <summary>The largest file the channel takes. 10 without Nitro or boosts; a clip over it is re-encoded to fit before it is sent.</summary>
     public double DiscordMaxMb { get; set; } = 10;
+    /// <summary>Share modules: programs of your own that send a clip somewhere (see docs/share-modules.md). Each one is an entry in a clip's Share menu.</summary>
+    public List<ShareTargetConfig> Targets { get; set; } = new();
+
+    public ShareTargetConfig? FindTarget(string name) =>
+        Targets.FirstOrDefault(t => string.Equals(t.Name, name, StringComparison.OrdinalIgnoreCase));
+}
+
+/// <summary>One [[share.targets]] entry: a program that is handed a clip and uploads it.</summary>
+public sealed class ShareTargetConfig
+{
+    /// <summary>What the Share menu calls it.</summary>
+    public string Name { get; set; } = "";
+    /// <summary>The module: an executable, run directly (no shell). ~/ is expanded.</summary>
+    public string Command { get; set; } = "";
+    /// <summary>Arguments given to it before anything else.</summary>
+    public List<string> Args { get; set; } = new();
+    /// <summary>The largest file the service takes; a clip over it is re-encoded to fit first. 0 = sent as it is.</summary>
+    public double MaxMb { get; set; }
+    /// <summary>Handed to the module untouched: an address, a token, whatever it needs. Tokens are secrets.</summary>
+    public Dictionary<string, string> Settings { get; set; } = new();
 }
 
 public sealed class RetentionConfig
@@ -440,6 +460,15 @@ public static class ConfigLoader
         if (cfg.Share.DiscordMaxMb is < 1 or > 500) throw new InvalidOperationException("share.discord_max_mb must be between 1 and 500");
         if (!string.IsNullOrWhiteSpace(cfg.Share.DiscordWebhook) && !LooksLikeDiscordWebhook(cfg.Share.DiscordWebhook))
             throw new InvalidOperationException("share.discord_webhook must be a Discord webhook address (https://discord.com/api/webhooks/...)");
+        var targetNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "discord" };
+        foreach (var t in cfg.Share.Targets)
+        {
+            if (string.IsNullOrWhiteSpace(t.Name)) throw new InvalidOperationException("share.targets: every entry needs a name");
+            if (t.Name.Contains('/')) throw new InvalidOperationException($"share.targets: '{t.Name}' must not contain a slash");
+            if (!targetNames.Add(t.Name)) throw new InvalidOperationException($"share.targets: the name '{t.Name}' is taken");
+            if (string.IsNullOrWhiteSpace(t.Command)) throw new InvalidOperationException($"share.targets: '{t.Name}' needs a command (the module to run)");
+            if (t.MaxMb is < 0 or > 4000) throw new InvalidOperationException($"share.targets: '{t.Name}': max_mb must be between 0 (no limit) and 4000");
+        }
         if (cfg.AutoGames.RamGb <= 0) throw new InvalidOperationException("auto_games.ram_gb must be above 0");
         if (!string.IsNullOrEmpty(cfg.AutoGames.Quality) && cfg.FindQuality(cfg.AutoGames.Quality) is null)
             throw new InvalidOperationException($"auto_games.quality: unknown preset '{cfg.AutoGames.Quality}' (known: {string.Join(", ", cfg.Quality.Select(q => q.Name))})");

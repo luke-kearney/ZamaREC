@@ -146,7 +146,21 @@ runs one now.
 | `discord_webhook` | unset | a Discord webhook address (Server Settings → Integrations → Webhooks). With it set, a clip's Share menu can post the clip to that channel. It is a secret: anyone who has it can post there. Only `discord.com` addresses are accepted |
 | `discord_max_mb` | `10` | the largest file the channel takes: 10 without Nitro or boosts. A clip over it is re-encoded to fit before it is sent |
 
-Nothing is ever sent on its own; a clip goes out only when you click *Send to Discord*.
+### `[[share.targets]]`: share modules
+
+A share module is a program of your own that uploads a clip to some other service; each entry adds a
+*Send to …* line to the Share menu. [share-modules.md](share-modules.md) has what a module is given
+and what it answers.
+
+| key | default | meaning |
+|---|---|---|
+| `name` | required | what the Share menu calls it; unique, and not `discord` |
+| `command` | required | the module: an executable, run directly without a shell. `~/` is expanded |
+| `args` | `[]` | arguments given to it |
+| `max_mb` | `0` | the largest file the service takes; a clip over it is re-encoded to fit first. `0` sends the clip as it is |
+| `settings` | empty | a table of strings handed to the module untouched: its address, a token. Tokens are secrets |
+
+Nothing is ever sent on its own; a clip goes out only when you click a *Send to* entry.
 
 A share-size copy is always a re-encode on the GPU (NVENC, decoded and scaled on the GPU too): the
 bitrate is what fits the size over the clip's length, and the picture steps down from the source

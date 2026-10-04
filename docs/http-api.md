@@ -62,7 +62,9 @@ localhost. Everything the web UI does goes through these.
 | POST | `/clips/{profile}/{file}/star` | toggle, or set with `?on=true\|false`; starring clears the expiry |
 | PATCH | `/clips/{profile}/{file}` | `{ "label": "..." }`: rename (the file keeps its name) |
 | POST | `/clips/{profile}/{file}/reveal` | show the clip in the file manager |
-| POST | `/clips/{profile}/{file}/discord` | `{ "message": "..." }`: post it to `share.discord_webhook`, re-encoded first if over `share.discord_max_mb`; returns the attachment link |
+| POST | `/clips/{profile}/{file}/share/{target}` | `{ "message": "..." }`: send it to a share target, `discord` (`share.discord_webhook`) or the name of a `[[share.targets]]` module; re-encoded first if over the target's size limit. Runs in the background and returns a job: `{ "id", "target", "stage", "progress", "note", "url", "error", "file", "bytes", "reencoded" }`, `stage` being `encoding`, `sending`, `done`, `failed` or `cancelled` |
+| GET | `/share/jobs/{id}` | how that job is going (kept for 30 minutes after it ends) |
+| DELETE | `/share/jobs/{id}` | cancel it: a running module is killed |
 | DELETE | `/clips/{profile}/{file}` | |
 | POST | `/clips/{profile}/{file}/export` | cut a clip out of a clip: `{ "start", "end", "label", "exact" }` |
 

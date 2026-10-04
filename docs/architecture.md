@@ -72,7 +72,14 @@ budget, less 6%, is spread over the length; audio takes 64 to 128 kbps and the r
 bitrate; the picture steps down a ladder until the bitrate gives each pixel enough. The encode is
 NVENC two-pass VBR with the frames decoded and scaled on the GPU (`-hwaccel cuda`, `scale_cuda`),
 and the result is checked against the cap and redone at a lower bitrate if the encoder overshot.
-`DiscordShare` uploads a clip to a webhook as one multipart request. Both run only on a click.
+`DiscordShare` uploads a clip to a webhook as one multipart request.
+
+Sending is a background job (`ShareJobs`): fit the clip to the target's size limit, send it, write
+the event log; the page asks how the job is going and can cancel it. A target is Discord or a share
+module from `[[share.targets]]`: `ShareModule` (Core) runs the configured program with the clip and
+the target's settings as JSON on stdin and reads progress and the result as JSON lines from stdout
+(the contract is [share-modules.md](share-modules.md)). The daemon knows nothing about the services
+behind the modules. All of it runs only on a click.
 
 ## Hover previews
 

@@ -83,10 +83,18 @@
       ${field('never record these Steam app ids (comma list)', inp('autoGames.ignore', (ag.ignore || []).join(', ')), true)}
     </div></div>`;
 
-    const sh = c.share || (c.share = { discordWebhook: null, discordMaxMb: 10 });
+    const sh = c.share || (c.share = { discordWebhook: null, discordMaxMb: 10, targets: [] });
+    sh.targets ||= [];
     h += `<div class="card"><h3>Sharing</h3><div class="help">A clip's Share button can post it to a Discord channel through a webhook. Nothing is sent unless you click it. A clip over the size limit is re-encoded on the GPU to fit first.</div><div class="fields">
       ${field('Discord webhook address', inp('share.discordWebhook', sh.discordWebhook, 'text', 'placeholder="https://discord.com/api/webhooks/…" autocomplete="off" spellcheck="false"'), true, 'in Discord: Server Settings → Integrations → Webhooks → New Webhook → Copy Webhook URL. Treat it like a password: anyone who has it can post to that channel')}
       ${field('largest file the channel takes, MB', inp('share.discordMaxMb', sh.discordMaxMb, 'number', 'min="1" max="500" step="1"'), false, '10 without Nitro or server boosts')}
+      <div class="field wide"><span>share modules</span>
+        <small class="hint">a program of your own that uploads a clip somewhere; each one becomes an entry in the Share menu. It is handed the clip and its settings (an address, a token) as JSON. Settings are one <code>key = value</code> per line; treat a token like a password</small>
+        <div class="tracks">
+          ${sh.targets.map((t, i) => `<div class="srow"><input type="text" data-path="share.targets.${i}.name" value="${escA(t.name)}" placeholder="name in the Share menu"><input type="text" data-path="share.targets.${i}.command" value="${escA(t.command)}" placeholder="~/path/to/module" spellcheck="false"><input type="number" data-path="share.targets.${i}.maxMb" value="${t.maxMb || ''}" min="0" max="4000" placeholder="max MB" title="the largest file the service takes; blank = send the clip as it is"><button type="button" class="tiny" data-deltarget="${i}" title="remove module">${window.icon('x')}</button><textarea data-path="share.targets.${i}.settings" rows="2" spellcheck="false" autocomplete="off" placeholder="url = https://…&#10;token = …">${escA(Object.entries(t.settings || {}).map(([k, v]) => `${k} = ${v}`).join('\n'))}</textarea></div>`).join('')}
+          <div class="trow-foot"><button type="button" class="btn small" id="addTarget">+ Add module</button></div>
+        </div>
+      </div>
     </div></div>`;
 
     h += `<div class="card"><h3>Quality presets <span class="spacer"></span><button class="btn small" id="addQuality">+ Add preset</button></h3>
@@ -164,6 +172,8 @@
       if (sel.value && !have.includes(sel.value)) inp.value = [...have, sel.value].join(', ');
       sel.value = '';
     });
+    if ($('addTarget')) $('addTarget').onclick = () => { collect(); cfg.share.targets.push({ name: '', command: '', args: [], maxMb: 0, settings: {} }); render(); };
+    document.querySelectorAll('[data-deltarget]').forEach(b => b.onclick = () => { collect(); cfg.share.targets.splice(+b.dataset.deltarget, 1); render(); });
     if ($('addQuality')) $('addQuality').onclick = () => { collect(); (cfg.quality ||= []).push({ name: '', fps: null, codec: null, bitrateKbps: null, keyframeSeconds: null, scale: null }); render(); };
     document.querySelectorAll('[data-delq]').forEach(b => b.onclick = () => { collect(); cfg.quality.splice(+b.dataset.delq, 1); render(); });
     const pm = $('presetMenu');
@@ -341,6 +351,9 @@
       if (path.endsWith('eventClips')) v = (v || '').split(',').map(x => x.trim()).filter(Boolean);
       if (/^capture\.tracks\.\d+\.sources$/.test(path)) v = (v || '').split(',').map(x => x.trim()).filter(Boolean);
       if (/^capture\.tracks\.\d+\.name$/.test(path)) v = v || '';
+      if (/^share\.targets\.\d+\.(name|command)$/.test(path)) v = v || '';
+      if (/^share\.targets\.\d+\.maxMb$/.test(path)) v = v || 0;
+      if (/^share\.targets\.\d+\.settings$/.test(path)) v = Object.fromEntries((v || '').split('\n').map(l => l.match(/^\s*([^=\s]+)\s*=\s*(.*?)\s*$/)).filter(Boolean).map(m => [m[1], m[2]]));
       if (path === 'autoGames.ignore') v = (v || '').split(',').map(x => +x.trim()).filter(x => x > 0);
       setPath(cfg, path, v);
     });
@@ -349,6 +362,7 @@
       ($('audioExtra').value || '').split(',').map(s => s.trim()).filter(Boolean).forEach(a => audio.push(a));
       cfg.capture.audio = audio;
     }
+    if (cfg.share && cfg.share.targets) cfg.share.targets = cfg.share.targets.filter(t => t.name || t.command);
     if (cfg.quality) { for (const q of cfg.quality) for (const k of Object.keys(q)) if (q[k] === '') q[k] = null; cfg.quality = cfg.quality.filter(q => q.name); }
     for (const p of cfg.profiles) {
       if (p.quality === '') p.quality = null;
