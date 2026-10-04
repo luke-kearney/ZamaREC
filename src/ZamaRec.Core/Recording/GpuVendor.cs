@@ -9,7 +9,10 @@ namespace ZamaRec.Core.Recording;
 /// </summary>
 public static class GpuVendor
 {
-    private static readonly Lazy<IReadOnlyList<string>> Found = new(() => Platform.IsWindows ? FromRegistry() : FromSysfs());
+    // ZAMAREC_GPU_FOUND=amd stands in for the detection: for trying another vendor's code path on a machine without that card.
+    private static readonly Lazy<IReadOnlyList<string>> Found = new(() =>
+        Environment.GetEnvironmentVariable("ZAMAREC_GPU_FOUND") is { Length: > 0 } forced ? forced.ToLowerInvariant().Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+        : Platform.IsWindows ? FromRegistry() : FromSysfs());
 
     /// <summary>The vendors present, as capture.gpu spells them, the preferred encoder first.</summary>
     public static IReadOnlyList<string> Detected => Found.Value;

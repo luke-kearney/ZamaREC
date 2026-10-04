@@ -109,6 +109,30 @@ fetch, config edits from the UI, a save from the timeline (27.7 s clip written),
 Still unverified: A/V sync over a long session, the app window and its raise, Explorer "reveal",
 `zamarec.exe` against the socket, NVENC and Quick Sync on Windows.
 
+## Bundle 4 (2026-10-04): no CPU step for AMD, and a log that says more
+
+Not yet run by the tester. Built for findings 2 and 3; finding 4 (the recorder dying on
+`ACCESS_LOST`) is **not** fixed in it, so the game should still be set to Borderless.
+
+- **AMD on the GPU (finding 2).** The recorder now tries, in order: `ddagrab -> scale_d3d11=format=nv12
+  -> h264_amf` (Direct3D 11's video processor converts the frame on the GPU), then
+  `ddagrab -> hwmap=derive_device=amf -> vpp_amf=format=nv12 -> h264_amf` (AMF's own converter), and
+  only if both fail to start the old system-memory route, with a warning. The log names the route:
+  `video route: d3d11 nv12 (the frame stays on the GPU)`, or
+  `video route d3d11 nv12 did not start (...); trying amf nv12`. Both chains are accepted by the
+  bundled ffmpeg's parser; neither has run on an AMD card.
+- **Frame rate in the log (finding 3).** `recorder: 59.9 fps over the last 30 s (... frames in all,
+  N duplicated and N dropped by ffmpeg, speed 1x, ...)` after 10 s and then every 30 s, and
+  `recorder ended (exit code N): ... fps on average` at the end. ddagrab repeats frames to hold 60, so
+  a steady 60 here with a picture that still stutters means the capture is starved (exclusive
+  fullscreen); a low number means the pipeline cannot keep up.
+- **What ffmpeg sees.** ffmpeg's own description of the capture and the encoder (frame size, pixel
+  format, rate) is now in the log, and the daemon logs its version, the Windows version and the
+  ffmpeg build at start.
+
+From the tester we need `daemon.log` after one session of a few minutes, and whether the clip looks
+smooth.
+
 ## What to do next, in order
 
 1. **Survive `ACCESS_LOST`** (finding 4): restart the recorder inside the session.

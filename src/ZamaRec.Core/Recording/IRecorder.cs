@@ -26,11 +26,17 @@ public static class Recorder
 {
     public static string Name => Platform.IsWindows ? "ffmpeg" : "gpu-screen-recorder";
 
-    /// <summary>Starts the capture for a profile: gpu-screen-recorder on Linux, ffmpeg with Desktop Duplication on Windows.</summary>
-    public static IRecorder Start(ZamaRecConfig cfg, EffectiveProfile profile, string mediaDir, string bufferOutDir, string ipcSocket, ILogger log)
+    /// <summary>
+    /// Starts the capture for a profile and waits until it is capturing: gpu-screen-recorder on Linux, ffmpeg with
+    /// Desktop Duplication on Windows (which may take more than one attempt, see <see cref="FfmpegRecorder.Routes"/>).
+    /// </summary>
+    public static async Task<IRecorder> StartReadyAsync(ZamaRecConfig cfg, EffectiveProfile profile, string mediaDir, string bufferOutDir, string ipcSocket, ILogger log, TimeSpan readyTimeout, CancellationToken ct)
     {
-        if (Platform.IsWindows) return FfmpegRecorder.Start(cfg, profile, mediaDir, log);
+        if (Platform.IsWindows) return await FfmpegRecorder.StartReadyAsync(cfg, profile, mediaDir, log, readyTimeout, ct);
         var args = GsrArguments.Build(cfg, profile, mediaDir, bufferOutDir, ipcSocket);
-        return GsrProcess.Start(args, ipcSocket, log);
+        var rec = GsrProcess.Start(args, ipcSocket, log);
+        try { await rec.WaitForReadyAsync(readyTimeout, ct); }
+        catch { await rec.DisposeAsync(); throw; }
+        return rec;
     }
 }

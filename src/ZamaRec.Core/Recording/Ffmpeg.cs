@@ -30,18 +30,23 @@ public static class Ffmpeg
     }
 
     /// <summary>True when ffmpeg can be started at all; used for the startup check on Windows.</summary>
-    public static bool Available()
+    public static bool Available() => Version() is not null;
+
+    /// <summary>The first line of "ffmpeg -version" ("ffmpeg version 9.0.2-essentials_build..."), or null when it cannot be started.</summary>
+    public static string? Version()
     {
         try
         {
-            var psi = new ProcessStartInfo(Exe) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
+            var psi = new ProcessStartInfo(Exe) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true };
             psi.ArgumentList.Add("-version");
             using var p = Process.Start(psi);
-            if (p is null) return false;
-            p.StandardOutput.ReadToEnd();
-            return p.WaitForExit(5000) && p.ExitCode == 0;
+            if (p is null) return null;
+            var text = p.StandardOutput.ReadToEnd();
+            if (!p.WaitForExit(5000) || p.ExitCode != 0) return null;
+            var line = text.Split('\n')[0].Trim();
+            return line.IndexOf(" Copyright", StringComparison.Ordinal) is > 0 and var at ? line[..at] : line;
         }
-        catch { return false; }
+        catch { return null; }
     }
 }
 

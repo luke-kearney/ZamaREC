@@ -108,9 +108,7 @@ public sealed class RecordingCoordinator : IAsyncDisposable
             IRecorder rec;
             try
             {
-                rec = Recorder.Start(_cfg, profile, session.MediaDir, incoming, sock, _log);
-                try { await rec.WaitForReadyAsync(TimeSpan.FromSeconds(15), ct); }
-                catch { await rec.DisposeAsync(); throw; }
+                rec = await Recorder.StartReadyAsync(_cfg, profile, session.MediaDir, incoming, sock, _log, TimeSpan.FromSeconds(15), ct);
             }
             catch (Exception ex)
             {

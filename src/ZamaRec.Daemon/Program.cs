@@ -85,7 +85,10 @@ log.LogInformation("zamarec daemon starting; config {path}; ui http://{bind}:{po
         log.LogWarning("capture.gpu is {set} but this machine has {found}: using the {use} encoder", set, string.Join(", ", found), use);
     else log.LogInformation("gpu encoder: {use} (capture.gpu = {set}; found: {found})", use, set, found.Count == 0 ? "nothing" : string.Join(", ", found));
 }
-if (Platform.IsWindows && !ZamaRec.Core.Recording.Ffmpeg.Available())
+var ffmpegVersion = Platform.IsWindows ? ZamaRec.Core.Recording.Ffmpeg.Version() : null;
+if (Platform.IsWindows && ffmpegVersion is not null)
+    log.LogInformation("zamarec {version} on {os}; {ffmpeg} ({exe})", typeof(Program).Assembly.GetName().Version, System.Runtime.InteropServices.RuntimeInformation.OSDescription, ffmpegVersion, ZamaRec.Core.Recording.Ffmpeg.Exe);
+if (Platform.IsWindows && ffmpegVersion is null)
 {
     log.LogError("ffmpeg.exe was not found next to the daemon or on PATH: nothing can be recorded or exported until it is");
     if (OperatingSystem.IsWindows())
