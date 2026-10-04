@@ -16,7 +16,7 @@ public static class WebApi
     /// <param name="MaxMb">Make a re-encoded copy that fits under this many megabytes, for posting somewhere with a size limit.</param>
     public sealed record ExportRequest(double Start, double End, string? Label, bool Exact, Dictionary<string, double>? Mix = null, double? MaxMb = null);
     public sealed record LabelRequest(string? Label);
-    public sealed record DiscordRequest(string? Message);
+    public sealed record ShareRequestBody(string? Message);
     public sealed record AroundRequest(string MarkerId, double Before, double After, string? Label, bool Exact, Dictionary<string, double>? Mix = null);
     public sealed record BatchRequest(string Type, double Before, double After, bool Exact, Dictionary<string, double>? Mix = null);
     public sealed record MarkRequest(string? Label);
@@ -27,7 +27,7 @@ public static class WebApi
     {
         var api = app.MapGroup("/api");
 
-        api.MapGet("/status", (RecordingCoordinator rec, ZamaRecConfig cfg, GsiService gsi, PauseControl pause) =>
+        api.MapGet("/status", (RecordingCoordinator rec, ZamaRecConfig cfg, GsiService gsi, PauseControl pause, ShareJobs share) =>
         {
             var s = rec.Status();
             var u = rec.Usage();
@@ -37,7 +37,7 @@ public static class WebApi
                 GsiLastSeconds = gsi.SecondsSinceLastPayload, GsiMap = gsi.CurrentMap, GsiCfg = gsi.CfgPath,
                 Usage = new { u.CpuPercent, u.RssBytes, u.Processes, RamFsBytes = ProcessUsage.DirBytes(ramDir), RamFsFree = FreeBytes(ramDir), Cores = Environment.ProcessorCount },
                 Pause = ps.Mode == "off" ? null : new { ps.Mode, ps.Until, Text = PauseControl.Describe(ps) },
-                Discord = !string.IsNullOrWhiteSpace(cfg.Share.DiscordWebhook), DiscordMaxMb = cfg.Share.DiscordMaxMb,
+                ShareTargets = share.Targets(),
                 Profiles = cfg.Profiles.Select(p => new { p.Name, p.Mode }) });
         });
 
@@ -479,32 +479,21 @@ public static class WebApi
             return shown ? Results.Ok(new { Ok = true }) : Results.BadRequest(new { Error = "no file manager answered" });
         });
 
-        // Posts the clip to the Discord webhook in [share]. A clip over the channel's limit is re-encoded to fit
-        // first, and that smaller copy is kept as a clip.
-        api.MapPost("/clips/{profile}/{file}/discord", async (string profile, string file, DiscordRequest req, SessionCatalog cat, ZamaRecConfig cfg, DiscordShare discord,
-            RecordingCoordinator rec, EventLog events, ILogger<Program> log, CancellationToken ct) =>
+        // Sends the clip to a share target: "discord" (the webhook in [share]) or a module from [[share.targets]].
+        // It runs in the background; the answer is a job to ask about.
+        api.MapPost("/clips/{profile}/{file}/share/{target}", (string profile, string file, string target, ShareRequestBody req, SessionCatalog cat, ShareJobs share) =>
         {
             var p = cat.ClipPath(profile, file);
             if (p is null) return Results.NotFound();
-            if (string.IsNullOrWhiteSpace(cfg.Share.DiscordWebhook)) return Results.BadRequest(new { Error = "no Discord webhook is set: add one under Settings → Sharing" });
-            var src = ReadClipInfo(p, profile);
-            var cap = ShareBytes(cfg.Share.DiscordMaxMb)!.Value;
-            var send = p;
-            if (new FileInfo(p).Length > cap)
-            {
-                var (copy, error) = await ShareCopyAsync(p, profile, src, cap, $"{cfg.Share.DiscordMaxMb:0.#}mb", cat, cfg, rec, log, ct);
-                if (copy is null) return Results.BadRequest(new { Error = error });
-                send = copy;
-            }
-            var bytes = new FileInfo(send).Length;
-            var sent = await discord.SendAsync(cfg.Share.DiscordWebhook, send, req.Message ?? src.Label, ct);
-            events.Write(sent.Ok ? "export" : "error", sent.Ok ? $"sent to Discord: {bytes / 1e6:0.0} MB" + (send != p ? " (re-encoded to fit)" : "") : "Discord upload failed: " + sent.Error,
-                profile, src.SessionId, Path.GetFileName(send), bytes, level: sent.Ok ? "info" : "error");
-            return sent.Ok
-                ? Results.Ok(new { Ok = true, sent.Url, File = Path.GetFileName(send), Reencoded = send != p, Bytes = bytes })
-                : Results.BadRequest(new { sent.Error, File = send != p ? Path.GetFileName(send) : null });
+            var (job, error) = share.Start(target, p, profile, req.Message);
+            return job is null ? Results.BadRequest(new { Error = error }) : Results.Ok(ShareJobView(job));
         });
+        api.MapGet("/share/jobs/{id}", (string id, ShareJobs share) => share.Find(id) is { } job ? Results.Ok(ShareJobView(job)) : Results.NotFound());
+        api.MapDelete("/share/jobs/{id}", (string id, ShareJobs share) => share.CancelJob(id) ? Results.Ok(new { Ok = true }) : Results.NotFound());
     }
+
+    private static object ShareJobView(ShareJobs.Job j) =>
+        new { j.Id, j.Target, j.Stage, j.Progress, j.Note, j.Url, j.Error, File = j.File is null ? null : Path.GetFileName(j.File), j.Bytes, j.Reencoded };
 
     private static bool Run(string exe, IEnumerable<string> args, bool wait = true)
     {
@@ -533,7 +522,7 @@ public static class WebApi
         try { return GC.GetGCMemoryInfo().TotalAvailableMemoryBytes; } catch { return 0; }
     }
 
-    private static ClipInfo ReadClipInfo(string clipPath, string profile)
+    internal static ClipInfo ReadClipInfo(string clipPath, string profile)
     {
         try
         {
@@ -579,10 +568,10 @@ public static class WebApi
     }
 
     /// <summary>Megabytes as the byte cap a share copy must fit: decimal megabytes, so it is under any "N MB" limit however the site counts.</summary>
-    private static long? ShareBytes(double? maxMb) => maxMb is double mb && mb > 0 ? (long)(Math.Min(mb, 4000) * 1_000_000) : null;
+    internal static long? ShareBytes(double? maxMb) => maxMb is double mb && mb > 0 ? (long)(Math.Min(mb, 4000) * 1_000_000) : null;
 
     /// <summary>A re-encoded copy of a whole clip that fits under <paramref name="cap"/> bytes, filed as a clip of its own.</summary>
-    private static async Task<(string? Path, string? Error)> ShareCopyAsync(string clipPath, string profile, ClipInfo src, long cap, string suffix,
+    internal static async Task<(string? Path, string? Error)> ShareCopyAsync(string clipPath, string profile, ClipInfo src, long cap, string suffix,
         SessionCatalog cat, ZamaRecConfig cfg, RecordingCoordinator rec, ILogger log, CancellationToken ct)
     {
         var length = src.DurationSeconds ?? await VideoProbe.DurationSecondsAsync(clipPath, ct) ?? 0;

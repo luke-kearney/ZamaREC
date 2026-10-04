@@ -67,6 +67,14 @@ public static class DefaultConfig
         [share]
         # discord_webhook = "https://discord.com/api/webhooks/..."   # a clip's Share menu can post to this channel; keep it secret
         discord_max_mb = 10               # the channel's upload limit; bigger clips are re-encoded to fit first
+        # Share modules: a program of your own that uploads a clip somewhere (docs/share-modules.md).
+        # [[share.targets]]
+        # name = "Our clips"              # the entry in the Share menu
+        # command = "~/bin/clips-upload"  # run directly, handed the clip and the settings below as JSON on stdin
+        # max_mb = 0                      # 0 = send the clip as it is
+        # [share.targets.settings]
+        # url = "https://..."
+        # token = "..."
 
         [hotkeys]                         # Windows only: system-wide keys the daemon registers itself.
         mark = "ctrl+alt+m"               # Linux binds the zamarec CLI to desktop shortcuts instead.

@@ -101,7 +101,10 @@ recorded cannot be ticked). Delete asks for a second click.
     its name, since sessions and markers refer to it.
   - **Show in folder**: opens the file manager with the clip selected.
   - **Share**: *Send to Discord* posts the clip to the webhook set under Settings → Sharing,
-    re-encoding it first if it is over the channel's limit; and *a copy small enough to post*
+    re-encoding it first if it is over the channel's limit; *Send to …* does the same through each
+    share module set up there ([share-modules.md](share-modules.md)). The message at the bottom
+    follows the upload, a click on it cancels, and the link that comes back is copied to the
+    clipboard. *A copy small enough to post*
     makes a re-encoded copy under 10, 25, 50 or 100 MB, filed as a clip of its own (source
     `share`). The original is never touched.
   - **Delete**, which asks for a second click.

@@ -72,7 +72,7 @@ async function refreshStatus() {
     } else { el.className = 'status idle'; txt.textContent = s.state; }
     if (s.pause) { el.className = 'status paused'; txt.textContent = (s.state === 'recording' ? txt.textContent + ' · ' : '') + 'auto recording off ' + s.pause.text; }
     $('powerBtn').className = 'switch ' + (s.pause ? 'off' : 'on');
-    state.discord = !!s.discord; state.discordMaxMb = s.discordMaxMb;
+    state.shareTargets = s.shareTargets || [];
     if (s.usage) {
       const perCore = localStorage.getItem('cpuPerCore') === '1';
       $('uCpu').textContent = (perCore ? s.usage.cpuPercent : s.usage.cpuPercent / (s.usage.cores || 1)).toFixed(1) + '%';
@@ -549,21 +549,45 @@ $('revealClip').onclick = async () => {
 $('shareClip').onclick = e => {
   e.stopPropagation();
   const menu = $('shareMenu'); menu.hidden = !menu.hidden;
-  $('shareDiscord').disabled = !state.discord;
-  $('shareDiscordSub').textContent = state.discord ? `to the webhook in Settings; re-encoded first if over ${state.discordMaxMb} MB` : 'add a webhook under Settings → Sharing first';
+  // one entry per share target: Discord, then the modules from [[share.targets]]
+  const box = $('shareTargets'); box.textContent = '';
+  for (const t of state.shareTargets || []) {
+    const b = document.createElement('button'), sub = document.createElement('span');
+    b.textContent = 'Send to ' + t.name; b.disabled = !t.ready;
+    sub.className = 'sub'; sub.textContent = !t.ready ? t.problem : t.maxMb > 0 ? `re-encoded first if over ${t.maxMb} MB` : 'sent as it is';
+    b.append(sub); b.onclick = () => shareTo(t); box.append(b);
+  }
 };
 $('shareMenu').onclick = e => e.stopPropagation();
 document.addEventListener('click', () => { $('shareMenu').hidden = true; });
-$('shareDiscord').onclick = async () => {
-  const cur = state.current; if (!cur || cur.kind !== 'clip' || !state.discord) return;
+// A share runs in the daemon; the toast follows it and a click on the toast cancels it.
+let shareJob = null;
+async function shareTo(target) {
+  const cur = state.current; if (!cur || cur.kind !== 'clip' || !target.ready) return;
   $('shareMenu').hidden = true;
-  toast('sending to Discord…', false, 300000);
+  if (shareJob) return toast('still sending the last clip; click the message to cancel it', true);
+  const t = $('toast');
   try {
-    const r = await api(clipPath(cur.data) + '/discord', { body: { message: cur.data.label || null } });
-    toast(`sent to Discord: ${(r.bytes / 1e6).toFixed(1)} MB` + (r.reencoded ? ', re-encoded to fit' : ''));
-    if (r.reencoded && state.tab === 'clips') refreshList();
+    let job = shareJob = await api(`${clipPath(cur.data)}/share/${encodeURIComponent(target.id)}`, { body: { message: cur.data.label || null } });
+    t.onclick = () => api('/share/jobs/' + job.id, { method: 'DELETE' }).catch(() => {});
+    t.classList.add('clickable');
+    while (job.stage === 'encoding' || job.stage === 'sending') {
+      const pct = job.progress != null ? ` ${Math.round(job.progress * 100)}%` : '';
+      toast((job.stage === 'encoding' ? `re-encoding to fit under ${target.maxMb} MB…` : `sending to ${target.name}…${pct}` + (job.note ? ' · ' + job.note : '')) + ' (click to cancel)', false, 300000);
+      await new Promise(r => setTimeout(r, 500));
+      job = await api('/share/jobs/' + job.id);
+    }
+    if (job.stage === 'done') {
+      let copied = false;
+      if (job.url) try { await navigator.clipboard.writeText(job.url); copied = true; } catch { }
+      toast(`sent to ${target.name}: ${(job.bytes / 1e6).toFixed(1)} MB` + (job.reencoded ? ', re-encoded to fit' : '') + (copied ? ' · link copied' : job.url ? ' · ' + job.url : ''), false, copied || !job.url ? 0 : 15000);
+    }
+    else if (job.stage === 'cancelled') toast('not sent: cancelled');
+    else toast('not sent: ' + job.error, true);
+    if (job.reencoded && state.tab === 'clips') refreshList();
   } catch (e) { toast('not sent: ' + e.message, true); }
-};
+  finally { shareJob = null; t.onclick = null; t.classList.remove('clickable'); }
+}
 document.querySelectorAll('[data-share-mb]').forEach(b => b.onclick = async () => {
   const cur = state.current; if (!cur || cur.kind !== 'clip') return;
   const mb = +b.dataset.shareMb; $('shareMenu').hidden = true;
