@@ -138,9 +138,20 @@ public sealed class FfmpegRecorder : IRecorder
         var graph = new StringBuilder();
         graph.Append($"ddagrab=output_idx={MonitorIndex(c.Monitor, log)}:framerate={p.Fps}:draw_mouse={(c.Cursor ? 1 : 0)}");
         graph.Append((route ?? Routes(gpu)[0]).Filters);
-        graph.Append(",setpts=(RTCTIME-").Append(baseReal.ToString(CultureInfo.InvariantCulture)).Append(")/(1000000*TB)[v]");
+        // One wall-clock stamp anchors the stream (media time = clock - B, as on Linux); after that frames
+        // advance by exactly 1/fps. Stamping every frame with the clock instead records ddagrab's arrival
+        // jitter (0 ms / 33 ms pairs ten times a second) and HLS playback hitches on it. If capture stalls
+        // for over half a second the stream snaps back to the clock rather than drifting. settb first: in
+        // ddagrab's 1/framerate timebase the stamps truncate to whole frame slots and collide.
+        var wall = $"(RTCTIME-{baseReal.ToString(CultureInfo.InvariantCulture)})/(1000000*TB)";
+        var step = $"1/({p.Fps}*TB)";
+        graph.Append($",settb=AVTB,setpts='if(eq(N,0),{wall},if(gt(abs({wall}-PREV_OUTPTS-{step}),500000),{wall},PREV_OUTPTS+{step}))'[v]");
         if (!string.IsNullOrWhiteSpace(p.Scale)) log.LogWarning("scale {scale} is ignored on Windows: the capture is recorded at the monitor's size", p.Scale);
 
+        // Audio mixing goes into its OWN -filter_complex: a graph that holds both ddagrab and pipe-fed audio
+        // inputs is scheduled as one unit, keeps waiting on the pipes, and polls ddagrab a handful of times a
+        // second -- the recording comes out at ~5 fps with nothing reported dropped. Separate graphs run free.
+        var audioGraph = new StringBuilder();
         var maps = new List<string> { "-map", "[v]" };
         var ti = 0;
         foreach (var track in tracks)
@@ -150,12 +161,14 @@ public sealed class FfmpegRecorder : IRecorder
             if (inputs.Count == 1) maps.AddRange(["-map", $"{inputs[0]}:a"]);
             else
             {
-                graph.Append(';').Append(string.Concat(inputs.Select(i => $"[{i}:a]"))).Append($"amix=inputs={inputs.Count}:normalize=0[t{ti}]");
+                if (audioGraph.Length > 0) audioGraph.Append(';');
+                audioGraph.Append(string.Concat(inputs.Select(i => $"[{i}:a]"))).Append($"amix=inputs={inputs.Count}:normalize=0[t{ti}]");
                 maps.AddRange(["-map", $"[t{ti}]"]);
             }
             ti++;
         }
         args.AddRange(["-filter_complex", graph.ToString()]);
+        if (audioGraph.Length > 0) args.AddRange(["-filter_complex", audioGraph.ToString()]);
         args.AddRange(maps);
 
         var kbps = p.BitrateKbps;
