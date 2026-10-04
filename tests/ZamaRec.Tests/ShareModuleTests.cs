@@ -66,7 +66,7 @@ public class ShareModuleTests
     }
 
     private static Task<ShareResult> Run(ShareTargetConfig t, List<(double?, string?)>? seen = null, CancellationToken ct = default) =>
-        ShareModule.RunAsync(t, new ShareRequest { File = "/clips/a.mp4", FileName = "a.mp4", Bytes = 42, Title = "ace", Profile = "cs2" }, (p, n) => seen?.Add((p, n)), NullLogger.Instance, ct);
+        ShareModule.RunAsync(t, new ShareRequest { File = "/clips/a.mp4", FileName = "a.mp4", Bytes = 42, Title = "ace é", Profile = "cs2", SteamAppId = 730 }, (p, n) => seen?.Add((p, n)), NullLogger.Instance, ct);
 
     [Fact]
     public async Task AModuleGetsTheRequestOnStdinAndReportsBack()
@@ -86,7 +86,9 @@ public class ShareModuleTests
             Assert.Equal(1, o.GetProperty("version").GetInt32());
             Assert.Equal("/clips/a.mp4", o.GetProperty("file").GetString());
             Assert.Equal(42, o.GetProperty("bytes").GetInt64());
-            Assert.Equal("ace", o.GetProperty("title").GetString());
+            Assert.Equal("ace é", o.GetProperty("title").GetString());
+            Assert.Equal(730, o.GetProperty("steam_app_id").GetInt64());
+            Assert.False(o.TryGetProperty("duration_seconds", out _));   // what is not known is left out
             Assert.Equal("s3cret", o.GetProperty("settings").GetProperty("token").GetString());
         }
         finally { Directory.Delete(dir, true); }

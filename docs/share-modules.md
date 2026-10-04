@@ -48,6 +48,7 @@ read by other processes.
   "content_type": "video/mp4",
   "title": "ace on mirage",
   "profile": "cs2",
+  "steam_app_id": 730,
   "duration_seconds": 40.0,
   "recorded_at": "2026-10-04T21:14:03+02:00",
   "reencoded": false,
@@ -61,7 +62,8 @@ read by other processes.
 | `version` | the contract's version, `1`. New fields may appear without it changing; ignore what you do not know |
 | `file` | the file to upload, absolute. Read it; do not change, move or delete it |
 | `title` | the clip's name in the library; absent when it has none |
-| `profile` | the profile it was recorded under, which is the game |
+| `profile` | the profile it was recorded under, which is the game. For a Steam game recorded without a profile it is the game's name |
+| `steam_app_id` | the game's Steam app id, when the profile has one (its own or its game preset's); otherwise absent |
 | `duration_seconds`, `recorded_at` | the clip's length and when the footage was recorded; either may be absent |
 | `reencoded` | true when `file` is a copy made to fit `max_mb` |
 | `markers` | the clip's markers, `t` in seconds from its start; `label` and `data` may be absent |

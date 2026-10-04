@@ -123,8 +123,10 @@ public sealed class ShareJobs(ZamaRecConfig cfg, SessionCatalog cat, RecordingCo
     private async Task<ShareResult> SendToModuleAsync(ShareTargetConfig module, Job job, string clipPath, string profile, string? message, CancellationToken ct)
     {
         var info = WebApi.ReadClipInfo(clipPath, profile);
+        var game = cfg.FindProfile(profile);
         var request = new ShareRequest
         {
+            SteamAppId = game?.SteamAppId ?? (game is null ? null : GamePresets.Resolve(game)?.SteamAppId),
             File = job.File!, FileName = Path.GetFileName(job.File!), Bytes = job.Bytes,
             Title = string.IsNullOrWhiteSpace(message) ? info.Label : message, Profile = profile,
             // a copy made to fit has the clip's length and markers

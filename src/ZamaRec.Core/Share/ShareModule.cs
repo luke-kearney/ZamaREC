@@ -20,6 +20,8 @@ public sealed class ShareRequest
     [JsonPropertyName("title")] public string? Title { get; set; }
     /// <summary>The profile it was recorded under: the game.</summary>
     [JsonPropertyName("profile")] public string Profile { get; set; } = "";
+    /// <summary>The game's Steam app id, when the profile has one (its own or its game preset's).</summary>
+    [JsonPropertyName("steam_app_id")] public long? SteamAppId { get; set; }
     [JsonPropertyName("duration_seconds")] public double? DurationSeconds { get; set; }
     /// <summary>When the footage was recorded.</summary>
     [JsonPropertyName("recorded_at")] public DateTimeOffset? RecordedAt { get; set; }
@@ -42,6 +44,7 @@ public sealed record ShareResult(bool Ok, string? Url, string? Error);
 /// </summary>
 public static class ShareModule
 {
+    private static readonly System.Text.UTF8Encoding Utf8 = new(false);
     private static readonly JsonSerializerOptions RequestJson = new() { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull };
 
     /// <summary>The module's path, or null with the reason when it cannot be run.</summary>
@@ -60,6 +63,8 @@ public static class ShareModule
         {
             UseShellExecute = false, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true,
             WorkingDirectory = Path.GetDirectoryName(path)!,
+            // UTF-8 both ways whatever the system's code page is: clip names and paths are not always ASCII
+            StandardInputEncoding = Utf8, StandardOutputEncoding = Utf8, StandardErrorEncoding = Utf8,
         };
         foreach (var a in target.Args) psi.ArgumentList.Add(a);
         request.Settings = target.Settings;
