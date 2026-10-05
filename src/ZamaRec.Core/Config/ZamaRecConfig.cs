@@ -175,6 +175,10 @@ public sealed class CaptureConfig
     /// <summary>Quality preset used by profiles that do not pick their own. Empty = the raw fps/codec/bitrate values below.</summary>
     public string Quality { get; set; } = "high";
     public int Fps { get; set; } = 60;
+    /// <summary>Windows only, a trial: how often ddagrab grabs the screen. 0 = as often as the recording's fps. Above it, ffmpeg keeps the frame nearest each 1/fps slot and drops the rest (more GPU copies per second).</summary>
+    public int GrabFps { get; set; } = 0;
+    /// <summary>Windows only, a trial: ddagrab (Desktop Duplication) | gfxcapture (Windows.Graphics.Capture, frames keep their display times).</summary>
+    public string Grabber { get; set; } = "ddagrab";
     /// <summary>h264 | hevc | av1. h264 is the only one every browser plays.</summary>
     public string Codec { get; set; } = "h264";
     /// <summary>Constant bitrate in kbps. CBR keeps the RAM buffer a predictable size.</summary>

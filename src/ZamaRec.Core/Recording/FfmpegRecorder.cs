@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Runtime.InteropServices;
 using System.Text;
 using ZamaRec.Core.Config;
 using Microsoft.Extensions.Logging;
@@ -77,6 +78,7 @@ public sealed class FfmpegRecorder : IRecorder
             {
                 await rec.WaitForReadyAsync(readyTimeout, ct);
                 lock (KnownRoute) KnownRoute[gpu] = i;
+                rec.RaiseGpuPriority();
                 if (route.OnGpu) log.LogInformation("video route: {route} (the frame stays on the GPU)", route.Name);
                 else log.LogWarning("video route: {route} (every frame is copied to system memory and converted on the CPU)", route.Name);
                 return rec;
@@ -89,6 +91,31 @@ public sealed class FfmpegRecorder : IRecorder
             }
         }
     }
+
+    /// <summary>
+    /// Asks Windows' GPU scheduler, once, to serve ffmpeg ahead of normal processes. A game that uses the whole
+    /// GPU otherwise leaves the capture and the encoder waiting: in a GPU-bound game at ~90 fps ddagrab got
+    /// 40 to 57 frames a second and the recording juddered, while the same game capped at 60 recorded smoothly
+    /// (2026-10-05). It only works once ffmpeg has its D3D device (before that the call is "invalid parameter"),
+    /// hence after the first frame. Not a GPU query and never repeated.
+    /// </summary>
+    private void RaiseGpuPriority()
+    {
+        // D3DKMT_SCHEDULINGPRIORITYCLASS: idle 0, below normal 1, normal 2, above normal 3, high 4, realtime 5.
+        // High changed nothing on the owner's machine (still 41-52 frames a second from a GPU-bound game);
+        // realtime is what OBS asks for, and another recorder's notes report none dropped at realtime against
+        // 54 of 484 at normal on a saturated GPU. On trial.
+        const int Realtime = 5;
+        try
+        {
+            var status = D3DKMTSetProcessSchedulingPriorityClass(_proc.Handle, Realtime);
+            if (status == 0) _log.LogInformation("recorder GPU priority: realtime");
+            else _log.LogWarning("recorder GPU priority not raised (status 0x{status:x8}); a game using the whole GPU may starve the capture", status);
+        }
+        catch (Exception ex) { _log.LogWarning("recorder GPU priority not raised: {why}", ex.Message); }
+    }
+
+    [DllImport("gdi32.dll")] private static extern int D3DKMTSetProcessSchedulingPriorityClass(IntPtr process, int priority);
 
     public int Pid => _proc.Id;
     public bool HasExited => _proc.HasExited;
@@ -136,16 +163,42 @@ public sealed class FfmpegRecorder : IRecorder
         }
 
         var graph = new StringBuilder();
-        graph.Append($"ddagrab=output_idx={MonitorIndex(c.Monitor, log)}:framerate={p.Fps}:draw_mouse={(c.Cursor ? 1 : 0)}");
+        // capture.grab_fps above the recording's rate: ddagrab then hands over the game's own frames as they
+        // are presented, and the recording keeps the first one in each 1/fps slot WITH the time it arrived
+        // (variable frame rate, see below). Putting them on an even 1/fps grid instead shows a game running
+        // at 90 fps as steps of one and two game frames, which judders; Steam's recorder keeps true times too
+        // (its 60 fps files of such a game have gaps of ~12 and ~23 ms).
+        //
+        // capture.grabber = "gfxcapture" (a trial): Windows.Graphics.Capture instead of Desktop Duplication.
+        // It always works this way: its frames come as the compositor shows them, each with its own display
+        // time (pts from 0, on the monitor's refresh grid, a constant offset from the wall clock when
+        // measured on the desktop). ddagrab in this mode got only ~40 frames a second out of a GPU-bound game.
+        var gfx = string.Equals(c.Grabber, "gfxcapture", StringComparison.OrdinalIgnoreCase);
+        var grabFps = gfx ? (c.GrabFps > p.Fps ? c.GrabFps : p.Fps * 4) : Math.Max(p.Fps, c.GrabFps);
+        var trueTimes = grabFps > p.Fps;
+        if (trueTimes) log.LogInformation("grabbing the screen with {grabber} at up to {grab} fps for a recording of up to {fps} fps, frames keep their own times", gfx ? "gfxcapture" : "ddagrab", grabFps, p.Fps);
+        if (gfx) graph.Append($"gfxcapture=monitor_idx={MonitorIndex(c.Monitor, log)}:capture_cursor={(c.Cursor ? 1 : 0)}:max_framerate={grabFps}");
+        else graph.Append($"ddagrab=output_idx={MonitorIndex(c.Monitor, log)}:framerate={grabFps}:draw_mouse={(c.Cursor ? 1 : 0)}");
+        // dup_frames=0: ddagrab waits for the next presented frame instead of handing the last one out again
+        // on its own timer. That timer is Windows' 15.6 ms tick, and with it the stamps were the tick's, not
+        // the frames' (gaps mostly 16 ms in a 90 fps game, where Steam's show 12 and 23). A still screen
+        // then gives no video frames at all until something moves.
+        if (trueTimes && !gfx) graph.Append(":dup_frames=0");
         graph.Append((route ?? Routes(gpu)[0]).Filters);
-        // One wall-clock stamp anchors the stream (media time = clock - B, as on Linux); after that frames
-        // advance by exactly 1/fps. Stamping every frame with the clock instead records ddagrab's arrival
-        // jitter (0 ms / 33 ms pairs ten times a second) and HLS playback hitches on it. If capture stalls
-        // for over half a second the stream snaps back to the clock rather than drifting. settb first: in
-        // ddagrab's 1/framerate timebase the stamps truncate to whole frame slots and collide.
+        // Every frame is stamped with the wall clock (media time = clock - B, as on Linux) and the encoder
+        // side runs constant rate (-fps_mode cfr below): ffmpeg puts each frame in the nearest 1/fps slot,
+        // repeats one where ddagrab delivered none and drops one that came early. The stamps alone carry
+        // ddagrab's arrival jitter (0 ms / 33 ms pairs ten times a second), and the encoder counts in 1/fps
+        // whatever the filter's timebase, so passed through as they are they collide ("Non-monotonic DTS")
+        // and HLS playback hitches. Counting frames instead (PREV_OUTPTS + 1/fps) only holds if ddagrab
+        // delivers the full rate, and it gives ~57 of 60: media time ran 5% slow and jumped half a second
+        // every ten. settb so the stamps keep their microseconds up to the slotting.
         var wall = $"(RTCTIME-{baseReal.ToString(CultureInfo.InvariantCulture)})/(1000000*TB)";
-        var step = $"1/({p.Fps}*TB)";
-        graph.Append($",settb=AVTB,setpts='if(eq(N,0),{wall},if(gt(abs({wall}-PREV_OUTPTS-{step}),500000),{wall},PREV_OUTPTS+{step}))'[v]");
+        // gfxcapture: keep its own display times and only move them onto the clock, by the offset found at frame 0
+        // (st/ld keep a value between frames).
+        graph.Append(gfx ? $",settb=AVTB,setpts='if(eq(N,0),st(0,{wall}-PTS));PTS+ld(0)'" : $",settb=AVTB,setpts={wall}");
+        if (trueTimes) graph.Append($",select='isnan(prev_selected_t)+gt(floor(t*{p.Fps}),floor(prev_selected_t*{p.Fps}))'");
+        graph.Append("[v]");
         if (!string.IsNullOrWhiteSpace(p.Scale)) log.LogWarning("scale {scale} is ignored on Windows: the capture is recorded at the monitor's size", p.Scale);
 
         // Audio mixing goes into its OWN -filter_complex: a graph that holds both ddagrab and pipe-fed audio
@@ -171,9 +224,15 @@ public sealed class FfmpegRecorder : IRecorder
         if (audioGraph.Length > 0) args.AddRange(["-filter_complex", audioGraph.ToString()]);
         args.AddRange(maps);
 
-        var kbps = p.BitrateKbps;
+        // The encoder is told ddagrab's rate (grab_fps) and budgets bitrate/rate per frame; -r cannot correct it
+        // (ffmpeg refuses -r outside cfr). Only ~fps frames arrive, so without scaling a 20000k recording
+        // came out at 5000k and blocky. The file's real bitrate is the configured one.
+        var kbps = trueTimes ? (int)((long)p.BitrateKbps * grabFps / p.Fps) : p.BitrateKbps;
         var gop = Math.Max(1, (int)Math.Round(p.Fps * p.KeyframeSeconds));
-        args.AddRange(["-c:v", HwCodec.Encoder(p.Codec, gpu), "-fps_mode", "passthrough", "-g", gop.ToString(), "-keyint_min", gop.ToString()]);
+        args.AddRange(["-c:v", HwCodec.Encoder(p.Codec, gpu)]);
+        // true times: the encoder must count finer than 1/fps, or two frames a millisecond apart across a slot boundary collide
+        args.AddRange(trueTimes ? ["-fps_mode", "passthrough", "-enc_time_base", "1:90000"] : ["-r", p.Fps.ToString(), "-fps_mode", "cfr"]);
+        args.AddRange(["-g", gop.ToString(), "-keyint_min", gop.ToString()]);
         args.AddRange(gpu switch
         {
             "amd" => ["-rc", "cbr", "-b:v", $"{kbps}k", "-maxrate", $"{kbps}k", "-bufsize", $"{kbps * 2}k", "-usage", "transcoding", "-quality", "speed"],
