@@ -66,6 +66,23 @@ public sealed class FfmpegRecorder : IRecorder
     /// <summary>Starts ffmpeg and waits until it is capturing, going down the vendor's routes until one starts.</summary>
     public static async Task<FfmpegRecorder> StartReadyAsync(ZamaRecConfig cfg, EffectiveProfile p, string mediaDir, ILogger log, TimeSpan readyTimeout, CancellationToken ct)
     {
+        // gfxcapture is the default but has run on one machine only; where it does not start (an older Windows,
+        // another vendor's route) the recording is made with ddagrab, and it is not tried again until the daemon restarts.
+        if (!IsGfx(cfg.Capture.Grabber) || _gfxFailed) return await StartRoutesAsync(cfg, p, mediaDir, log, readyTimeout, _gfxFailed ? "ddagrab" : null, ct);
+        try { return await StartRoutesAsync(cfg, p, mediaDir, log, readyTimeout, null, ct); }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _gfxFailed = true;
+            log.LogWarning("gfxcapture did not start ({why}); recording with ddagrab", ex.Message);
+            return await StartRoutesAsync(cfg, p, mediaDir, log, readyTimeout, "ddagrab", ct);
+        }
+    }
+
+    private static volatile bool _gfxFailed;
+    private static bool IsGfx(string? grabber) => string.Equals(grabber, "gfxcapture", StringComparison.OrdinalIgnoreCase);
+
+    private static async Task<FfmpegRecorder> StartRoutesAsync(ZamaRecConfig cfg, EffectiveProfile p, string mediaDir, ILogger log, TimeSpan readyTimeout, string? grabber, CancellationToken ct)
+    {
         var gpu = HwCodec.Normalize(cfg.Capture.Gpu);
         var routes = Routes(gpu);
         int first;
@@ -73,7 +90,7 @@ public sealed class FfmpegRecorder : IRecorder
         for (var i = first; ; i++)
         {
             var route = routes[i];
-            var rec = Start(cfg, p, mediaDir, log, route);
+            var rec = Start(cfg, p, mediaDir, log, route, grabber);
             try
             {
                 await rec.WaitForReadyAsync(readyTimeout, ct);
@@ -130,7 +147,7 @@ public sealed class FfmpegRecorder : IRecorder
         try { if (proc.HasExited) OnExited(); } catch (InvalidOperationException) { }
     }
 
-    public static FfmpegRecorder Start(ZamaRecConfig cfg, EffectiveProfile p, string mediaDir, ILogger log, VideoRoute? route = null)
+    public static FfmpegRecorder Start(ZamaRecConfig cfg, EffectiveProfile p, string mediaDir, ILogger log, VideoRoute? route = null, string? grabber = null)
     {
         var c = cfg.Capture;
         var gpu = HwCodec.Normalize(c.Gpu);
@@ -169,11 +186,11 @@ public sealed class FfmpegRecorder : IRecorder
         // at 90 fps as steps of one and two game frames, which judders; Steam's recorder keeps true times too
         // (its 60 fps files of such a game have gaps of ~12 and ~23 ms).
         //
-        // capture.grabber = "gfxcapture" (a trial): Windows.Graphics.Capture instead of Desktop Duplication.
+        // capture.grabber = "gfxcapture" (the default): Windows.Graphics.Capture instead of Desktop Duplication.
         // It always works this way: its frames come as the compositor shows them, each with its own display
         // time (pts from 0, on the monitor's refresh grid, a constant offset from the wall clock when
         // measured on the desktop). ddagrab in this mode got only ~40 frames a second out of a GPU-bound game.
-        var gfx = string.Equals(c.Grabber, "gfxcapture", StringComparison.OrdinalIgnoreCase);
+        var gfx = IsGfx(grabber ?? c.Grabber);
         var grabFps = gfx ? (c.GrabFps > p.Fps ? c.GrabFps : p.Fps * 4) : Math.Max(p.Fps, c.GrabFps);
         var trueTimes = grabFps > p.Fps;
         if (trueTimes) log.LogInformation("grabbing the screen with {grabber} at up to {grab} fps for a recording of up to {fps} fps, frames keep their own times", gfx ? "gfxcapture" : "ddagrab", grabFps, p.Fps);

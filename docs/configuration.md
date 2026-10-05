@@ -24,6 +24,8 @@ Every key below is optional. Profiles override the global sections under the sam
 | `audio` | `["default_output"]` | recorder audio sources merged into the recording's audio: `default_output`, `default_input`, `device:NAME`, `app:NAME`, `app-inverse:NAME` |
 | `multitrack` | `false` | also record the `[[capture.tracks]]` as separate audio tracks |
 | `cursor` | `false` | draw the pointer into the recording |
+| `grabber` | `"gfxcapture"` | Windows only: how the screen is captured. `gfxcapture` (Windows.Graphics.Capture) records each frame at the time it was displayed, at most `fps` of them a second, which stays smooth when the game does not run at a multiple of `fps`; nothing is recorded while the screen is completely still. `ddagrab` (Desktop Duplication) records an even `fps`, repeating a frame where none arrived, and is what the recorder falls back to if `gfxcapture` does not start |
+| `grab_fps` | `0` | Windows only: how often the screen is looked at. `0` leaves it to the grabber (four times `fps` for `gfxcapture`, `fps` for `ddagrab`) |
 | `fps`, `codec`, `bitrate_kbps`, `keyframe_seconds`, `scale` | 60, h264, 20000, 1.0, native | raw encoder values; presets fall back to these for fields they leave blank |
 
 ### `[[capture.tracks]]`: separate audio tracks
