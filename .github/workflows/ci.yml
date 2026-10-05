@@ -19,3 +19,23 @@ jobs:
           sudo apt-get install -y clang zlib1g-dev >/dev/null
           dotnet publish src/ZamaRec.Cli -c Release -r linux-x64 -o /tmp/cli --nologo -v q
           /tmp/cli/zamarec --help | head -3
+
+  windows-bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: cache ffmpeg download
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/zamarec
+          key: ffmpeg-essentials-${{ hashFiles('packaging/windows/build.sh') }}
+      - name: build the Windows bundle (cross-published from Linux)
+        run: packaging/windows/build.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zamarec-windows-x64-${{ github.sha }}
+          path: dist/windows/zamarec-windows-x64.zip
+          if-no-files-found: error
