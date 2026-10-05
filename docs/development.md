@@ -10,6 +10,20 @@ dotnet test tests/ZamaRec.Tests  # config, segment index, GSI detector
 Both builds come from the same source; the Windows one swaps the recorder and a few system calls at run time
 (`Platform.IsWindows`). See [windows.md](windows.md) for the mapping and what has and has not been verified there.
 
+## Branches and releases
+
+- Work on a feature branch and open a pull request into `develop`. Every pull request is built and
+  tested, and its run carries the Windows bundle as an artifact, for trying the change on Windows
+  before it is merged.
+- A push to `develop` replaces the **Development build** pre-release (tag `dev`) with a new zip.
+- `develop` reaches `master` by pull request only. A push to `master` publishes a release of its
+  own, `vYYYY.MM.DD-N`, which becomes the latest release.
+- Merge with a merge commit, not a squash or rebase: both rewrite the commits, and `develop` and
+  `master` then no longer share them.
+
+The workflow is `.github/workflows/ci.yml`. Releases are only published once the tests and the
+Windows bundle both passed.
+
 Run a second daemon against a scratch config without disturbing the installed one:
 
 ```sh

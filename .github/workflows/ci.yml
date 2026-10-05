@@ -1,7 +1,10 @@
 name: ci
+# Feature branches go into develop by pull request, develop goes into master by pull request.
+# Every pull request is built and tested. A push to develop replaces the "dev" pre-release,
+# a push to master publishes a release of its own.
 on:
   push:
-    branches: [master]
+    branches: [master, develop]
   pull_request:
 jobs:
   build:
@@ -39,3 +42,30 @@ jobs:
           name: zamarec-windows-x64-${{ github.sha }}
           path: dist/windows/zamarec-windows-x64.zip
           if-no-files-found: error
+
+  # Only after both jobs above passed, and never for a pull request.
+  release:
+    if: github.event_name == 'push'
+    needs: [build, windows-bundle]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: zamarec-windows-x64-${{ github.sha }}
+      - name: develop -> the "dev" pre-release, replaced each time
+        if: github.ref == 'refs/heads/develop'
+        run: |
+          gh release delete dev --cleanup-tag --yes 2>/dev/null || true
+          gh release create dev zamarec-windows-x64.zip --prerelease --target "$GITHUB_SHA" \
+            --title "Development build" \
+            --notes "The newest build of the develop branch, replaced on every push. Built from $GITHUB_SHA on $(date -u +%Y-%m-%d\ %H:%M) UTC."
+      - name: master -> a release of its own
+        if: github.ref == 'refs/heads/master'
+        run: |
+          tag="v$(date -u +%Y.%m.%d)-$GITHUB_RUN_NUMBER"
+          gh release create "$tag" zamarec-windows-x64.zip --latest --target "$GITHUB_SHA" --title "ZamaREC $tag" --generate-notes
