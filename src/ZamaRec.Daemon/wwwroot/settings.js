@@ -50,14 +50,23 @@
       </div>
     </div></div>`;
 
+    // Windows has no tmpfs and its recorder (ffmpeg) no replay buffer: every recording there is a timeline in the
+    // storage folder, so the RAM and buffer settings are left out (a field that is not shown keeps its value).
+    const win = meta.platform === 'windows';
+    const drives = (meta.drives || []).map(d => `<button type="button" class="btn small" data-root="${escA(d.root + 'zamarec')}" title="record to ${escA(d.root + 'zamarec')}">${escA(d.root.replace(/\\$/, ''))}${d.label ? ' ' + escA(d.label) : ''} · ${gb(d.free)} free</button>`).join(' ');
+    const storageCard = `<div class="card"><h3>Storage</h3><div class="help">Where sessions and clips are written. ${win ? 'Windows has no RAM disk and its recorder has no RAM buffer, so buffer mode is off here: every recording is a rolling timeline in this folder.' : 'RAM timelines and buffers stay out of it until a clip is written.'}</div><div class="fields">
+      ${field('recordings folder', inp('storage.root', c.storage.root, 'text', 'spellcheck="false"'), true, `now ${meta.root || c.storage.root} · ${gb(meta.diskFree)} free. Applies from the next session. What is already recorded stays in the old folder and is no longer listed`)}
+      ${drives ? `<div class="field wide"><span>or pick a drive</span><div>${drives}</div><small class="hint">fills in a zamarec folder on that drive; Save to apply</small></div>` : ''}
+      ${field('timeline footage folder', inp('storage.footageDir', c.storage.footageDir, 'text', 'spellcheck="false" placeholder="same as the recordings folder"'), true, `${meta.footageDir ? `now ${meta.footageDir} · ${gb(meta.footageFree || 0)} free. ` : ''}only the rolling timeline of each session goes here; clips, markers and session details stay in the recordings folder. ${win ? 'Point it at a RAM disk to keep the timeline off the disk' : 'For a second disk; RAM timelines keep using the RAM directory below'}. If the folder is emptied, those sessions keep their markers and clips and show "footage gone"`)}
+    </div></div>`;
     const defaultsCard = `<div class="card"><h3>Defaults</h3><div class="help">Used by every profile unless the profile overrides the value.</div><div class="fields">
       ${field('timeline window minutes (0 = keep all)', inp('timeline.windowMinutes', c.timeline.windowMinutes, 'number', 'min="0"'))}
       ${field('timeline segment seconds', inp('timeline.segmentSeconds', c.timeline.segmentSeconds, 'number', 'min="2"'))}
-      ${field('timeline storage', sel('timeline.storage', c.timeline.storage, [{ v: 'disk', l: 'disk' }, { v: 'ram', l: 'ram (tmpfs, needs window × bitrate of RAM)' }]))}
-      ${field('RAM footage kept for hours', inp('timeline.ramKeepHours', c.timeline.ramKeepHours, 'number', 'min="0" step="0.5"'))}
-      ${field('RAM directory (tmpfs)', inp('timeline.ramDir', c.timeline.ramDir))}
-      ${field('buffer minutes', inp('buffer.minutes', c.buffer.minutes, 'number', 'min="1"'))}
-      ${field('buffer storage', sel('buffer.storage', c.buffer.storage, ['ram', 'disk']))}
+      ${win ? '' : field('timeline storage', sel('timeline.storage', c.timeline.storage, [{ v: 'disk', l: 'disk' }, { v: 'ram', l: 'ram (tmpfs, needs window × bitrate of RAM)' }]))}
+      ${win ? '' : field('RAM footage kept for hours', inp('timeline.ramKeepHours', c.timeline.ramKeepHours, 'number', 'min="0" step="0.5"'))}
+      ${win ? '' : field('RAM directory (tmpfs)', inp('timeline.ramDir', c.timeline.ramDir))}
+      ${win ? '' : field('buffer minutes', inp('buffer.minutes', c.buffer.minutes, 'number', 'min="1"'))}
+      ${win ? '' : field('buffer storage', sel('buffer.storage', c.buffer.storage, ['ram', 'disk']))}
       ${field('save seconds (zamarec save)', inp('clips.saveSeconds', c.clips.saveSeconds, 'number', 'min="1"'))}
       ${field('mark: seconds before', inp('clips.markBeforeSeconds', c.clips.markBeforeSeconds, 'number', 'min="0"'))}
       ${field('mark: seconds after', inp('clips.markAfterSeconds', c.clips.markAfterSeconds, 'number', 'min="0"'))}
@@ -68,7 +77,6 @@
       ${field('retention max days', inp('retention.maxDays', c.retention.maxDays, 'number', 'min="0"'))}
       ${field('sound feedback', chk('feedback.sound', c.feedback.sound), false, 'a short tone on mark, save, start and stop; never a popup')}
       ${field('sound volume', inp('feedback.volume', c.feedback.volume, 'number', 'min="0" max="1" step="0.1"'))}
-      ${field('storage root', inp('storage.root', c.storage.root))}
       ${field('open the UI in', sel('daemon.uiWindow', c.daemon.uiWindow ?? 'app', [{ v: 'app', l: 'its own window' }, { v: 'browser', l: 'a tab in the default browser' }]), false, 'for the menu entry, the tray and zamarec ui. Its own window needs Chrome, Chromium, Brave, Edge or Vivaldi and keeps a separate profile')}
       ${field('UI port (restart needed)', inp('daemon.uiPort', c.daemon.uiPort, 'number'))}
       ${field('GSI port (restart needed)', inp('daemon.gsiPort', c.daemon.gsiPort, 'number'))}
@@ -86,9 +94,9 @@
 
     const ag = c.autoGames || (c.autoGames = { enabled: true, ramGb: 2, quality: null, ignore: [] });
     const agKbps = ((c.quality || []).find(q => q.name === (ag.quality || c.capture.quality)) || {}).bitrateKbps ?? c.capture.bitrateKbps;
-    h += `<div class="card"><h3>Unconfirmed games</h3><div class="help">${meta.platform === 'windows' ? 'A Steam game with no profile is still recorded, a rolling window sized by the RAM figure below, with these settings.' : 'A Steam game with no profile is still recorded, to RAM only, with these settings. Nothing reaches the disk unless you mark or save.'} Keep or ignore such games on the Games page.</div><div class="fields">
+    h += `<div class="card"><h3>Unconfirmed games</h3><div class="help">${meta.platform === 'windows' ? 'A Steam game with no profile is still recorded, a rolling window in the storage folder sized by the budget below, with these settings.' : 'A Steam game with no profile is still recorded, to RAM only, with these settings. Nothing reaches the disk unless you mark or save.'} Keep or ignore such games on the Games page.</div><div class="fields">
       ${field('record Steam games without a profile', chk('autoGames.enabled', ag.enabled))}
-      ${field('RAM budget GB', inp('autoGames.ramGb', ag.ramGb, 'number', 'min="0.5" step="0.5"'), false, `about ${Math.max(1, Math.floor((ag.ramGb || 0) * 1e9 / 1.1 / (agKbps * 125) / 60))} min of rolling window at ${agKbps} kbps`)}
+      ${field(win ? 'size budget GB' : 'RAM budget GB', inp('autoGames.ramGb', ag.ramGb, 'number', 'min="0.5" step="0.5"'), false, `about ${Math.max(1, Math.floor((ag.ramGb || 0) * 1e9 / 1.1 / (agKbps * 125) / 60))} min of rolling window at ${agKbps} kbps`)}
       ${field('quality preset', sel('autoGames.quality', ag.quality ?? '', [{ v: '', l: '(capture default)' }, ...presetOpts]))}
       ${field('never record these Steam app ids (comma list)', inp('autoGames.ignore', (ag.ignore || []).join(', ')), true)}
     </div></div>`;
@@ -112,22 +120,26 @@
       <div class="qgrid"><div class="qh">name</div><div class="qh">fps</div><div class="qh">codec</div><div class="qh">bitrate kbps</div><div class="qh">keyframe s</div><div class="qh">scale</div><div class="qh">≈ GB/h</div><div class="qh"></div>
       ${(c.quality || []).map((q, i) => `<input type="text" data-path="quality.${i}.name" value="${q.name ?? ''}"><input type="number" data-path="quality.${i}.fps" value="${q.fps ?? ''}" placeholder="60"><select data-path="quality.${i}.codec"><option value="" ${!q.codec ? 'selected' : ''}>(capture)</option>${meta.codecs.map(x => `<option ${q.codec === x ? 'selected' : ''}>${x}</option>`).join('')}</select><input type="number" data-path="quality.${i}.bitrateKbps" value="${q.bitrateKbps ?? ''}" placeholder="20000" step="500"><input type="number" data-path="quality.${i}.keyframeSeconds" value="${q.keyframeSeconds ?? ''}" placeholder="1" step="0.5"><input type="text" data-path="quality.${i}.scale" value="${q.scale ?? ''}" placeholder="native"><span class="mono muted qrate" data-qrate="${i}"></span><button class="tiny" data-delq="${i}" title="remove preset">${window.icon('x')}</button>`).join('')}
       </div></div>`;
-    h += `</div><div class="col right">${defaultsCard}</div></div>`;
+    h += `</div><div class="col right">${storageCard}${defaultsCard}</div></div>`;
     let editor = '';
     c.profiles.forEach((p, i) => {
       if (view !== 'games' || i !== selected) return;
       const P = `profiles.${i}.`;
       const ov = (o, k) => (o && o[k] != null) ? o[k] : '';
-      const st = p.mode === 'buffer' ? (ov(p.buffer, 'storage') || c.buffer.storage) : (ov(p.timeline, 'storage') || c.timeline.storage);
-      const len = p.mode === 'buffer' ? `${ov(p.buffer, 'minutes') || c.buffer.minutes} min buffer` : `${ov(p.timeline, 'windowMinutes') === '' ? c.timeline.windowMinutes : ov(p.timeline, 'windowMinutes')} min window`;
-      editor += `<div class="card profile open" data-profile="${i}"><h3 class="ph"><span class="name">${p.name || 'new profile'}</span><span class="badge">${p.mode}</span><span class="badge">${st}</span><span class="muted sum">${len}</span><span class="spacer"></span><button class="btn small danger" data-del="${i}">Delete</button><button class="btn small" id="editorClose" title="close the editor">${window.icon('x')}</button></h3>
+      const st = win ? 'disk' : p.mode === 'buffer' ? (ov(p.buffer, 'storage') || c.buffer.storage) : (ov(p.timeline, 'storage') || c.timeline.storage);
+      const len = p.mode === 'buffer' ? `${ov(p.buffer, 'minutes') || c.buffer.minutes} min ${win ? 'window' : 'buffer'}` : `${ov(p.timeline, 'windowMinutes') === '' ? c.timeline.windowMinutes : ov(p.timeline, 'windowMinutes')} min window`;
+      // Windows: buffer cannot be chosen. A profile that already says buffer (a config shared with Linux) keeps saying so and records as a timeline of the buffer's length.
+      const modeField = win
+        ? field('mode', `<select data-path="${P}mode"><option value="timeline" ${p.mode === 'buffer' ? '' : 'selected'}>timeline (rolling window on disk)</option><option value="buffer" disabled ${p.mode === 'buffer' ? 'selected' : ''}>buffer (not on Windows${p.mode === 'buffer' ? ': recorded as a timeline' : ''})</option></select>`, false, 'Windows has no RAM buffer: every profile records a rolling timeline to the storage folder, and you can scrub the last N minutes any time')
+        : field('mode', sel(P + 'mode', p.mode, [{ v: 'timeline', l: 'timeline (rolling window on disk)' }, { v: 'buffer', l: 'buffer (RAM ring buffer)' }]), false, 'timeline: scrub the last N minutes any time. buffer: nothing is written until you mark or save');
+      editor += `<div class="card profile open" data-profile="${i}"><h3 class="ph"><span class="name">${p.name || 'new profile'}</span><span class="badge">${win ? 'timeline' : p.mode}</span><span class="badge">${st}</span><span class="muted sum">${len}</span><span class="spacer"></span><button class="btn small danger" data-del="${i}">Delete</button><button class="btn small" id="editorClose" title="close the editor">${window.icon('x')}</button></h3>
         <div class="body"><div class="fields">
           ${field('name', inp(P + 'name', p.name), false, 'used for the session folder and the clips subfolder')}
           ${field('game preset', sel(P + 'game', p.game ?? '', [{ v: '', l: '(none)' }, ...(meta.presets || []).map(g => ({ v: g.id, l: g.name }))]), false, 'a built-in game: supplies the banner when nothing below is set. A profile named like a preset is matched automatically')}
           ${field('steam app id', inp(P + 'steamAppId', p.steamAppId, 'number', 'placeholder="730"'), false, 'the banner is Steam\'s header art for this app, and with both regex fields blank the profile starts when Steam launches it. Blank: zamarec searches the Steam store for the profile name once and uses the first hit')}
           ${field('banner URL', inp(P + 'bannerUrl', p.bannerUrl, 'text', 'placeholder="https://…/image.jpg"'), false, 'any image on the web, for games that are not on Steam. Fetched once and cached')}
           <label class="field wide banner-field"><span>banner</span><div class="banner-row"><img class="banner-preview" data-banner="${i}" alt=""><span class="muted banner-src" data-bsrc="${i}"></span><span class="spacer"></span><button type="button" class="btn small" data-bupload="${i}">Upload image…</button><button type="button" class="btn small" data-bremove="${i}" hidden>Remove upload</button></div><small class="hint">an uploaded JPEG, PNG or WebP beats every other source. Shown behind this profile's cards in the sidebar</small></label>
-          ${field('mode', sel(P + 'mode', p.mode, [{ v: 'timeline', l: 'timeline (rolling window on disk)' }, { v: 'buffer', l: 'buffer (RAM ring buffer)' }]), false, 'timeline: scrub the last N minutes any time. buffer: nothing is written until you mark or save')}
+          ${modeField}
           ${field('events', sel(P + 'events', p.events, [{ v: 'none', l: 'none (manual markers only)' }, { v: 'cs2-gsi', l: 'cs2-gsi (CS2 game state)' }]), false, 'cs2-gsi adds kill, death, round and MVP markers from the game itself')}
           ${field('quality preset', sel(P + 'quality', p.quality ?? '', [{ v: '', l: '(capture defaults)' }, ...(c.quality || []).map(q => ({ v: q.name, l: q.name + (q.bitrateKbps ? ` · ${q.bitrateKbps} kbps` : '') + (q.fps ? ` · ${q.fps} fps` : '') }))]), false, 'fps, codec, bitrate and size for this game; presets are defined on the left')}
           <label class="field"><span>process name regex <button class="tiny" data-pick="${i}" title="pick from running processes">pick…</button></span>${inp(P + 'match', p.match, 'text', 'placeholder="^cs2$"')}<small class="hint">matched against the process name (first 15 chars). Recording starts when it appears and stops when it exits</small></label>
@@ -138,10 +150,10 @@
         <div class="sub"><div class="lbl">overrides</div><div class="fields">
           ${field('timeline window minutes', inp(P + 'timeline.windowMinutes', ov(p.timeline, 'windowMinutes'), 'number', `placeholder="${c.timeline.windowMinutes}"`), false, 'how far back you can scrub; older footage is deleted as you play. 0 keeps everything', 'timeline')}
           ${field('timeline segment seconds', inp(P + 'timeline.segmentSeconds', ov(p.timeline, 'segmentSeconds'), 'number', `placeholder="${c.timeline.segmentSeconds}"`), false, 'file chunk length; a save waits for the current chunk to finish', 'timeline')}
-          ${field('timeline storage', sel(P + 'timeline.storage', ov(p.timeline, 'storage'), [{ v: '', l: '(default)' }, 'disk', 'ram']), false, 'ram keeps the window in tmpfs: no disk writes, needs window × bitrate of memory', 'timeline')}
-          ${field('RAM footage kept for hours', inp(P + 'timeline.ramKeepHours', ov(p.timeline, 'ramKeepHours'), 'number', `placeholder="${c.timeline.ramKeepHours}"`), false, 'after a RAM session ends its footage stays this long, or until the next session starts', 'timeline')}
-          ${field('buffer minutes', inp(P + 'buffer.minutes', ov(p.buffer, 'minutes'), 'number', `placeholder="${c.buffer.minutes}"`), false, 'ring buffer length; the most a mark or save can reach back', 'buffer')}
-          ${field('buffer storage', sel(P + 'buffer.storage', ov(p.buffer, 'storage'), [{ v: '', l: '(default)' }, 'ram', 'disk']), false, 'where the ring lives; ram costs ~150 MB per minute at 20 Mbps', 'buffer')}
+          ${win ? '' : field('timeline storage', sel(P + 'timeline.storage', ov(p.timeline, 'storage'), [{ v: '', l: '(default)' }, 'disk', 'ram']), false, 'ram keeps the window in tmpfs: no disk writes, needs window × bitrate of memory', 'timeline')}
+          ${win ? '' : field('RAM footage kept for hours', inp(P + 'timeline.ramKeepHours', ov(p.timeline, 'ramKeepHours'), 'number', `placeholder="${c.timeline.ramKeepHours}"`), false, 'after a RAM session ends its footage stays this long, or until the next session starts', 'timeline')}
+          ${field(win ? 'window minutes' : 'buffer minutes', inp(P + 'buffer.minutes', ov(p.buffer, 'minutes'), 'number', `placeholder="${c.buffer.minutes}"`), false, win ? 'this profile is set to buffer mode; on Windows its length is the timeline window' : 'ring buffer length; the most a mark or save can reach back', 'buffer')}
+          ${win ? '' : field('buffer storage', sel(P + 'buffer.storage', ov(p.buffer, 'storage'), [{ v: '', l: '(default)' }, 'ram', 'disk']), false, 'where the ring lives; ram costs ~150 MB per minute at 20 Mbps', 'buffer')}
           ${field('save seconds', inp(P + 'clips.saveSeconds', ov(p.clips, 'saveSeconds'), 'number', `placeholder="${c.clips.saveSeconds}"`), false, 'what zamarec save and the tray Save write when no length is given')}
           ${field('mark: seconds before', inp(P + 'clips.markBeforeSeconds', ov(p.clips, 'markBeforeSeconds'), 'number', `placeholder="${c.clips.markBeforeSeconds}"`), false, 'a mark clip starts this long before the mark')}
           ${field('mark: seconds after', inp(P + 'clips.markAfterSeconds', ov(p.clips, 'markAfterSeconds'), 'number', `placeholder="${c.clips.markAfterSeconds}"`), false, 'and ends this long after it; marks inside that time join the same clip')}
@@ -159,6 +171,7 @@
     $('cfgForm').addEventListener('input', updateFootprints);
     updateFootprints();
     document.querySelectorAll('[data-pick]').forEach(b => b.onclick = e => { e.preventDefault(); openPicker(+b.dataset.pick, b); });
+    document.querySelectorAll('[data-root]').forEach(b => b.onclick = () => setField('storage.root', b.dataset.root));
     const applyModes = () => document.querySelectorAll('.profile').forEach(card => {
       const mode = card.querySelector('[data-path$=".mode"]').value;
       card.querySelectorAll('[data-mode]').forEach(f => { f.hidden = f.dataset.mode !== mode; });
@@ -195,7 +208,7 @@
         const g = (meta.presets || []).find(x => x.id === b.dataset.preset);
         collect(); selected = cfg.profiles.length;
         cfg.profiles.push(g
-          ? { name: g.name, game: g.id, steamAppId: g.steamAppId, bannerUrl: g.bannerUrl, match: g.match, matchCmdline: g.matchCmdline, mode: g.mode, events: g.events, fps: null, timeline: null, buffer: null, clips: null, retention: null }
+          ? { name: g.name, game: g.id, steamAppId: g.steamAppId, bannerUrl: g.bannerUrl, match: g.match, matchCmdline: g.matchCmdline, mode: meta.platform === 'windows' ? 'timeline' : g.mode, events: g.events, fps: null, timeline: null, buffer: null, clips: null, retention: null }
           : { name: '', game: null, steamAppId: null, bannerUrl: null, match: '', matchCmdline: null, mode: 'timeline', events: 'none', fps: null, timeline: null, buffer: null, clips: null, retention: null });
         render();
       });
@@ -241,25 +254,25 @@
   const ago = iso => { if (!iso) return 'never'; const d = (Date.now() - new Date(iso)) / 864e5; return d < 1 ? 'today' : d < 2 ? 'yesterday' : d < 30 ? `${Math.floor(d)} days ago` : new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }); };
   const bannerImg = name => `<span class="gbanner"><span class="ginit">${escH((name || '?').trim().charAt(0).toUpperCase())}</span>${name ? `<img loading="lazy" src="/api/banners/${encodeURIComponent(name)}" alt="" onerror="this.remove()">` : ''}</span>`;
   function gamesHtml(editor) {
-    const c = cfg, g = meta.games || { auto: {}, games: [] };
+    const c = cfg, g = meta.games || { auto: {}, games: [] }, win = meta.platform === 'windows';
     const played = {};
     for (const s of meta.sessions || []) { const k = s.profile.toLowerCase(); const e = played[k] ||= { n: 0, last: null }; e.n++; if (!e.last || s.startedAt > e.last) e.last = s.startedAt; }
     const kbpsOf = q => ((c.quality || []).find(x => x.name === (q || c.capture.quality)) || {}).bitrateKbps ?? c.capture.bitrateKbps;
     const mine = c.profiles.map((p, i) => {
-      const ram = p.mode === 'buffer' ? ((p.buffer && p.buffer.storage) || c.buffer.storage) === 'ram' : ((p.timeline && p.timeline.storage) || c.timeline.storage) === 'ram';
+      const ram = !win && (p.mode === 'buffer' ? ((p.buffer && p.buffer.storage) || c.buffer.storage) === 'ram' : ((p.timeline && p.timeline.storage) || c.timeline.storage) === 'ram');
       const mins = p.mode === 'buffer' ? (p.buffer && p.buffer.minutes) ?? c.buffer.minutes : (p.timeline && p.timeline.windowMinutes) ?? c.timeline.windowMinutes;
       const need = mins > 0 ? mins * 60 * kbpsOf(p.quality) * 125 : 0;
       const pl = played[(p.name || '').toLowerCase()];
       const how = p.match || p.matchCmdline ? 'process match' : p.steamAppId ? 'Steam launch' : 'no match yet';
       return `<button type="button" class="gcard ${i === selected ? 'sel' : ''}" data-edit="${i}">${bannerImg(p.name)}<span class="gbody">
         <span class="gname">${escH(p.name) || 'new profile'}</span>
-        <span class="gbadges"><span class="badge">${p.mode}</span><span class="badge ${ram ? 'ram' : ''}">${ram ? 'ram' : 'disk'}</span>${p.events !== 'none' ? `<span class="badge">${p.events}</span>` : ''}</span>
-        <span class="gline">${mins > 0 ? `${mins} min ${p.mode === 'buffer' ? 'buffer' : 'window'}` : 'keeps everything'} · ${p.quality || c.capture.quality || 'capture'}${need ? ` · ${gb(need)}` : ''}</span>
+        <span class="gbadges"><span class="badge">${win ? 'timeline' : p.mode}</span><span class="badge ${ram ? 'ram' : ''}">${ram ? 'ram' : 'disk'}</span>${p.events !== 'none' ? `<span class="badge">${p.events}</span>` : ''}</span>
+        <span class="gline">${mins > 0 ? `${mins} min ${p.mode === 'buffer' && !win ? 'buffer' : 'window'}` : 'keeps everything'} · ${p.quality || c.capture.quality || 'capture'}${need ? ` · ${gb(need)}` : ''}</span>
         <span class="gline muted">${how} · ${pl ? `${pl.n} session${pl.n > 1 ? 's' : ''}, last ${ago(pl.last)}` : 'not played yet'}</span></span></button>`;
     }).join('');
     const seen = g.games.filter(x => x.state === 'unconfirmed').map(x => `<div class="gcard static">${bannerImg(x.name)}<span class="gbody">
         <span class="gname">${escH(x.name)}</span>
-        <span class="gbadges">${x.recording ? '<span class="badge live">REC</span>' : x.running ? '<span class="badge">running</span>' : ''}<span class="badge ram">ram</span></span>
+        <span class="gbadges">${x.recording ? '<span class="badge live">REC</span>' : x.running ? '<span class="badge">running</span>' : ''}${win ? '<span class="badge">disk</span>' : '<span class="badge ram">ram</span>'}</span>
         <span class="gline muted">launched ${x.launches}× · last ${ago(x.lastSeen)}</span>
         <span class="gacts"><button type="button" class="btn small primary" data-keep="${x.appId}">Keep as profile</button><button type="button" class="btn small" data-ignore="${x.appId}">Never record</button></span></span></div>`).join('');
     const names = Object.fromEntries(g.games.map(x => [x.appId, x.name]));
@@ -267,6 +280,7 @@
     const a = g.auto;
     const autoLine = a.enabled === false
       ? 'Steam games without a profile are not recorded (turned off in Settings); they are only listed here.'
+      : win ? `Steam games without a profile are recorded as a rolling window in the storage folder: ${a.windowMinutes} min at ${a.quality || 'capture'} quality, ${a.ramGb} GB at most. Keep one to give it its own settings.`
       : `Steam games without a profile are recorded to RAM only: a ${a.windowMinutes} min window at ${a.quality || 'capture'} quality, ${a.ramGb} GB at most. Marks still write clips to disk. Keep one to give it its own settings.`;
     return `<div class="games ${editor ? 'editing' : ''}"><div class="gmain">
       <div class="gsec"><h3>Your games <span class="muted">${c.profiles.length}</span></h3><div class="ggrid">${mine || '<div class="muted">no profiles yet</div>'}</div></div>
@@ -330,7 +344,12 @@
       if (qn) kbps = presetKbps(qn) ?? capKbps;
       const perHour = kbps * 1000 / 8 * 3600;
       let need = 0, where = '', note = '', avail = 0, ok = true;
-      if (mode === 'buffer') {
+      if (meta.platform === 'windows') {   // always a timeline on disk; a buffer profile's length is its window
+        const win = mode === 'buffer' ? numv(P + 'buffer.minutes', cfg.buffer.minutes) : numv(P + 'timeline.windowMinutes', numv('timeline.windowMinutes', cfg.timeline.windowMinutes));
+        where = meta.footageDir ? 'the footage folder' : 'disk'; avail = meta.footageFree ?? meta.diskFree;
+        if (win > 0) { need = win * 60 * kbps * 125 * 1.1; note = `${win} min window at ${kbps} kbps`; ok = need <= avail; }
+        else { note = `no window: grows ${gb(perHour)} per hour on disk`; }
+      } else if (mode === 'buffer') {
         const mins = numv(P + 'buffer.minutes', numv('buffer.minutes', cfg.buffer.minutes));
         const st = val(P + 'buffer.storage') || val('buffer.storage') || 'ram';
         need = mins * 60 * kbps * 125; where = st === 'ram' ? 'RAM' : 'disk'; avail = st === 'ram' ? meta.memTotal : meta.diskFree;
@@ -339,7 +358,7 @@
       } else {
         const win = numv(P + 'timeline.windowMinutes', numv('timeline.windowMinutes', cfg.timeline.windowMinutes));
         const st = val(P + 'timeline.storage') || val('timeline.storage') || 'disk';
-        where = st === 'ram' ? 'RAM (tmpfs)' : 'disk'; avail = st === 'ram' ? meta.ramFree : meta.diskFree;
+        where = st === 'ram' ? 'RAM (tmpfs)' : 'disk'; avail = st === 'ram' ? meta.ramFree : (meta.footageFree ?? meta.diskFree);
         if (win > 0) { need = win * 60 * kbps * 125 * 1.1; note = `${win} min window at ${kbps} kbps`; ok = need <= avail; }
         else { note = `no window: grows ${gb(perHour)} per hour on ${where}`; }
       }

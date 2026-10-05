@@ -33,6 +33,19 @@
       tile('clips folder now', fmtB(o.clipsBytes)) +
       tile('RAM footage now', fmtB(o.ramDirBytes), 'in tmpfs') +
       tile('disk free', fmtB(o.freeBytes));
+    // One row per folder ever written to. Lifetime figures are counted as they are written; "in it now" is read from the folder.
+    const esc = s => String(s ?? '').replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+    const places = d.places || [];
+    $('placesTable').innerHTML = `<thead><tr><th>folder</th><th>used for</th><th class="n">footage written</th><th class="n">clips written</th><th class="n">sessions</th><th class="n">in it now</th><th class="n">drive free</th><th>last written</th></tr></thead><tbody>${places.map(p => `<tr>
+      <td class="mono" title="${esc(p.path)}">${esc(p.path)}</td>
+      <td>${p.inUse ? esc(p.role) : '<span class="muted">not in use</span>'}${p.exists ? '' : ' <span class="badge gone">missing</span>'}</td>
+      <td class="n">${fmtB(p.footageBytes)}</td>
+      <td class="n">${p.clipBytes || p.clips ? fmtB(p.clipBytes) + ' <span class="muted">(' + p.clips + ')</span>' : '–'}</td>
+      <td class="n">${p.sessions || '–'}</td>
+      <td class="n">${p.exists ? fmtB(p.nowBytes) : '–'}</td>
+      <td class="n" title="${p.driveTotal ? 'of ' + fmtB(p.driveTotal) + ' on ' + esc(p.drive) : ''}">${p.driveTotal ? fmtB(p.driveFree) : '–'}</td>
+      <td>${p.lastUsed ? fmtD(p.lastUsed) : '<span class="muted">never</span>'}</td></tr>`).join('') || '<tr><td colspan="8" class="muted">nothing yet</td></tr>'}</tbody>`;
+    $('placesNote').textContent = 'What was ever written to each folder, kept when the folder is changed in Settings.' + (places.some(p => p.seeded) ? ' Totals from before folders were counted are under the recordings folder.' : '') + ' RAM footage belongs to no folder.';
     const rows = d.sessions.map(s => `<tr class="${s.live ? 'live' : ''}">
       <td>${fmtD(s.startedAt)}</td><td>${s.profile}</td><td>${s.mode}</td>
       <td><span class="badge ${s.storage === 'ram' ? 'ram' : ''}">${s.storage}</span>${s.footageGone ? ' <span class="badge gone">gone</span>' : ''}</td>

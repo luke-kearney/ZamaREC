@@ -13,6 +13,7 @@ Every key below is optional. Profiles override the global sections under the sam
 | key | default | meaning |
 |---|---|---|
 | `root` | `"~/Videos/zamarec"` | holds `sessions/` and `clips/` |
+| `footage_dir` | not set | where a timeline's segments go, one folder per session; not set = inside the session's folder under `root`. A plain folder on any drive: a RAM disk on Windows (which has no tmpfs, and where buffer mode and `storage = "ram"` do not exist), or a second disk. Clips, markers and session details stay under `root`. A session whose footage folder has gone keeps its markers and clips and shows "footage gone". If the folder cannot be created when a session starts, that session's footage goes under `root` and the log says so |
 
 ## `[capture]`
 

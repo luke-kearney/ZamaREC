@@ -73,6 +73,7 @@ public sealed class RetentionService : BackgroundService
                 if (s.Id == _rec.ActiveSessionId) continue;
                 var store = SessionStore.Load(s.Dir);
                 var bytes = DirBytes(s.Dir);   // RAM media is not on disk and is purged by its own timer
+                if (store.Info.MediaPlain && store.Info.MediaDir is { } md && Directory.Exists(md)) bytes += DirBytes(md);   // a footage folder counts: it goes with the session
                 var starred = store.Markers.Any(m => m.Starred);
                 var hasClips = clipsBySession.ContainsKey(s.Id);
                 var prot = starred || hasClips;

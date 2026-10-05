@@ -28,17 +28,25 @@ public sealed class SessionStore
         Directory.CreateDirectory(dir);
         var eff = cfg.Effective(profile);
         string? mediaDir = null;
+        var plain = false;
         if (eff.Mode == CaptureMode.Timeline && eff.TimelineStorage == "ram")
         {
             mediaDir = Path.Combine(Paths.Expand(cfg.Timeline.RamDir), id);
             Directory.CreateDirectory(mediaDir);
+        }
+        else if (eff.Mode == CaptureMode.Timeline && cfg.FootageDir is { } footage)
+        {
+            // A footage folder that cannot be made (a RAM disk that is not there yet) must not cost the recording:
+            // the segments then go into the session folder as if it were not set, and the caller says so.
+            try { mediaDir = Path.Combine(footage, id); Directory.CreateDirectory(mediaDir); plain = true; }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or ArgumentException) { mediaDir = null; }
         }
         var info = new SessionInfo
         {
             Id = id, Profile = profile.Name, Mode = eff.Mode.ToString().ToLowerInvariant(), Trigger = trigger,
             StartedAt = now, SpawnMonoUs = MonotonicClock.NowMicros(), GamePid = gamePid, SteamAppId = steamAppId,
             Playlist = eff.Mode == CaptureMode.Timeline ? Recording.GsrArguments.PlaylistName : null,
-            MediaDir = mediaDir,
+            MediaDir = mediaDir, MediaPlain = plain,
             AudioTracks = cfg.Capture.EffectiveTracks() is { Count: > 0 } tracks ? tracks.Select(t => t.Name).ToList() : null,
         };
         // Buffer sessions never get a first-frame stamp (nothing is written until a save), so their

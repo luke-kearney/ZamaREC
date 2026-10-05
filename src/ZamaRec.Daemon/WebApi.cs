@@ -76,7 +76,7 @@ public static class WebApi
             var sessions = cat.Sessions().Select(s =>
             {
                 var live = s.Id == rec.ActiveSessionId;
-                var toRam = s.Info.Mode == "buffer" || s.Info.MediaDir is not null;
+                var toRam = s.Info.Mode == "buffer" || s.Info.InRam;
                 var recorded = live ? rec.ActiveRecordedBytes : s.Info.RecordedBytes;
                 clipBytesBySession.TryGetValue(s.Id, out var cb);
                 return new { s.Id, s.Info.Profile, s.Info.Mode, Storage = toRam ? "ram" : "disk", s.Info.StartedAt, s.Info.EndedAt, s.Info.DurationSeconds, Live = live,
@@ -88,10 +88,35 @@ public static class WebApi
             var c = stats.Counters;
             var liveRam = rec.ActiveSessionId is not null && sessions.FirstOrDefault(s => s.Live) is { } ls && ls.Storage == "ram" ? ls.RecordedBytes : 0;
             var liveDisk = rec.ActiveSessionId is not null && sessions.FirstOrDefault(s => s.Live) is { } ld && ld.Storage == "disk" ? ld.RecordedBytes : 0;
+
+            // Per folder: what was ever written there (stats.json) next to what is in it now. The folders in use
+            // are listed even before anything was written; one that is no longer configured stays with its figures.
+            var pathCmp = Core.Platform.IsWindows ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+            var rootKey = StatsCounters.NormalizeDir(cfg.RootDir);
+            var footageKey = cfg.FootageDir is { } fk ? StatsCounters.NormalizeDir(fk) : null;
+            var known = stats.PlacesSnapshot().ToDictionary(p => p.Key, p => p.Value, pathCmp);
+            known.TryAdd(rootKey, new PlaceCounters());
+            if (footageKey is not null) known.TryAdd(footageKey, new PlaceCounters());
+            var places = known.Select(p =>
+            {
+                var isRoot = pathCmp.Equals(p.Key, rootKey);
+                var isFootage = footageKey is null ? isRoot : pathCmp.Equals(p.Key, footageKey);
+                long driveFree = 0, driveTotal = 0;
+                try { var di = new DriveInfo(Path.GetPathRoot(p.Key) is { Length: > 0 } r ? r : p.Key); if (di.IsReady) { driveFree = di.AvailableFreeSpace; driveTotal = di.TotalSize; } } catch { }
+                return new
+                {
+                    Path = p.Key, Drive = Path.GetPathRoot(p.Key),
+                    Role = isRoot && isFootage ? "clips and timeline footage" : isRoot ? "clips and session details" : isFootage ? "timeline footage" : "not in use",
+                    InUse = isRoot || isFootage, Exists = Directory.Exists(p.Key),
+                    p.Value.FootageBytes, p.Value.ClipBytes, p.Value.Sessions, p.Value.Clips, p.Value.FirstUsed, p.Value.LastUsed, p.Value.Seeded,
+                    NowBytes = dirSize(p.Key), DriveFree = driveFree, DriveTotal = driveTotal,
+                };
+            }).OrderByDescending(p => p.InUse).ThenBy(p => p.Path, pathCmp).ToList();
             return Results.Ok(new
             {
+                Places = places,
                 Totals = new { c.Sessions, c.SecondsRecorded, DiskBytes = c.DiskBytes + liveDisk, RamBytes = c.RamBytes + liveRam, c.ClipBytes, c.Clips, c.Marks, c.Saves, c.Exports },
-                OnDisk = new { SessionsBytes = dirSize(cfg.SessionsDir), ClipsBytes = dirSize(cfg.ClipsDir), FreeBytes = free, RamDirBytes = ramUsed },
+                OnDisk = new { SessionsBytes = dirSize(cfg.SessionsDir) + (cfg.FootageDir is { } fdir ? dirSize(fdir) : 0),ClipsBytes = dirSize(cfg.ClipsDir), FreeBytes = free, RamDirBytes = ramUsed },
                 Sessions = sessions,
             });
         });
@@ -109,6 +134,8 @@ public static class WebApi
             cs.Path, Text = cs.ReadText(), Config = cfg, Pending = cs.HasPending, SessionRunning = rec.IsActive,
             RamFree = FreeBytes(Paths.Expand(cfg.Timeline.RamDir)), RamTotal = TotalBytes(Paths.Expand(cfg.Timeline.RamDir)),
             DiskFree = FreeBytes(cfg.RootDir), MemTotal = MemTotalBytes(),
+            Root = cfg.RootDir, Drives = Drives(),
+            FootageDir = cfg.FootageDir, FootageFree = cfg.FootageDir is { } fd ? FreeBytes(fd) : (long?)null,
             Monitors = await GsrInfo.MonitorsAsync(ct), AudioDevices = await GsrInfo.AudioDevicesAsync(ct), AudioApps = await GsrInfo.AudioApplicationsAsync(ct),
             Codecs = new[] { "h264", "hevc", "av1" },
             Platform = Core.Platform.IsWindows ? "windows" : "linux",
@@ -220,7 +247,7 @@ public static class WebApi
             {
                 s.Id, s.Info.Profile, s.Info.Mode, s.Info.Map, s.Info.StartedAt, s.Info.EndedAt, s.Info.DurationSeconds,
                 s.MarkerCount, ClipCount = s.Info.Clips.Count, Live = s.Id == rec.ActiveSessionId,
-                Ram = s.Info.MediaDir is not null, s.Info.FootageGone,
+                Ram = s.Info.InRam, s.Info.FootageGone,
                 s.Info.SteamAppId, Unconfirmed = s.Info.SteamAppId is not null && cfg.FindProfile(s.Info.Profile) is null,
                 s.Info.AudioTracks,
                 Game = GamePresets.ResolveByProfileName(cfg, s.Info.Profile)?.Id,
@@ -244,7 +271,7 @@ public static class WebApi
                 store.Info.SteamAppId, Unconfirmed = store.Info.SteamAppId is not null && cfg.FindProfile(store.Info.Profile) is null,
                 store.Info.AudioTracks,
                 Game = GamePresets.ResolveByProfileName(cfg, store.Info.Profile)?.Id,
-                Ram = store.Info.MediaDir is not null, store.Info.FootageGone,
+                Ram = store.Info.InRam, store.Info.FootageGone,
                 RecordedSeconds = recorded,
                 WindowStart = avail.Count > 0 ? avail[0].Start : 0.0,
                 WindowEnd = avail.Count > 0 ? avail[^1].Start + avail[^1].Duration : 0.0,
@@ -506,6 +533,18 @@ public static class WebApi
             return p is not null && p.WaitForExit(5000) && p.ExitCode == 0;
         }
         catch { return false; }
+    }
+
+    /// <summary>Windows: the fixed drives with their free space, for picking where recordings go. Read when Settings opens.</summary>
+    private static object[] Drives()
+    {
+        if (!Core.Platform.IsWindows) return [];
+        try
+        {
+            return DriveInfo.GetDrives().Where(d => d.DriveType == DriveType.Fixed && d.IsReady)
+                .Select(d => (object)new { Root = d.Name, Label = d.VolumeLabel, Free = d.AvailableFreeSpace, Total = d.TotalSize }).ToArray();
+        }
+        catch { return []; }
     }
 
     private static long FreeBytes(string path)

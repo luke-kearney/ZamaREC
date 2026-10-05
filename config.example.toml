@@ -3,6 +3,7 @@
 
 [storage]
 root = "~/Videos/zamarec"          # sessions/ and clips/ live under here
+# footage_dir = "R:/zamarec"       # timeline segments go here instead (a RAM disk on Windows, a second disk); clips stay under root
 
 [capture]
 monitor = "DP-1"                  # gpu-screen-recorder --list-monitors

@@ -22,6 +22,10 @@ public sealed class SessionInfo
     [JsonPropertyName("playlist")] public string? Playlist { get; set; }
     /// <summary>Where the segments live when not in the session directory (RAM timelines: a tmpfs path).</summary>
     [JsonPropertyName("media_dir")] public string? MediaDir { get; set; }
+    /// <summary>The media directory is a plain folder (storage.footage_dir), not tmpfs: none of the RAM rules apply to it.</summary>
+    [JsonPropertyName("media_plain")] public bool MediaPlain { get; set; }
+    /// <summary>A RAM timeline: its footage is dropped when the next one starts or its keep time passes.</summary>
+    [JsonIgnore] public bool InRam => MediaDir is not null && !MediaPlain;
     /// <summary>Set once a RAM timeline's segments have been dropped.</summary>
     [JsonPropertyName("footage_gone")] public bool FootageGone { get; set; }
     /// <summary>Footage bytes this session produced (all segments ever written, or the buffer's churn).</summary>

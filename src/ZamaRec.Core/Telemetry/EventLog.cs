@@ -90,6 +90,55 @@ public sealed class StatsCounters
     [JsonPropertyName("marks")] public int Marks { get; set; }
     [JsonPropertyName("saves")] public int Saves { get; set; }
     [JsonPropertyName("exports")] public int Exports { get; set; }
+    /// <summary>
+    /// The same counted per folder written to: the recordings folder (storage.root) and each footage folder
+    /// (storage.footage_dir) there has been. A folder that is no longer configured keeps its figures. RAM footage
+    /// belongs to no folder and is not in here.
+    /// </summary>
+    [JsonPropertyName("places")] public Dictionary<string, PlaceCounters> Places { get; set; } = new();
+
+    /// <summary>The counters of a folder, made on first use. Paths compare the way the file system does.</summary>
+    public PlaceCounters Place(string dir)
+    {
+        var key = NormalizeDir(dir);
+        var cmp = Platform.IsWindows ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        var found = Places.Keys.FirstOrDefault(k => string.Equals(k, key, cmp));
+        if (found is not null) return Places[found];
+        return Places[key] = new PlaceCounters { FirstUsed = DateTimeOffset.Now };
+    }
+
+    public static string NormalizeDir(string dir)
+    {
+        try { dir = System.IO.Path.GetFullPath(dir); } catch { }
+        var root = System.IO.Path.GetPathRoot(dir);
+        return dir.Length > (root?.Length ?? 0) ? dir.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar) : dir;
+    }
+
+    /// <summary>
+    /// Figures from before folders were counted go to the recordings folder in use now: until then there was
+    /// only ever the one. The session count is only known when nothing went to RAM.
+    /// </summary>
+    public void SeedPlaces(string root)
+    {
+        if (Places.Count > 0 || (DiskBytes == 0 && ClipBytes == 0)) return;
+        var p = Place(root);
+        p.FootageBytes = DiskBytes; p.ClipBytes = ClipBytes; p.Clips = Clips;
+        if (RamBytes == 0) p.Sessions = Sessions;
+        p.Seeded = true;
+    }
+}
+
+public sealed class PlaceCounters
+{
+    [JsonPropertyName("footage_bytes")] public long FootageBytes { get; set; }
+    [JsonPropertyName("clip_bytes")] public long ClipBytes { get; set; }
+    /// <summary>Sessions whose footage was written here.</summary>
+    [JsonPropertyName("sessions")] public int Sessions { get; set; }
+    [JsonPropertyName("clips")] public int Clips { get; set; }
+    [JsonPropertyName("first_used")] public DateTimeOffset? FirstUsed { get; set; }
+    [JsonPropertyName("last_used")] public DateTimeOffset? LastUsed { get; set; }
+    /// <summary>Starts from the totals kept before folders were counted.</summary>
+    [JsonPropertyName("seeded")] public bool Seeded { get; set; }
 }
 
 public sealed class StatsStore
@@ -103,6 +152,9 @@ public sealed class StatsStore
         Path = path ?? System.IO.Path.Combine(Paths.DataDir(), "stats.json");
         Counters = File.Exists(Path) ? JsonSerializer.Deserialize(File.ReadAllText(Path), TelemetryJson.Default.StatsCounters) ?? new() : new();
     }
+
+    /// <summary>The per-folder counters as they are now, safe to read while a session ends on another thread.</summary>
+    public List<KeyValuePair<string, PlaceCounters>> PlacesSnapshot() { lock (_lock) return Counters.Places.ToList(); }
 
     public void Update(Action<StatsCounters> change)
     {

@@ -29,6 +29,8 @@ public sealed class ZamaRecConfig
     [JsonIgnore] public string RootDir => Paths.Expand(Storage.Root);
     [JsonIgnore] public string SessionsDir => Path.Combine(RootDir, "sessions");
     [JsonIgnore] public string ClipsDir => Path.Combine(RootDir, "clips");
+    /// <summary>storage.footage_dir, expanded; null when it is not set.</summary>
+    [JsonIgnore] public string? FootageDir => string.IsNullOrWhiteSpace(Storage.FootageDir) ? null : Paths.Expand(Storage.FootageDir.Trim());
 
     /// <summary>Bumped on every reload so long-lived components can notice a change.</summary>
     [JsonIgnore] public int Version { get; private set; }
@@ -166,6 +168,13 @@ public sealed class EffectiveProfile
 public sealed class StorageConfig
 {
     public string Root { get; set; } = "~/Videos/zamarec";
+    /// <summary>
+    /// Where a timeline's segments go, one folder per session. Blank = inside the session's own folder under root.
+    /// A plain location, on any drive: a RAM disk on Windows, a second disk. Clips and each session's details stay
+    /// under root, so losing this folder loses the rolling footage only (the session then shows "footage gone").
+    /// RAM timelines (timeline.storage = "ram") keep using timeline.ram_dir.
+    /// </summary>
+    public string? FootageDir { get; set; }
 }
 
 public sealed class CaptureConfig

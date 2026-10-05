@@ -58,6 +58,7 @@ public sealed class RecordingCoordinator : IAsyncDisposable
     public RecordingCoordinator(ZamaRecConfig cfg, SoundFeedback sound, ConfigService configService, EventLog events, StatsStore stats, ILogger<RecordingCoordinator> log)
     {
         _cfg = cfg; _sound = sound; _configService = configService; _events = events; _stats = stats; _log = log;
+        try { if (_stats.Counters.Places.Count == 0) _stats.Update(c => c.SeedPlaces(_cfg.RootDir)); } catch (Exception ex) { _log.LogDebug(ex, "stats seed"); }
     }
 
     /// <summary>Live footage bytes for the active session (measured for timelines, estimated for buffers).</summary>
@@ -86,6 +87,8 @@ public sealed class RecordingCoordinator : IAsyncDisposable
                 return Fail($"already recording profile '{_active.Profile.Name}' (started by {_active.Trigger})");
 
             var profile = _cfg.Effective(profileCfg);
+            if (Platform.IsWindows && profileCfg.CaptureMode == CaptureMode.Buffer)
+                _log.LogInformation("profile {profile} is set to buffer mode; Windows has no RAM buffer, so it records a {minutes} min timeline to disk", profileCfg.Name, profile.WindowMinutes);
             if (profile.Mode == CaptureMode.Timeline && profile.TimelineStorage == "ram")
             {
                 // RAM footage of earlier sessions goes when a new one starts, then check the window fits.
@@ -102,6 +105,11 @@ public sealed class RecordingCoordinator : IAsyncDisposable
                 }
             }
             var session = SessionStore.Create(_cfg, profileCfg, trigger, gamePid, steamAppId);
+            if (profile.Mode == CaptureMode.Timeline && profile.TimelineStorage != "ram" && _cfg.FootageDir is { } footageDir)
+            {
+                if (session.Info.MediaDir is null) _log.LogWarning("the footage folder {dir} could not be used; this session's footage goes to {fallback}", footageDir, session.Dir);
+                else _log.LogInformation("timeline footage goes to {dir}", session.Info.MediaDir);
+            }
             var sock = ControlPaths.SocketPath().Replace(".sock", "") + "-gsr.sock";   // next to the control socket, so test daemons stay isolated
             var incoming = Path.Combine(_cfg.ClipsDir, ".incoming");
             Directory.CreateDirectory(incoming);
@@ -181,8 +189,14 @@ public sealed class RecordingCoordinator : IAsyncDisposable
             a.Session.Info.BytesEstimated = true;
         }
         a.Session.Finish(duration);
-        var toRam = a.Profile.Mode == CaptureMode.Buffer || a.Session.Info.MediaDir is not null;
-        _stats.Update(c => { c.Sessions++; c.SecondsRecorded += duration ?? 0; if (toRam) c.RamBytes += a.Session.Info.RecordedBytes; else c.DiskBytes += a.Session.Info.RecordedBytes; c.Marks += a.Session.Markers.Count(m => m.Type == "manual"); });
+        var toRam = a.Profile.Mode == CaptureMode.Buffer || a.Session.Info.InRam;
+        // the folder the footage went to: the footage folder this session used, or the root its session folder is under
+        var footagePlace = a.Session.Info is { MediaPlain: true, MediaDir: { } md } ? Path.GetDirectoryName(md) : Path.GetDirectoryName(Path.GetDirectoryName(a.Session.Dir));
+        _stats.Update(c =>
+        {
+            c.Sessions++; c.SecondsRecorded += duration ?? 0; if (toRam) c.RamBytes += a.Session.Info.RecordedBytes; else c.DiskBytes += a.Session.Info.RecordedBytes; c.Marks += a.Session.Markers.Count(m => m.Type == "manual");
+            if (!toRam && footagePlace is not null) { var p = c.Place(footagePlace); p.Sessions++; p.FootageBytes += a.Session.Info.RecordedBytes; p.LastUsed = DateTimeOffset.Now; }
+        });
         _events.Write("session", $"session ended ({reason}): {duration:0}s, {a.Session.Info.RecordedBytes / 1e6:0} MB to {(toRam ? "RAM" : "disk")}{(a.Session.Info.BytesEstimated ? " (estimated)" : "")}, {a.Session.Markers.Count} markers, {a.Session.Info.Clips.Count} clips",
             a.Profile.Name, a.Session.Info.Id, bytes: a.Session.Info.RecordedBytes, seconds: duration);
 
@@ -475,6 +489,18 @@ public sealed class RecordingCoordinator : IAsyncDisposable
             SessionStore store;
             try { if (!File.Exists(Path.Combine(dir, "session.json"))) continue; store = SessionStore.Load(dir); } catch { continue; }
             if (store.Info.MediaDir is null || store.Info.FootageGone) continue;
+            if (store.Info.MediaPlain)
+            {
+                // A footage folder (storage.footage_dir) is left alone; only a folder that has vanished (a RAM disk
+                // after a reboot) is noted, so the session shows its markers and clips without footage.
+                if (!Directory.Exists(store.Info.MediaDir))
+                {
+                    _log.LogInformation("footage of {id} is gone from {dir}", store.Info.Id, store.Info.MediaDir);
+                    _events.Write("purge", "footage folder no longer there", store.Info.Profile, store.Info.Id, bytes: store.Info.RecordedBytes);
+                    store.DropMedia();
+                }
+                continue;
+            }
             var keep = _cfg.FindProfile(store.Info.Profile) is { } p ? _cfg.Effective(p).RamKeepHours : _cfg.Timeline.RamKeepHours;
             var ended = store.Info.EndedAt ?? store.Info.StartedAt;
             var expired = (DateTimeOffset.Now - ended).TotalHours >= keep;
@@ -541,15 +567,18 @@ public sealed class RecordingCoordinator : IAsyncDisposable
     {
         _lastWritten = path;
         long bytes = 0; try { bytes = new FileInfo(path).Length; } catch { }
-        _stats.Update(c => { c.Clips++; c.ClipBytes += bytes; if (source == "save") c.Saves++; });
+        _stats.Update(c => { c.Clips++; c.ClipBytes += bytes; if (source == "save") c.Saves++; CountClip(c, bytes); });
         _events.Write("clip", $"{(source == "mark" ? "mark clip" : source == "save" ? "save" : "export")} written: {duration ?? 0:0.0}s, {bytes / 1e6:0.0} MB", a.Profile.Name, a.Session.Info.Id, Path.GetFileName(path), bytes, duration);
     }
+
+    /// <summary>Clips always go under the recordings folder.</summary>
+    private void CountClip(StatsCounters c, long bytes) { var p = c.Place(_cfg.RootDir); p.Clips++; p.ClipBytes += bytes; p.LastUsed = DateTimeOffset.Now; }
 
     /// <summary>For exports made through the web API (which do not go through the coordinator).</summary>
     public void RecordExport(string profile, string? session, string path, double? duration)
     {
         long bytes = 0; try { bytes = new FileInfo(path).Length; } catch { }
-        _stats.Update(c => { c.Clips++; c.ClipBytes += bytes; c.Exports++; });
+        _stats.Update(c => { c.Clips++; c.ClipBytes += bytes; c.Exports++; CountClip(c, bytes); });
         _events.Write("export", $"export written: {duration ?? 0:0.0}s, {bytes / 1e6:0.0} MB", profile, session, Path.GetFileName(path), bytes, duration);
     }
 
