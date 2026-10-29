@@ -89,8 +89,8 @@ recorded cannot be ticked). Delete asks for a second click.
   *set out* the other way round. Drag the handles or the whole range. *Play range* plays in to out
   and pauses at out; *jump to in* seeks to in.
 - **Export panel** (save icon, or `E`): the in/out numbers, `len`, a clip label, and *Export range*,
-  which writes a clip (stream copy, or frame-exact with the box ticked: only the frames up to the next
-  keyframe are re-encoded, the rest is copied). Its lower row is
+  which writes a clip: frame-exact by default (only the frames up to the next keyframe are re-encoded,
+  the rest is copied), or a plain stream copy with the box unticked, which the page remembers. Its lower row is
   **around markers**: the before/after boxes used by the scissors button on a marker, and *Export all* for every marker
   of one type. Escape or a click outside closes the panel. *Export range* closes it too; when the
   clip is written a toast says so and the in/out range and label are cleared, with the playhead left

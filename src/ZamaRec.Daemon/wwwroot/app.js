@@ -751,6 +751,9 @@ $('video').addEventListener('timeupdate', () => {
     stage.classList.toggle('muted', v.muted || v.volume === 0); if (!v.muted) $('tVol').value = v.volume;
     try { localStorage.setItem('volume', String(v.volume)); localStorage.setItem('muted', v.muted ? '1' : '0'); } catch {}
   });
+  // frame-exact is on unless it was turned off here
+  try { if (localStorage.getItem('exact') === '0') $('exact').checked = false; } catch {}
+  $('exact').addEventListener('change', () => { try { localStorage.setItem('exact', $('exact').checked ? '1' : '0'); } catch {} });
   let hideTimer;
   stage.addEventListener('mousemove', () => { stage.classList.add('show-ui'); clearTimeout(hideTimer); hideTimer = setTimeout(() => stage.classList.remove('show-ui'), 2000); });
   // Buffer sessions: when the loaded clip runs out, carry on in whichever clip covers the next moment.

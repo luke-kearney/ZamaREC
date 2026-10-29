@@ -114,7 +114,10 @@ public static class ClipExporter
         if (!exact && Mixes(tracks, mix) && Math.Floor(start) + 0.02 < start) start = Math.Floor(start) + 0.02;
         args.AddRange(["-ss", F(start), "-i", sourcePath, "-t", F(end - start)]);
         args.AddRange(Tracks(tracks, mix));
-        if (exact) args.AddRange(["-c:v", Recording.HwCodec.Encoder("h264", Gpu), .. Recording.HwCodec.ExactEncode(Gpu), "-c:a", "copy"]);
+        // The seek lands on the keyframe before "start" and the video is decoded on from there, but copied audio would
+        // keep its packets from that keyframe on: up to a keyframe interval of sound before the first frame, which
+        // make_zero then turns into a lead-in (1.6 s on a clip with 4 s keyframes). -copypriorss 0 drops them.
+        if (exact) args.AddRange(["-c:v", Recording.HwCodec.Encoder("h264", Gpu), .. Recording.HwCodec.ExactEncode(Gpu), "-c:a", "copy", "-copypriorss", "0"]);
         else args.AddRange(["-c", "copy"]);
         args.AddRange(MixCodec(tracks, mix));
         args.AddRange(["-avoid_negative_ts", "make_zero", "-movflags", "+faststart", outputPath]);
