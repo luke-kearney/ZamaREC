@@ -190,7 +190,7 @@
               <select id="exportSize" class="sel" title="original: a stream copy, as recorded. A size: re-encoded on the GPU to fit under it, for posting where uploads are limited">
                 <option value="">original size</option><option value="10">under 10 MB</option><option value="25">under 25 MB</option><option value="50">under 50 MB</option><option value="100">under 100 MB</option>
               </select>
-              <label class="chk"><input type="checkbox" id="exact"> frame-exact</label>
+              <label class="chk" title="start on the exact frame: only the part up to the next keyframe (under a second) is re-encoded, the rest is copied as recorded"><input type="checkbox" id="exact"> frame-exact</label>
               <label class="chk" id="exportMixWrap" title="remake the clip's mix from the separate tracks at the mixer's levels, so it sounds like what you hear now. The tracks themselves are kept" hidden><input type="checkbox" id="exportMix" checked> mixer levels</label>
               <button class="btn primary" id="exportBtn" title="E">Export range</button>
             </div>
