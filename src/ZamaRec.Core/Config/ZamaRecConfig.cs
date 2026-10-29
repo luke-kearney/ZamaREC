@@ -477,6 +477,15 @@ public static class ConfigLoader
             && (u.Host is "discord.com" or "discordapp.com" || u.Host.EndsWith(".discord.com", StringComparison.Ordinal));
     }
 
+    /// <summary>gpu-screen-recorder refuses to start when one track has both app: and app-inverse: sources.</summary>
+    private static void CheckAppSources(string what, List<string> sources)
+    {
+        var inverse = sources.Where(x => x.Trim().StartsWith("app-inverse:", StringComparison.Ordinal)).ToList();
+        var app = sources.Where(x => x.Trim().StartsWith("app:", StringComparison.Ordinal)).ToList();
+        if (inverse.Count > 0 && app.Count > 0)
+            throw new InvalidOperationException($"{what} mixes {app[0].Trim()} with {inverse[0].Trim()}: one track can have app: sources or app-inverse: sources, not both (the recorder will not start). Use app-inverse: for each app to leave out, or put the app: ones on a track of their own");
+    }
+
     public static void Validate(ZamaRecConfig cfg)
     {
         var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -504,7 +513,9 @@ public static class ConfigLoader
             if (string.IsNullOrWhiteSpace(t.Name)) throw new InvalidOperationException("capture.tracks: every track needs a name");
             if (!trackNames.Add(t.Name)) throw new InvalidOperationException($"capture.tracks: '{t.Name}' is used twice (\"{CaptureConfig.MixName}\" is the first track's name)");
             if (t.Sources.Count == 0 || t.Sources.Any(string.IsNullOrWhiteSpace)) throw new InvalidOperationException($"capture.tracks: track '{t.Name}' needs at least one source");
+            CheckAppSources($"capture.tracks: track '{t.Name}'", t.Sources);
         }
+        CheckAppSources("capture.audio", cfg.Capture.Audio);
         if (cfg.Daemon.UiWindow is not ("app" or "browser")) throw new InvalidOperationException($"daemon.ui_window must be app or browser (got '{cfg.Daemon.UiWindow}')");
         if (cfg.Share.DiscordMaxMb is < 1 or > 500) throw new InvalidOperationException("share.discord_max_mb must be between 1 and 500");
         if (!string.IsNullOrWhiteSpace(cfg.Share.DiscordWebhook) && !LooksLikeDiscordWebhook(cfg.Share.DiscordWebhook))

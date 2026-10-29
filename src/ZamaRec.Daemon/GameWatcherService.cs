@@ -45,9 +45,18 @@ public sealed class GameWatcherService : BackgroundService
 
                 if (_rec.IsActive)
                 {
-                    if (_rec.RecorderDied)
+                    if (_rec.RecorderDied && _rec.ActiveSeconds < RecordingCoordinator.EarlyDeathSeconds)
                     {
-                        _log.LogWarning("recorder exited unexpectedly; closing session");
+                        // Ready, then gone: as good as a failed start (a bad audio source does this). Same 60 s wait, one tone.
+                        var pid = _rec.ActiveGamePid;
+                        _log.LogError("recorder exited {s:0.0} s after starting{why}; closing session{retry}", _rec.ActiveSeconds,
+                            _rec.RecorderError is { } why ? $" ({why})" : "", pid is null ? "" : " (retrying in 60 s)");
+                        await _rec.StopAsync("recorder failed at start", ct, failed: true);
+                        if (pid is int p) { _failedPid = p; _retryAt = Environment.TickCount64 + 60_000; }
+                    }
+                    else if (_rec.RecorderDied)
+                    {
+                        _log.LogWarning("recorder exited unexpectedly{why}; closing session", _rec.RecorderError is { } why ? $" ({why})" : "");
                         await _rec.StopAsync("recorder died", ct);
                     }
                     else if (_rec.ActiveGamePid is int pid && !ProcessWatcher.IsAlive(pid))

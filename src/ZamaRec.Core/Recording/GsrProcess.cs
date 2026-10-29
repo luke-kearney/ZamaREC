@@ -21,6 +21,7 @@ public sealed class GsrProcess : IRecorder
     public bool HasExited => _proc.HasExited;
     public Task Exited => _exited.Task;
     public string Executable { get; }
+    public string? LastError { get; private set; }
 
     private GsrProcess(Process proc, string socketPath, string exe, ILogger log)
     {
@@ -39,18 +40,24 @@ public sealed class GsrProcess : IRecorder
         foreach (var a in args) psi.ArgumentList.Add(a);
         log.LogInformation("spawning {exe} {args}", executable, string.Join(' ', psi.ArgumentList.Select(Quote)));
         var proc = new Process { StartInfo = psi, EnableRaisingEvents = true };
+        GsrProcess? self = null;
         proc.OutputDataReceived += (_, e) => { if (e.Data is not null) log.LogDebug("gsr: {line}", e.Data); };
         proc.ErrorDataReceived += (_, e) =>
         {
             if (e.Data is null) return;
             // "failed to write frame ... to muxer" is the recorder flushing its last packet after we asked it to stop; harmless.
-            if (e.Data.Contains("error", StringComparison.OrdinalIgnoreCase) && !e.Data.Contains("failed to write frame")) log.LogWarning("gsr: {line}", e.Data);
+            if (e.Data.Contains("error", StringComparison.OrdinalIgnoreCase) && !e.Data.Contains("failed to write frame"))
+            {
+                log.LogWarning("gsr: {line}", e.Data);
+                if (self is not null) self.LastError = e.Data.Trim();
+            }
             else log.LogDebug("gsr: {line}", e.Data);
         };
         proc.Start();
+        self = new GsrProcess(proc, socketPath, executable, log);
         proc.BeginOutputReadLine();
         proc.BeginErrorReadLine();
-        return new GsrProcess(proc, socketPath, executable, log);
+        return self;
     }
 
     private static string Quote(string s) => s.Contains(' ') ? $"\"{s}\"" : s;
@@ -61,7 +68,11 @@ public sealed class GsrProcess : IRecorder
         var sw = Stopwatch.StartNew();
         while (sw.Elapsed < timeout)
         {
-            if (_proc.HasExited) throw new InvalidOperationException($"gpu-screen-recorder exited early with code {_proc.ExitCode}");
+            if (_proc.HasExited)
+            {
+                _proc.WaitForExit();   // the rest of stderr, so the reason is known
+                throw new InvalidOperationException($"gpu-screen-recorder exited early with code {_proc.ExitCode}" + (LastError is null ? "" : $" ({LastError})"));
+            }
             if (File.Exists(_socketPath)) return;
             await Task.Delay(50, ct);
         }

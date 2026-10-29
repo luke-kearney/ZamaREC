@@ -13,6 +13,8 @@ public interface IRecorder : IAsyncDisposable
     bool HasExited { get; }
     Task Exited { get; }
     string Executable { get; }
+    /// <summary>The last error line the recorder printed, if any: why it would not start or why it died.</summary>
+    string? LastError => null;
     /// <summary>Waits until the recorder is capturing (its IPC socket exists, or ffmpeg reports frames).</summary>
     Task WaitForReadyAsync(TimeSpan timeout, CancellationToken ct);
     /// <summary>Stop and save (record mode) or stop without saving the buffer. Returns the saved path in record mode.</summary>

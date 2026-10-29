@@ -41,7 +41,10 @@ exact.
   dumps the last N seconds to an MP4.
 - **RAM timelines** are ordinary timelines whose media directory is under tmpfs. Metadata stays in
   the session folder on disk. The coordinator refuses to start if window × bitrate exceeds the
-  tmpfs free space, and drops the footage after `ram_keep_hours` or when the next session starts.
+  tmpfs free space (counting the earlier footage it is about to drop), and drops the footage after
+  `ram_keep_hours` or once the next session's recorder has run for 10 s, so a start that fails does
+  not cost the last session its footage. A recorder that dies within those 10 s counts as a failed
+  start: one error tone, an empty session is not kept, and the watcher waits 60 s before trying again.
 
 Nothing polls the GPU. The only periodic work while idle is a `/proc` directory scan once a second.
 

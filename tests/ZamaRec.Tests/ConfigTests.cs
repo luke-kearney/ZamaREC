@@ -75,6 +75,17 @@ public class ConfigTests
     }
 
     [Fact]
+    public void RejectsAppAndAppInverseOnOneTrack()
+    {
+        var bad = "[capture]\nmultitrack = true\n[[capture.tracks]]\nname = \"game\"\nsources = [\"app-inverse:WEBRTC VoiceEngine\", \"app:Cider\"]\n";
+        var ex = Assert.Throws<InvalidOperationException>(() => ConfigLoader.Parse(bad));
+        Assert.Contains("'game'", ex.Message);
+        Assert.Throws<InvalidOperationException>(() => ConfigLoader.Parse("[capture]\naudio = [\"app:Cider\", \"app-inverse:Cider\"]\n"));
+        ConfigLoader.Parse(bad.Replace("app:Cider", "app-inverse:Cider"));   // all inverse is fine
+        ConfigLoader.Parse(bad.Replace("app-inverse:WEBRTC VoiceEngine", "app:WEBRTC VoiceEngine"));   // all app: too
+    }
+
+    [Fact]
     public void ExpandsHome()
     {
         var cfg = ConfigLoader.Parse("[storage]\nroot = \"~/Videos/k\"\n");
