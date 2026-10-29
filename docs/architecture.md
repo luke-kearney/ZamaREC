@@ -128,7 +128,19 @@ as long as the buffer or window still holds the earlier footage.
 
 Exports from a timeline concatenate segments with ffmpeg's concat demuxer. The demuxer cannot
 input-seek, so `-ss` is an output option, snapped down to a keyframe so the copy starts cleanly; the
-clip may begin up to one keyframe interval early. Frame-exact exports re-encode with `h264_nvenc`.
+clip may begin up to one keyframe interval early.
+
+Frame-exact exports re-encode only the head (`ClipExporter.SmartCutAsync`): the frames from the In
+point up to the next keyframe, under a second at the default 1 s keyframes, joined to a stream copy of
+the rest. That works because gpu-screen-recorder's H.264 has no B-frames and puts an IDR with its SPS
+and PPS at every keyframe: the copy can start on one and end on any frame, and the head, encoded with
+the same profile and `-bf 0`, gets the same SPS and PPS from NVENC (only the HRD rate differs). The
+head is counted in frames rather than cut by time, because a segment's last frame can sit a fraction
+of a millisecond past where the concat list places the next segment. The video goes through a second
+concat list (head, then the source with `inpoint` on the keyframe, in that file's own timestamps);
+the audio of the range is copied to a temporary file first, since the concat input cannot seek and an
+output `-ss` would cut the video too. A source with B-frames or another codec, a range with no
+keyframe inside, or a failed step falls back to re-encoding the whole range.
 
 ## Data on disk
 
