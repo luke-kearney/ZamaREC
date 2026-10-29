@@ -205,6 +205,21 @@ It waits 30 seconds before recording an unconfirmed game, so a profile's process
 appear; if one appears later still, the session switches to that profile. Non-Steam shortcuts are
 not recorded this way.
 
+## `[desktop]`
+
+A recording with no game behind it, started by hand: `zamarec start` (or Record in the web UI, or
+Start recording in the tray) when no game runs, or `zamarec start desktop` at any time. It is a
+timeline of `capture.monitor` with the `capture` audio, and it runs until you stop it.
+
+| key | default | meaning |
+|---|---|---|
+| `window_minutes` | `30` | the rolling window; `0` keeps everything |
+| `storage` | `"disk"` | `disk` or `ram`. A RAM recording drops the last game's RAM footage, like any new RAM session |
+| `quality` | unset | a `[[quality]]` name; unset uses `capture.quality` |
+| `yield_to_games` | `true` | a game that starts during a desktop recording ends it and gets its own session (not while auto recording is off). A game already running when the desktop recording began does not count |
+
+A profile of your own named `desktop` replaces these settings.
+
 ## `[[profiles]]`
 
 | key | default | meaning |

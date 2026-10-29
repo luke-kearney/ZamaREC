@@ -48,10 +48,11 @@
       <button data-pause="until" data-hours="2">for 2 hours</button>
       <button data-pause="until" data-hours="8">for 8 hours</button>
       <button data-pause="forever">until I turn it back on</button>
-      <div class="menu-note">A running session is stopped. Manual <code>zamarec start</code> still works.</div>
+      <div class="menu-note">A running session is stopped. Record (or <code>zamarec start</code>) still works.</div>
     </div>
   </div>
   <div id="status" class="status idle"><span class="dot"></span><span class="txt">idle</span></div>
+  <button id="recBtn" class="btn small" type="button" title="start recording: the game that is running, else the desktop">Record</button>
   <div class="usage" id="usage" title="ZamaREC's own CPU (per core) and memory: daemon + recorder">
     <span class="u" id="uCpuWrap" title="click to switch between share of all cores and share of one core" style="cursor:pointer"><span class="k" id="uCpuK">cpu</span><span class="v mono" id="uCpu">–</span></span>
     <span class="u"><span class="k">ram</span><span class="v mono" id="uRss">–</span></span>

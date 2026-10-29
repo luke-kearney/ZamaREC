@@ -16,6 +16,7 @@ public sealed class ZamaRecConfig
     public DaemonConfig Daemon { get; set; } = new();
     public GsiConfig Gsi { get; set; } = new();
     public AutoGamesConfig AutoGames { get; set; } = new();
+    public DesktopConfig Desktop { get; set; } = new();
     public ShareConfig Share { get; set; } = new();
     /// <summary>Windows only: global hotkeys the daemon registers itself (Linux binds the CLI to desktop shortcuts).</summary>
     public HotkeysConfig Hotkeys { get; set; } = new();
@@ -64,6 +65,16 @@ public sealed class ZamaRecConfig
             Timeline = new ProfileTimelineOverride { Storage = "ram", WindowMinutes = AutoGames.WindowMinutes(q?.BitrateKbps ?? Capture.BitrateKbps) },
         };
     }
+
+    /// <summary>
+    /// The profile a desktop recording uses: a timeline started and stopped by hand, with no game behind it.
+    /// A profile of your own named "desktop" takes its place.
+    /// </summary>
+    public ProfileConfig DesktopProfile() => FindProfile(DesktopConfig.ProfileName) ?? new ProfileConfig
+    {
+        Name = DesktopConfig.ProfileName, Mode = "timeline", Quality = string.IsNullOrEmpty(Desktop.Quality) ? null : Desktop.Quality,
+        Timeline = new ProfileTimelineOverride { Storage = Desktop.Storage, WindowMinutes = Desktop.WindowMinutes },
+    };
 
     /// <summary>Effective settings for a profile: profile overrides on top of the global defaults.</summary>
     public EffectiveProfile Effective(ProfileConfig p)
@@ -277,6 +288,20 @@ public sealed class GsiConfig
     public string CfgDir { get; set; } = "";
     /// <summary>Append every payload to gsi.jsonl in the session folder (useful for building test fixtures).</summary>
     public bool CaptureRaw { get; set; } = true;
+}
+
+/// <summary>Desktop recordings: started by hand (`zamarec start` with no game running, or `zamarec start desktop`).</summary>
+public sealed class DesktopConfig
+{
+    public const string ProfileName = "desktop";
+    /// <summary>Name of a [[quality]] preset; empty = the capture default.</summary>
+    public string? Quality { get; set; }
+    /// <summary>The rolling window; 0 = keep everything.</summary>
+    public int WindowMinutes { get; set; } = 30;
+    /// <summary>disk | ram. Disk by default: a RAM recording drops the last game's RAM footage, like any new RAM session.</summary>
+    public string Storage { get; set; } = "disk";
+    /// <summary>A game that starts during a desktop recording ends it and gets its own session.</summary>
+    public bool YieldToGames { get; set; } = true;
 }
 
 /// <summary>Steam games without a profile ("unconfirmed"): recorded to RAM with these defaults, never to disk unless you mark.</summary>
@@ -529,6 +554,11 @@ public static class ConfigLoader
             if (string.IsNullOrWhiteSpace(t.Command)) throw new InvalidOperationException($"share.targets: '{t.Name}' needs a command (the module to run)");
             if (t.MaxMb is < 0 or > 4000) throw new InvalidOperationException($"share.targets: '{t.Name}': max_mb must be between 0 (no limit) and 4000");
         }
+        if (!string.IsNullOrEmpty(cfg.Desktop.Quality) && cfg.FindQuality(cfg.Desktop.Quality) is null)
+            throw new InvalidOperationException($"desktop.quality: unknown preset '{cfg.Desktop.Quality}' (known: {string.Join(", ", cfg.Quality.Select(q => q.Name))})");
+        if (cfg.Desktop.Storage is not ("disk" or "ram")) throw new InvalidOperationException("desktop.storage must be disk or ram");
+        if (cfg.Desktop.Storage == "ram" && cfg.Desktop.WindowMinutes <= 0) throw new InvalidOperationException("desktop: a RAM recording needs a window (window_minutes > 0)");
+        if (cfg.Desktop.WindowMinutes < 0) throw new InvalidOperationException("desktop.window_minutes must be 0 or more");
         if (cfg.AutoGames.RamGb <= 0) throw new InvalidOperationException("auto_games.ram_gb must be above 0");
         if (!string.IsNullOrEmpty(cfg.AutoGames.Quality) && cfg.FindQuality(cfg.AutoGames.Quality) is null)
             throw new InvalidOperationException($"auto_games.quality: unknown preset '{cfg.AutoGames.Quality}' (known: {string.Join(", ", cfg.Quality.Select(q => q.Name))})");

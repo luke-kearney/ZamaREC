@@ -105,7 +105,7 @@ static int Usage(int code = 0)
 
           zamarec mark [label...]            drop a marker on the current session
           zamarec save [--last 30s] [label]  save the last N seconds from the replay buffer
-          zamarec start [profile]            start a session manually
+          zamarec start [profile|desktop]    start recording: the running game, else the desktop
           zamarec stop                       stop the current session
           zamarec status                     show what the daemon is doing
           zamarec pause [session|2h|forever] turn auto recording off (stops the current session)

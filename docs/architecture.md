@@ -46,6 +46,14 @@ exact.
   not cost the last session its footage. A recorder that dies within those 10 s counts as a failed
   start: one error tone, an empty session is not kept, and the watcher waits 60 s before trying again.
 
+- **Starting by hand** goes through `GameWatcherService.StartByHandAsync`, so a start key, the tray,
+  the web UI and the deck all choose alike: a profile's running process, else a Steam launch, else
+  a desktop recording (`[desktop]`, a timeline with no game pid). A game found this way is tied to
+  its pid like an automatic start. A game stopped by hand is left alone by the watcher until it
+  exits or is started again; so is a game already running when a desktop recording begins. During
+  a desktop recording the watcher keeps its ordinary scan, and a game that appears ends it
+  (`yield_to_games`).
+
 Nothing polls the GPU. The only periodic work while idle is a `/proc` directory scan once a second.
 
 ## Audio tracks and the mixer

@@ -65,6 +65,12 @@ public static class DefaultConfig
         # quality = "medium"              # unset = capture.quality
         ignore = []                       # Steam app ids never to record this way
 
+        [desktop]                         # recording without a game: `zamarec start` when none runs, or `zamarec start desktop`
+        window_minutes = 30               # 0 = keep everything
+        storage = "disk"                  # disk | ram (ram drops the last game's RAM footage, like any new RAM session)
+        # quality = "medium"              # unset = capture.quality
+        yield_to_games = true             # a game that starts meanwhile ends the desktop recording and gets its own session
+
         [share]
         # discord_webhook = "https://discord.com/api/webhooks/..."   # a clip's Share menu can post to this channel; keep it secret
         discord_max_mb = 10               # the channel's upload limit; bigger clips are re-encoded to fit first

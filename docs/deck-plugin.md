@@ -10,7 +10,7 @@ Stream Deck plugin protocol, so the Elgato Stream Deck app on Windows loads it t
 
 | key | shows | press | hold |
 |---|---|---|---|
-| **Recording** | red cap and the session time while recording, the profile, a badge with the marker count; IDLE, AUTO OFF (and until when), DIED when the recorder died, OFFLINE without a daemon | stop a session; turn auto recording back on when it is off; when idle, nothing (NO GAME) unless the key names a profile to start manually. A manual session records the screen under that profile and drops the last session's RAM footage, hence off by default. Can be set to "stop only", "open the window" or nothing | open the window |
+| **Recording** | red cap and the session time while recording, the profile, a badge with the marker count; IDLE, AUTO OFF (and until when), DIED when the recorder died, OFFLINE without a daemon | stop a session; turn auto recording back on when it is off; when idle, nothing (NO GAME) unless the key names a profile to start by hand: that profile, tied to its game when it runs, or `desktop` for a desktop recording. A new RAM session drops the last session's RAM footage (10 s after it starts), hence off by default. Can be set to "stop only", "open the window" or nothing | open the window |
 | **Mark** | the marker count, or the key's label; greyed out when nothing records | drop a marker (with the key's label) | open the window |
 | **Save clip** | SAVE and the seconds (the key's setting, or the profile's `save_seconds`) | save the last N seconds; SAVING until the clip is written | open the window |
 | **Auto recording** | AUTO ON, or AUTO OFF and until when | turn it off (for this game, 1, 2 or 8 hours, or until turned back on; set on the key); press again to turn it back on | open the window |

@@ -86,6 +86,28 @@ public class ConfigTests
     }
 
     [Fact]
+    public void DesktopProfileFollowsItsSection()
+    {
+        var cfg = ConfigLoader.Parse(DefaultConfig.Toml);
+        var d = cfg.Effective(cfg.DesktopProfile());
+        Assert.Equal("desktop", d.Profile.Name);
+        Assert.Equal(CaptureMode.Timeline, d.Mode);
+        Assert.Equal(30, d.WindowMinutes);
+        Assert.Equal("disk", d.TimelineStorage);
+        Assert.True(cfg.Desktop.YieldToGames);
+
+        var own = ConfigLoader.Parse("[desktop]\nwindow_minutes = 0\nquality = \"low\"\n");
+        Assert.Equal(0, own.Effective(own.DesktopProfile()).WindowMinutes);
+        Assert.Equal("low", own.Effective(own.DesktopProfile()).QualityName);
+        Assert.Equal("low", ConfigLoader.Parse(ConfigLoader.Serialize(own)).Desktop.Quality);   // saved by the settings page
+        Assert.Throws<InvalidOperationException>(() => ConfigLoader.Parse("[desktop]\nstorage = \"ram\"\nwindow_minutes = 0\n"));
+        Assert.Throws<InvalidOperationException>(() => ConfigLoader.Parse("[desktop]\nquality = \"nope\"\n"));
+
+        var mine = ConfigLoader.Parse("[[profiles]]\nname = \"Desktop\"\nmatch = \"never\"\ntimeline.window_minutes = 5\n");
+        Assert.Equal(5, mine.Effective(mine.DesktopProfile()).WindowMinutes);   // a profile of that name wins
+    }
+
+    [Fact]
     public void ExpandsHome()
     {
         var cfg = ConfigLoader.Parse("[storage]\nroot = \"~/Videos/k\"\n");
