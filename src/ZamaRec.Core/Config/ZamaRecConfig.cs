@@ -96,6 +96,7 @@ public sealed class ZamaRecConfig
         MarkClipExpireHours = p.Clips?.MarkClipExpireHours ?? Clips.MarkClipExpireHours,
         MarkSaves = p.CaptureMode == CaptureMode.Buffer || (p.Clips?.MarkSaves ?? Clips.MarkSaves ?? ((p.Timeline?.Storage ?? Timeline.Storage) == "ram")),
         EventClips = p.Clips?.EventClips ?? Clips.EventClips,
+        EventClipModes = p.Clips?.EventClipModes ?? Clips.EventClipModes,
         MaxGb = p.Retention?.MaxGb ?? Retention.MaxGb,
         MaxDays = p.Retention?.MaxDays ?? Retention.MaxDays,
         };
@@ -148,10 +149,13 @@ public sealed class EffectiveProfile
     public required int MarkClipExpireHours { get; init; }
     public required bool MarkSaves { get; init; }
     public required List<string> EventClips { get; init; }
+    public required List<string> EventClipModes { get; init; }
 
-    /// <summary>Does this game event deserve a clip? Matches "type" or "kill:N" entries.</summary>
-    public bool EventWantsClip(string type, int killCount)
+    /// <summary>Does this game event deserve a clip? Matches "type" or "kill:N" entries, and the CS2 mode
+    /// (map.mode) against event_clip_modes when that is not empty. An unknown mode does not hold a clip back.</summary>
+    public bool EventWantsClip(string type, int killCount, string? mode = null)
     {
+        if (EventClipModes.Count > 0 && mode is not null && !EventClipModes.Contains(mode, StringComparer.OrdinalIgnoreCase)) return false;
         foreach (var e in EventClips)
         {
             var parts = e.Split(':');
@@ -263,6 +267,8 @@ public sealed class ClipConfig
     public bool? MarkSaves { get; set; }
     /// <summary>Game events that also write a clip like a manual mark: kill:N (N or more kills in the round), mvp, death, round_win, round_loss.</summary>
     public List<string> EventClips { get; set; } = new() { "kill:2", "mvp" };
+    /// <summary>CS2 modes (map.mode: competitive, premier, casual, deathmatch, scrimcomp2v2, ...) in which event_clips apply. Empty = every mode. Markers are set either way.</summary>
+    public List<string> EventClipModes { get; set; } = new();
 }
 
 public sealed class GsiConfig
@@ -390,7 +396,7 @@ public sealed class ProfileConfig
 
 public sealed class ProfileTimelineOverride { public int? WindowMinutes { get; set; } public int? SegmentSeconds { get; set; } public string? Storage { get; set; } public double? RamKeepHours { get; set; } }
 public sealed class ProfileBufferOverride { public int? Minutes { get; set; } public string? Storage { get; set; } }
-public sealed class ProfileClipOverride { public int? SaveSeconds { get; set; } public int? MarkBeforeSeconds { get; set; } public int? MarkAfterSeconds { get; set; } public int? MarkClipExpireHours { get; set; } public bool? MarkSaves { get; set; } public List<string>? EventClips { get; set; } }
+public sealed class ProfileClipOverride { public int? SaveSeconds { get; set; } public int? MarkBeforeSeconds { get; set; } public int? MarkAfterSeconds { get; set; } public int? MarkClipExpireHours { get; set; } public bool? MarkSaves { get; set; } public List<string>? EventClips { get; set; } public List<string>? EventClipModes { get; set; } }
 public sealed class ProfileRetentionOverride { public double? MaxGb { get; set; } public int? MaxDays { get; set; } }
 
 public enum CaptureMode { Timeline, Buffer }

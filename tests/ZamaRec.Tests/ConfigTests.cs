@@ -54,6 +54,27 @@ public class ConfigTests
     }
 
     [Fact]
+    public void EventClipsFollowTheGameMode()
+    {
+        var every = ConfigLoader.Parse(DefaultConfig.Toml);
+        var e = every.Effective(every.FindProfile("cs2")!);
+        Assert.Empty(e.EventClipModes);
+        Assert.True(e.EventWantsClip("mvp", 0, "deathmatch"));
+
+        var toml = "[clips]\nevent_clip_modes = [\"competitive\", \"premier\", \"rush\"]\n[[profiles]]\nname = \"x\"\nmatch = \"x\"\n[[profiles]]\nname = \"y\"\nmatch = \"y\"\nclips.event_clip_modes = []\n";
+        var cfg = ConfigLoader.Parse(toml);
+        var x = cfg.Effective(cfg.Profiles[0]);
+        Assert.True(x.EventWantsClip("kill", 3, "competitive"));
+        Assert.True(x.EventWantsClip("kill", 2, "Rush"));
+        Assert.False(x.EventWantsClip("kill", 3, "deathmatch"));
+        Assert.False(x.EventWantsClip("kill", 3, "casual"));
+        Assert.False(x.EventWantsClip("kill", 1, "competitive"));   // event_clips still decide
+        Assert.True(x.EventWantsClip("mvp", 0, null));              // mode not known: not held back
+        Assert.True(cfg.Effective(cfg.Profiles[1]).EventWantsClip("mvp", 0, "deathmatch"));   // profile override
+        Assert.Equal(["competitive", "premier", "rush"], ConfigLoader.Parse(ConfigLoader.Serialize(cfg)).Clips.EventClipModes);   // saved by the settings page
+    }
+
+    [Fact]
     public void ExpandsHome()
     {
         var cfg = ConfigLoader.Parse("[storage]\nroot = \"~/Videos/k\"\n");

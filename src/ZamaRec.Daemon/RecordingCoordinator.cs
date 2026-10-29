@@ -240,7 +240,7 @@ public sealed class RecordingCoordinator : IAsyncDisposable
     }
 
     /// <summary>A game event from GSI: becomes a typed marker, and a clip if the profile's event_clips say so.</summary>
-    public async Task EventMarkAsync(GsiEvent ev, long tMono, CancellationToken ct)
+    public async Task EventMarkAsync(GsiEvent ev, long tMono, string? mode, CancellationToken ct)
     {
         await _lock.WaitAsync(ct);
         try
@@ -251,20 +251,21 @@ public sealed class RecordingCoordinator : IAsyncDisposable
             var m = a.Session.AddMarker(ev.Type, ev.Label, tMono, ev.Data);
             var where = m.TVideo is double tv ? $"{tv:0.00}s" : "t=?";
             var kills = ev.Data.TryGetValue("count", out var c) && c.TryGetInt32(out var k) ? k : 0;
-            var clip = a.Profile.EventWantsClip(ev.Type, kills);
-            _log.LogInformation("event {type} '{label}' at {where}{clip}", ev.Type, ev.Label ?? "", where, clip ? " (clip)" : "");
+            var clip = a.Profile.EventWantsClip(ev.Type, kills, mode);
+            var skipped = !clip && a.Profile.EventWantsClip(ev.Type, kills) ? $" (no clip in {mode})" : "";
+            _log.LogInformation("event {type} '{label}' at {where}{clip}", ev.Type, ev.Label ?? "", where, clip ? " (clip)" : skipped);
             _events.Write("mark", $"{ev.Type}{(ev.Label is null ? "" : " " + ev.Label)} at {where}" + (clip ? $", clip in {a.Profile.MarkAfterSeconds}s" : ""), a.Profile.Name, a.Session.Info.Id, seconds: m.TVideo);
             if (clip) await ScheduleMarkClipAsync(a, m, tMono, ct);   // automated: no sound, the log has it
         }
         finally { _lock.Release(); }
     }
 
-    public void SetMap(string map)
+    public void SetMap(string map, string? mode)
     {
         var a = _active;
         if (a is null) return;
         a.Session.SetMap(map);
-        _log.LogInformation("map {map}", map);
+        _log.LogInformation("map {map} ({mode})", map, mode ?? "mode unknown");
     }
 
     /// <summary>Queues a clip of [before, after] around a marker. Marks that arrive while one is pending join it.</summary>

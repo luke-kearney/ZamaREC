@@ -47,6 +47,7 @@ public static class DefaultConfig
         # mark_saves = true               # timeline mode: also write a clip around every mark.
                                           # unset = on for RAM timelines, off for disk ones. buffer mode always does.
         event_clips = ["kill:2", "mvp"]   # game events that write a clip like a mark: kill:N, mvp, death, round_win, round_loss
+        event_clip_modes = []             # CS2 modes those clips are written in, e.g. ["competitive", "premier", "rush"]; [] = every mode
 
         [gsi]                             # CS2 game state integration
         cfg_dir = ""                      # CS2's csgo/cfg folder; empty = find it via Steam. CS2 reads the cfg at launch.
