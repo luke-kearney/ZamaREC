@@ -57,7 +57,9 @@ sources = ["app:WEBRTC VoiceEngine"]
 ```
 
 `app:NAME` is one application and `app-inverse:NAME` everything except it, matched without case
-against the names `gpu-screen-recorder --list-application-audio` prints. Discord's voice chat
+against the names `gpu-screen-recorder --list-application-audio` prints. One track takes either
+kind, not both: the recorder will not start with a mix of them, so the settings page refuses to
+save one. To leave several applications out, give each its own `app-inverse:`. Discord's voice chat
 appears there as `WEBRTC VoiceEngine` once Discord is open; its other sounds, like those of any
 Electron app, come under `Chromium` and stay in the game track. An application that is
 not running when the session starts is picked up when it appears. The mix holds what plays on the
@@ -87,7 +89,7 @@ Named encoder presets. Four ship by default: `low` (720p30, 6000 kbps), `medium`
 | `segment_seconds` | `5` | segment length. A save waits for the current segment to close, so keep it short |
 | `storage` | `"disk"` | `disk` or `ram`. RAM puts the segments on tmpfs; needs window × bitrate of memory |
 | `ram_dir` | `"/dev/shm/zamarec"` | where RAM segments go |
-| `ram_keep_hours` | `6` | RAM footage of a finished session is dropped after this, or when the next session starts |
+| `ram_keep_hours` | `6` | RAM footage of a finished session is dropped after this, or once the next session has recorded for 10 s |
 
 ## `[buffer]` (defaults; profiles override under `buffer.*`)
 

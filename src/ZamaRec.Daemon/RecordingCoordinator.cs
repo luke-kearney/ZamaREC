@@ -37,6 +37,8 @@ public sealed class RecordingCoordinator : IAsyncDisposable
         public MarkJob? Pending { get; set; }
         /// <summary>The most recent mark clip written, so a mark shortly after can extend it instead of overlapping it.</summary>
         public WrittenClip? LastMarkClip { get; set; }
+        /// <summary>Earlier sessions' RAM footage still to drop, once this recorder has proved it keeps running.</summary>
+        public bool PurgeRamPending { get; set; }
     }
 
     private sealed class MarkJob
@@ -75,6 +77,11 @@ public sealed class RecordingCoordinator : IAsyncDisposable
     public bool ActiveUnconfirmed => _active?.Unconfirmed ?? false;
     public long? ActiveSteamAppId => _active?.Session.Info.SteamAppId;
     public bool RecorderDied => _active is { Recorder.HasExited: true };
+    /// <summary>A recorder that dies this soon after starting counts as one that did not start.</summary>
+    public const double EarlyDeathSeconds = 10;
+    /// <summary>Seconds since the active session's recorder was spawned.</summary>
+    public double ActiveSeconds => _active is null ? 0 : (MonotonicClock.NowMicros() - _active.Session.Info.SpawnMonoUs) / 1e6;
+    public string? RecorderError => _active?.Recorder.LastError;
 
     // ---------------------------------------------------------------- start / stop
 
@@ -89,14 +96,16 @@ public sealed class RecordingCoordinator : IAsyncDisposable
             var profile = _cfg.Effective(profileCfg);
             if (Platform.IsWindows && profileCfg.CaptureMode == CaptureMode.Buffer)
                 _log.LogInformation("profile {profile} is set to buffer mode; Windows has no RAM buffer, so it records a {minutes} min timeline to disk", profileCfg.Name, profile.WindowMinutes);
-            if (profile.Mode == CaptureMode.Timeline && profile.TimelineStorage == "ram")
+            var inRam = profile.Mode == CaptureMode.Timeline && profile.TimelineStorage == "ram";
+            if (inRam)
             {
-                // RAM footage of earlier sessions goes when a new one starts, then check the window fits.
-                PurgeRamSessions(all: true);
+                    // RAM footage of earlier sessions goes once the new recorder has run for EarlyDeathSeconds (a start that
+                // fails, or a recorder that dies at once, must not cost the last session its footage; TickAsync drops it),
+                // so count what it frees when checking the window fits.
                 var ramDir = Paths.Expand(_cfg.Timeline.RamDir);
                 Directory.CreateDirectory(ramDir);
                 var need = profile.WindowBytes() * 11 / 10;   // + audio and slack
-                long free = 0; try { free = new DriveInfo(ramDir).AvailableFreeSpace; } catch { }
+                long free = 0; try { free = new DriveInfo(ramDir).AvailableFreeSpace + RamFootageBytes(); } catch { }
                 if (need > free)
                 {
                     _sound.Play("error");
@@ -131,6 +140,7 @@ public sealed class RecordingCoordinator : IAsyncDisposable
             {
                 Profile = profile, Session = session, Recorder = rec, Trigger = trigger, GamePid = gamePid, Unconfirmed = unconfirmed,
                 Segments = profile.Mode == CaptureMode.Timeline ? new SegmentIndex(session.Dir, session.MediaDir) : null,
+                PurgeRamPending = inRam,
             };
             var detail = (profile.Mode == CaptureMode.Timeline
                 ? (profile.WindowMinutes > 0 ? $"{profile.WindowMinutes} min window" : "unlimited window") + (profile.TimelineStorage == "ram" ? " in RAM" : "")
@@ -144,7 +154,8 @@ public sealed class RecordingCoordinator : IAsyncDisposable
         finally { _lock.Release(); }
     }
 
-    public async Task<ControlResponse> StopAsync(string reason, CancellationToken ct)
+    /// <param name="failed">The recorder gave up right after starting: an error tone instead of the stop sound.</param>
+    public async Task<ControlResponse> StopAsync(string reason, CancellationToken ct, bool failed = false)
     {
         await _lock.WaitAsync(ct);
         try
@@ -152,8 +163,9 @@ public sealed class RecordingCoordinator : IAsyncDisposable
             if (_active is null) return Fail("not recording");
             var a = _active;
             _active = null;
+            if (failed) _events.Write("error", $"{Recorder.Name} stopped right after starting" + (a.Recorder.LastError is { } why ? ": " + why : ""), a.Profile.Name, a.Session.Info.Id, level: "error");
             var result = await StopActiveAsync(a, reason, ct);
-            _sound.Play("stop");
+            _sound.Play(failed ? "error" : "stop");
             _configService.ApplyPendingIfAny();
             return result;
         }
@@ -200,7 +212,8 @@ public sealed class RecordingCoordinator : IAsyncDisposable
         _events.Write("session", $"session ended ({reason}): {duration:0}s, {a.Session.Info.RecordedBytes / 1e6:0} MB to {(toRam ? "RAM" : "disk")}{(a.Session.Info.BytesEstimated ? " (estimated)" : "")}, {a.Session.Markers.Count} markers, {a.Session.Info.Clips.Count} clips",
             a.Profile.Name, a.Session.Info.Id, bytes: a.Session.Info.RecordedBytes, seconds: duration);
 
-        var keep = a.Profile.Mode == CaptureMode.Timeline || a.Session.Markers.Count > 0;
+        // A timeline with no footage and no markers (a recorder that died at once) is not worth a library entry.
+        var keep = (a.Profile.Mode == CaptureMode.Timeline && duration > 0) || a.Session.Markers.Count > 0;
         if (!keep) { TryDeleteSession(a.Session.Dir); return Ok($"session {a.Session.Info.Id} ended (nothing saved)"); }
         if (a.Profile.Mode == CaptureMode.Timeline && a.Session.Info.FirstFrameMonoUs is null)
             _log.LogWarning("session {id}: no first-frame timestamp found; markers keep monotonic times only", a.Session.Info.Id);
@@ -481,6 +494,26 @@ public sealed class RecordingCoordinator : IAsyncDisposable
     }
 
     /// <summary>Drops RAM footage of finished sessions: all of them, or only those past their keep time.</summary>
+    /// <summary>Bytes of earlier sessions' footage in RAM, which PurgeRamSessions(all: true) would free.</summary>
+    private long RamFootageBytes()
+    {
+        if (!Directory.Exists(_cfg.SessionsDir)) return 0;
+        long total = 0;
+        foreach (var dir in Directory.EnumerateDirectories(_cfg.SessionsDir))
+        {
+            if (dir == _active?.Session.Dir) continue;
+            try
+            {
+                if (!File.Exists(Path.Combine(dir, "session.json"))) continue;
+                var info = SessionStore.Load(dir).Info;
+                if (info.MediaDir is null || info.FootageGone || info.MediaPlain || !Directory.Exists(info.MediaDir)) continue;
+                total += new DirectoryInfo(info.MediaDir).EnumerateFiles("*", SearchOption.AllDirectories).Sum(f => f.Length);
+            }
+            catch { }
+        }
+        return total;
+    }
+
     public void PurgeRamSessions(bool all)
     {
         if (!Directory.Exists(_cfg.SessionsDir)) return;
@@ -527,6 +560,7 @@ public sealed class RecordingCoordinator : IAsyncDisposable
         {
             var a = _active;
             if (a is null || a.Recorder.HasExited) return;
+            if (a.PurgeRamPending && ActiveSeconds >= EarlyDeathSeconds) { a.PurgeRamPending = false; PurgeRamSessions(all: true); }
             a.Segments?.Refresh();
             if (a.Pending is { } job && MonotonicClock.NowMicros() >= job.DueMonoUs)
                 await FlushMarkJobAsync(a, "due", ct);
