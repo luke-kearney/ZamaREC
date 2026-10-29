@@ -14,11 +14,12 @@ public sealed class ControlSocketServer : BackgroundService
     private readonly GsiService _gsi;
     private readonly PauseControl _pause;
     private readonly RetentionService _retention;
+    private readonly Core.Telemetry.EventLog _events;
     private readonly ILogger<ControlSocketServer> _log;
 
-    public ControlSocketServer(RecordingCoordinator rec, Core.Config.ZamaRecConfig cfg, ConfigService configService, GsiService gsi, PauseControl pause, RetentionService retention, ILogger<ControlSocketServer> log)
+    public ControlSocketServer(RecordingCoordinator rec, Core.Config.ZamaRecConfig cfg, ConfigService configService, GsiService gsi, PauseControl pause, RetentionService retention, Core.Telemetry.EventLog events, ILogger<ControlSocketServer> log)
     {
-        _rec = rec; _cfg = cfg; _configService = configService; _gsi = gsi; _pause = pause; _retention = retention; _log = log;
+        _rec = rec; _cfg = cfg; _configService = configService; _gsi = gsi; _pause = pause; _retention = retention; _events = events; _log = log;
     }
 
     protected override async Task ExecuteAsync(CancellationToken ct)
@@ -76,7 +77,8 @@ public sealed class ControlSocketServer : BackgroundService
         }
     }
 
-    private async Task<ControlResponse> DispatchAsync(ControlRequest req, CancellationToken ct)
+    /// <summary>One CLI command. Also reached over HTTP as POST /api/control, for clients that cannot use the socket (a Stream Deck plugin on Windows).</summary>
+    public async Task<ControlResponse> DispatchAsync(ControlRequest req, CancellationToken ct)
     {
         switch (req.Cmd)
         {
@@ -120,7 +122,9 @@ public sealed class ControlSocketServer : BackgroundService
             case "status":
             {
                 var s = _rec.Status();
-                s.GsiLastSeconds = _gsi.SecondsSinceLastPayload; s.GsiMap = _gsi.CurrentMap;
+                s.GsiLastSeconds = _gsi.SecondsSinceLastPayload; s.GsiMap = _gsi.CurrentMap; s.Game = _gsi.Game;
+                if (_events.Last is { } last) s.LastEvent = new StatusEvent { Ts = last.Ts, Level = last.Level, Kind = last.Kind, Message = last.Message };
+                if (req.Storage == true) s.Storage = StorageNow();
                 var ps = _pause.Current; s.Paused = ps.Mode == "off" ? null : PauseControl.Describe(ps);
                 var gsiNote = s.GsiLastSeconds is double g ? $", gsi {g:0}s ago" + (s.GsiMap is null ? "" : $" on {s.GsiMap}") : "";
                 var msg = s.State == "idle" ? "idle" + (s.Paused is null ? "" : $" (auto recording paused {s.Paused})") + gsiNote
@@ -132,6 +136,16 @@ public sealed class ControlSocketServer : BackgroundService
             }
             default: return new ControlResponse { Ok = false, Message = $"unknown command '{req.Cmd}'" };
         }
+    }
+
+    private StorageState StorageNow()
+    {
+        var ram = Core.Config.Paths.Expand(_cfg.Timeline.RamDir);
+        var st = new StorageState { RamUsedBytes = Core.Telemetry.ProcessUsage.DirBytes(ram) };
+        try { st.RamFreeBytes = new DriveInfo(Existing(ram)).AvailableFreeSpace; } catch { }
+        try { var d = new DriveInfo(Existing(_cfg.RootDir)); st.DiskFreeBytes = d.AvailableFreeSpace; st.DiskTotalBytes = d.TotalSize; } catch { }
+        return st;
+        static string Existing(string p) { while (!Directory.Exists(p)) p = Path.GetDirectoryName(p) ?? "/"; return p; }
     }
 
     private static async Task<string> ReadLineAsync(Socket s, CancellationToken ct)

@@ -13,6 +13,9 @@ public sealed record GsiSnapshot
     public string? MapName { get; init; }
     public string? MapPhase { get; init; }
     public int? MapRound { get; init; }
+    public string? MapMode { get; init; }
+    public int? ScoreCt { get; init; }
+    public int? ScoreT { get; init; }
     public string? RoundPhase { get; init; }
     public string? RoundWinTeam { get; init; }
     public string? PlayerSteamId { get; init; }
@@ -23,6 +26,7 @@ public sealed record GsiSnapshot
     public int? RoundKills { get; init; }
     public int? RoundKillsHs { get; init; }
     public int? MatchKills { get; init; }
+    public int? MatchAssists { get; init; }
     public int? MatchDeaths { get; init; }
     public int? MatchMvps { get; init; }
 
@@ -45,6 +49,9 @@ public sealed record GsiSnapshot
             MapName = Str(map is { } m ? Get(m, "name") : null),
             MapPhase = Str(map is { } m2 ? Get(m2, "phase") : null),
             MapRound = Int(map is { } m3 ? Get(m3, "round") : null),
+            MapMode = Str(map is { } m4 ? Get(m4, "mode") : null),
+            ScoreCt = Int(map is { } m5 && Get(m5, "team_ct") is { } ct ? Get(ct, "score") : null),
+            ScoreT = Int(map is { } m6 && Get(m6, "team_t") is { } t ? Get(t, "score") : null),
             RoundPhase = Str(round is { } r ? Get(r, "phase") : null),
             RoundWinTeam = Str(round is { } r2 ? Get(r2, "win_team") : null),
             PlayerSteamId = Str(player is { } p3 ? Get(p3, "steamid") : null),
@@ -55,6 +62,7 @@ public sealed record GsiSnapshot
             RoundKills = Int(state is { } s2 ? Get(s2, "round_kills") : null),
             RoundKillsHs = Int(state is { } s3 ? Get(s3, "round_killhs") : null),
             MatchKills = Int(stats is { } st ? Get(st, "kills") : null),
+            MatchAssists = Int(stats is { } st4 ? Get(st4, "assists") : null),
             MatchDeaths = Int(stats is { } st2 ? Get(st2, "deaths") : null),
             MatchMvps = Int(stats is { } st3 ? Get(st3, "mvps") : null),
         };

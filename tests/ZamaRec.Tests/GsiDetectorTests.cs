@@ -34,6 +34,18 @@ public class GsiDetectorTests
     }
 
     [Fact]
+    public void ParsesTheScoreAndMatchStatsForTheDeck()
+    {
+        var s = GsiSnapshot.Parse("""
+            {"map":{"name":"de_inferno","mode":"competitive","phase":"live","round":9,"team_ct":{"score":5},"team_t":{"score":4}},
+             "player":{"match_stats":{"kills":11,"assists":3,"deaths":6,"mvps":2}}}
+            """);
+        Assert.Equal("competitive", s.MapMode);
+        Assert.Equal((5, 4), (s.ScoreCt, s.ScoreT));
+        Assert.Equal((11, 3, 6, 2), (s.MatchKills, s.MatchAssists, s.MatchDeaths, s.MatchMvps));
+    }
+
+    [Fact]
     public void KillsCarryTheRoundCountAndHeadshotFlag()
     {
         var kills = Run().Where(x => x.Ev.Type == "kill").ToList();

@@ -18,6 +18,7 @@ public sealed class GsiService
     private string? _detectorSession;
     private long _lastMono;
     private string? _lastMap;
+    private Protocol.GameState? _game;
 
     public string Token { get; }
     public string? CfgPath { get; private set; }
@@ -43,6 +44,26 @@ public sealed class GsiService
     public double? SecondsSinceLastPayload => _lastMono == 0 ? null : (MonotonicClock.NowMicros() - _lastMono) / 1e6;
     public string? CurrentMap => _lastMap;
 
+    /// <summary>The match as the last payloads described it (map, score, the player's own stats); null in the menu.</summary>
+    public Protocol.GameState? Game { get { lock (_lock) return _game; } }
+
+    // CS2 sends only the blocks that exist: no map block in the menu, and the player block can be someone being
+    // spectated. Stats are taken from the player's own block only, and start over with each map.
+    private void UpdateGame(GsiSnapshot s)
+    {
+        if (s.MapName is null) { _game = null; return; }
+        var prev = _game?.Map == s.MapName ? _game : null;
+        var own = s.IsOwnPlayer;
+        _game = new Protocol.GameState
+        {
+            Map = s.MapName, Mode = s.MapMode ?? prev?.Mode, Phase = s.MapPhase ?? prev?.Phase, Round = s.MapRound ?? prev?.Round,
+            ScoreCt = s.ScoreCt ?? prev?.ScoreCt, ScoreT = s.ScoreT ?? prev?.ScoreT,
+            Team = (own ? s.PlayerTeam : null) ?? prev?.Team,
+            Kills = (own ? s.MatchKills : null) ?? prev?.Kills, Assists = (own ? s.MatchAssists : null) ?? prev?.Assists,
+            Deaths = (own ? s.MatchDeaths : null) ?? prev?.Deaths, Mvps = (own ? s.MatchMvps : null) ?? prev?.Mvps,
+        };
+    }
+
     /// <summary>Handles one POST from the game. Returns false when the token does not match.</summary>
     public async Task<bool> HandleAsync(JsonElement root, long arrivalMono, CancellationToken ct)
     {
@@ -57,6 +78,7 @@ public sealed class GsiService
             if (sessionId != _detectorSession) { _detector = new GsiEventDetector(); _detectorSession = sessionId; }
             events = _detector.Process(snap);
             _lastMap = _detector.CurrentMap;
+            UpdateGame(snap);
         }
         if (_cfg.Gsi.CaptureRaw && _rec.ActiveSessionDir is string dir)
         {
