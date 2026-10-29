@@ -30,6 +30,8 @@ public sealed class EventLog
 {
     private readonly object _lock = new();
     public string Path { get; }
+    /// <summary>The newest event written since the daemon started, for the status reply.</summary>
+    public LogEvent? Last { get; private set; }
 
     public EventLog(string? path = null)
     {
@@ -41,7 +43,7 @@ public sealed class EventLog
     {
         var e = new LogEvent { Kind = kind, Message = message, Profile = profile, Session = session, File = file, Bytes = bytes, Seconds = seconds, Level = level };
         var line = JsonSerializer.Serialize(e, TelemetryJson.Default.LogEvent) + "\n";
-        lock (_lock) File.AppendAllText(Path, line);
+        lock (_lock) { File.AppendAllText(Path, line); Last = e; }
         return e;
     }
 

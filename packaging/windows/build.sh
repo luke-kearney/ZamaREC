@@ -6,6 +6,7 @@
 #   ffmpeg.exe          the recorder and exporter (gyan.dev's "essentials" build: NVENC, AMF, QSV, ddagrab)
 #   ffprobe.exe
 #   README.txt          how to set it up
+#   com.zamarec.deck.streamDeckPlugin   the Stream Deck plugin (packaging/opendeck); opening it installs it
 #
 # The same source builds the Linux install (install.sh); nothing here changes it.
 set -euo pipefail
@@ -35,6 +36,9 @@ FF=$(ls -d "$OUT"/ffmpeg/ffmpeg-*/ | head -1)
 cp "$FF/bin/ffmpeg.exe" "$FF/bin/ffprobe.exe" "$OUT/stage/zamarec/"
 cp "$FF/LICENSE" "$OUT/stage/zamarec/ffmpeg-LICENSE.txt"
 cp packaging/windows/README.txt "$OUT/stage/zamarec/README.txt"
+# The Stream Deck plugin: a .streamDeckPlugin is the plugin folder zipped; opening it installs it.
+STAGE=$(cd "$OUT/stage/zamarec" && pwd)
+(cd packaging/opendeck && python3 -m zipfile -c "$STAGE/com.zamarec.deck.streamDeckPlugin" com.zamarec.deck.sdPlugin)
 
 echo ">> zipping"
 rm -f "$OUT/zamarec-windows-x64.zip"

@@ -25,6 +25,8 @@ Using it
   recorded too and listed under Games so you can keep or ignore them.
 - Ctrl+Alt+M drops a marker. Ctrl+Alt+S saves the last 30 seconds as a clip.
   Ctrl+Alt+K opens the window. Change these under Settings -> Hotkeys.
+- With a Stream Deck: open com.zamarec.deck.streamDeckPlugin for keys that
+  show whether it is recording and mark, save or pause with a press.
 - Feedback is a short sound; ZamaREC never pops anything up over a game.
 - Recordings live in Videos\zamarec. Old ones are deleted by the retention
   settings (100 GB / 30 days by default).

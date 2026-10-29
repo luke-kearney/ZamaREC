@@ -7,6 +7,7 @@ localhost. Everything the web UI does goes through these.
 
 | method | path | notes |
 |---|---|---|
+| POST | `/control` | the CLI's request (`{ "cmd": "mark", "label": "..." }`, `save`, `start`, `stop`, `pause`, `resume`, `status`, ...) and its reply, snake_case as on the control socket; for clients that cannot reach the socket (the [deck plugin](deck-plugin.md) on Windows) |
 | GET | `/status` | state, profile, mode, elapsed, window, markers, GSI age and map, usage (cpu %, rss, tmpfs bytes, cores), pause, profiles |
 | POST | `/mark` | `{ "label": "..." }` |
 | POST | `/pause` | `{ "mode": "session" \| "until" \| "forever", "hours": 2 }`; stops the current session |

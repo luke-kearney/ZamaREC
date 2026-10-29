@@ -96,6 +96,7 @@ its own clip and retention settings.
 - [Web UI](docs/web-ui.md): the timeline, editing, settings, stats and log.
 - [CS2 events](docs/cs2-gsi.md): what Game State Integration gives you and how it is used.
 - [HTTP API](docs/http-api.md): everything the UI talks to, for scripting.
+- [Stream Deck / OpenDeck](docs/deck-plugin.md): keys that show the recording state, mark, save and pause.
 - [Troubleshooting](docs/troubleshooting.md): the things that go wrong and what they mean.
 - [Windows](docs/windows.md): the Windows build, how it differs, and how to make the bundle.
 - [Development](docs/development.md) and [CONTRIBUTING](CONTRIBUTING.md).
