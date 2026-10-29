@@ -13,6 +13,8 @@ public sealed class ControlRequest
     /// <summary>pause: session | until | forever</summary>
     [JsonPropertyName("mode")] public string? Mode { get; set; }
     [JsonPropertyName("hours")] public double? Hours { get; set; }
+    /// <summary>status: also measure storage. That walks the RAM dir, so ask every few seconds, not every second.</summary>
+    [JsonPropertyName("storage")] public bool? Storage { get; set; }
 }
 
 public sealed class ControlResponse
@@ -49,6 +51,51 @@ public sealed class DaemonStatus
     [JsonPropertyName("ui_window")] public string? UiWindow { get; set; }
     [JsonPropertyName("save_seconds")] public int? SaveSeconds { get; set; }
     [JsonPropertyName("profiles")] public List<string> Profiles { get; set; } = new();
+    /// <summary>How long the session keeps: the timeline window or the buffer, in seconds. Null for an unlimited window.</summary>
+    [JsonPropertyName("window_limit_seconds")] public double? WindowLimitSeconds { get; set; }
+    /// <summary>True when the session's footage is in RAM (tmpfs or the replay buffer).</summary>
+    [JsonPropertyName("in_ram")] public bool? InRam { get; set; }
+    /// <summary>The newest line of the event log (kept in memory, not read back from the file).</summary>
+    [JsonPropertyName("last_event")] public StatusEvent? LastEvent { get; set; }
+    /// <summary>What CS2's game state integration last said; null outside a match.</summary>
+    [JsonPropertyName("game")] public GameState? Game { get; set; }
+    /// <summary>Only when the request asked for it.</summary>
+    [JsonPropertyName("storage")] public StorageState? Storage { get; set; }
+}
+
+public sealed class StatusEvent
+{
+    [JsonPropertyName("ts")] public DateTimeOffset Ts { get; set; }
+    [JsonPropertyName("level")] public string Level { get; set; } = "info";
+    [JsonPropertyName("kind")] public string Kind { get; set; } = "";
+    [JsonPropertyName("message")] public string Message { get; set; } = "";
+}
+
+public sealed class GameState
+{
+    [JsonPropertyName("map")] public string? Map { get; set; }
+    [JsonPropertyName("mode")] public string? Mode { get; set; }
+    /// <summary>warmup | live | intermission | gameover</summary>
+    [JsonPropertyName("phase")] public string? Phase { get; set; }
+    [JsonPropertyName("round")] public int? Round { get; set; }
+    [JsonPropertyName("score_ct")] public int? ScoreCt { get; set; }
+    [JsonPropertyName("score_t")] public int? ScoreT { get; set; }
+    /// <summary>CT | T, the player's own side.</summary>
+    [JsonPropertyName("team")] public string? Team { get; set; }
+    [JsonPropertyName("kills")] public int? Kills { get; set; }
+    [JsonPropertyName("assists")] public int? Assists { get; set; }
+    [JsonPropertyName("deaths")] public int? Deaths { get; set; }
+    [JsonPropertyName("mvps")] public int? Mvps { get; set; }
+}
+
+public sealed class StorageState
+{
+    /// <summary>What the RAM dir (timeline.ram_dir) holds, and what its tmpfs has left.</summary>
+    [JsonPropertyName("ram_used_bytes")] public long RamUsedBytes { get; set; }
+    [JsonPropertyName("ram_free_bytes")] public long RamFreeBytes { get; set; }
+    /// <summary>The disk under storage.root.</summary>
+    [JsonPropertyName("disk_free_bytes")] public long DiskFreeBytes { get; set; }
+    [JsonPropertyName("disk_total_bytes")] public long DiskTotalBytes { get; set; }
 }
 
 [JsonSourceGenerationOptions(DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]

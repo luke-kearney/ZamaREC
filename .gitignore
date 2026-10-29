@@ -5,3 +5,6 @@ obj/
 .idea/
 publish/
 dist/
+# Local only: notes for the coding agent, KDE folder settings
+CLAUDE.md
+.directory

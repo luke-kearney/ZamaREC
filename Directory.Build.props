@@ -5,5 +5,9 @@
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
     <LangVersion>latest</LangVersion>
     <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Releases are MAJOR.MINOR.PATCH. Raise this by hand for a new minor or major; CI adds the patch
+         (one past the newest vMAJOR.MINOR.* tag) and passes -p:Version. Local builds say MAJOR.MINOR.0-dev. -->
+    <ZamaRecVersion>0.1</ZamaRecVersion>
+    <Version Condition="'$(Version)' == ''">$(ZamaRecVersion).0-dev</Version>
   </PropertyGroup>
 </Project>

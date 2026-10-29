@@ -1,0 +1,88 @@
+{
+  "$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
+  "Name": "ZamaREC",
+  "UUID": "com.zamarec.deck",
+  "Description": "Recording state, markers, clips and auto-recording for the ZamaREC game recorder.",
+  "Author": "ZamaREC",
+  "Version": "1.0.0.0",
+  "Icon": "icons/plugin",
+  "Category": "ZamaREC",
+  "CategoryIcon": "icons/plugin",
+  "CodePath": "plugin.js",
+  "CodePathLin": "plugin.js",
+  "SDKVersion": 2,
+  "Nodejs": { "Version": "20" },
+  "Software": { "MinimumVersion": "6.4" },
+  "OS": [
+    { "Platform": "linux" },
+    { "Platform": "windows", "MinimumVersion": "10" }
+  ],
+  "Actions": [
+    {
+      "UUID": "com.zamarec.deck.recording",
+      "Name": "Recording",
+      "Tooltip": "Shows whether ZamaREC is recording, for how long and how many markers; press to start or stop, hold to open the window",
+      "Icon": "icons/recording",
+      "Controllers": ["Keypad"],
+      "DisableAutomaticStates": true,
+      "SupportedInMultiActions": false,
+      "PropertyInspectorPath": "pi/index.html",
+      "States": [{ "Image": "icons/key-recording", "ShowTitle": false }]
+    },
+    {
+      "UUID": "com.zamarec.deck.mark",
+      "Name": "Mark",
+      "Tooltip": "Drop a marker on the current session",
+      "Icon": "icons/mark",
+      "Controllers": ["Keypad"],
+      "DisableAutomaticStates": true,
+      "SupportedInMultiActions": true,
+      "PropertyInspectorPath": "pi/index.html",
+      "States": [{ "Image": "icons/key-mark", "ShowTitle": false }]
+    },
+    {
+      "UUID": "com.zamarec.deck.save",
+      "Name": "Save clip",
+      "Tooltip": "Save the last N seconds as a clip",
+      "Icon": "icons/save",
+      "Controllers": ["Keypad"],
+      "DisableAutomaticStates": true,
+      "SupportedInMultiActions": true,
+      "PropertyInspectorPath": "pi/index.html",
+      "States": [{ "Image": "icons/key-save", "ShowTitle": false }]
+    },
+    {
+      "UUID": "com.zamarec.deck.pause",
+      "Name": "Auto recording",
+      "Tooltip": "Turn automatic recording off and on again",
+      "Icon": "icons/pause",
+      "Controllers": ["Keypad"],
+      "DisableAutomaticStates": true,
+      "SupportedInMultiActions": true,
+      "PropertyInspectorPath": "pi/index.html",
+      "States": [{ "Image": "icons/key-pause", "ShowTitle": false }]
+    },
+    {
+      "UUID": "com.zamarec.deck.ui",
+      "Name": "Open ZamaREC",
+      "Tooltip": "Open the ZamaREC window, or bring it to the front",
+      "Icon": "icons/ui",
+      "Controllers": ["Keypad"],
+      "DisableAutomaticStates": true,
+      "SupportedInMultiActions": false,
+      "PropertyInspectorPath": "pi/index.html",
+      "States": [{ "Image": "icons/key-ui", "ShowTitle": false }]
+    },
+    {
+      "UUID": "com.zamarec.deck.info",
+      "Name": "Info display",
+      "Tooltip": "Shows one thing: session time, window, markers, CS2 score, K/A/D or map, the last event, RAM or disk. Made for keys that are only a screen",
+      "Icon": "icons/info",
+      "Controllers": ["Keypad"],
+      "DisableAutomaticStates": true,
+      "SupportedInMultiActions": false,
+      "PropertyInspectorPath": "pi/index.html",
+      "States": [{ "Image": "icons/key-info", "ShowTitle": false }]
+    }
+  ]
+}

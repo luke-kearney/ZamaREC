@@ -558,6 +558,9 @@ public sealed class RecordingCoordinator : IAsyncDisposable
             s.WindowSeconds = a.Segments.Available(includeTail: false).Sum(x => x.Duration);
         }
         s.PendingMarks = a.Pending?.Marks.Count ?? 0;
+        var p = a.Profile;
+        s.WindowLimitSeconds = p.Mode == CaptureMode.Buffer ? p.BufferMinutes * 60 : p.WindowMinutes > 0 ? p.WindowMinutes * 60 : null;
+        s.InRam = a.Session.Info.InRam || p.Mode == CaptureMode.Buffer;
         return s;
     }
 

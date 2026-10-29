@@ -1,29 +1,55 @@
 name: ci
-# Feature branches go into develop by pull request, develop goes into master by pull request.
-# Every pull request is built and tested. A push to develop replaces the "dev" pre-release,
-# a push to master publishes a release of its own.
+# Feature branches go into master by pull request. Every pull request is built and tested; a push to
+# master publishes a release, vMAJOR.MINOR.PATCH. MAJOR.MINOR is ZamaRecVersion in Directory.Build.props
+# (raised by hand); PATCH is one past the newest tag of that MAJOR.MINOR, so it starts at 0.
 on:
   push:
-    branches: [master, develop]
+    branches: [master]
   pull_request:
+# One master run at a time, so two quick merges cannot pick the same version. A newer push to a pull
+# request replaces its older run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
-  build:
+  version:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # the tags
+      - id: v
+        run: |
+          minor=$(grep -oP '(?<=<ZamaRecVersion>)[^<]+' Directory.Build.props)
+          last=$(git tag -l "v$minor.*" | sed "s/^v$minor\.//" | grep -E '^[0-9]+$' | sort -n | tail -1 || true)
+          version="$minor.$(( ${last:--1} + 1 ))"
+          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then version="$version-pr.${{ github.event.number }}"; fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "version $version"
+
+  build:
+    needs: version
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
       - run: dotnet restore
-      - run: dotnet build --no-restore -c Release
+      - run: dotnet build --no-restore -c Release -p:Version=$VERSION
       - run: dotnet test tests/ZamaRec.Tests --no-build -c Release --logger "trx;LogFileName=results.trx"
       - name: publish CLI (NativeAOT smoke)
         run: |
           sudo apt-get install -y clang zlib1g-dev >/dev/null
-          dotnet publish src/ZamaRec.Cli -c Release -r linux-x64 -o /tmp/cli --nologo -v q
+          dotnet publish src/ZamaRec.Cli -c Release -r linux-x64 -o /tmp/cli --nologo -v q -p:Version=$VERSION
           /tmp/cli/zamarec --help | head -3
 
   windows-bundle:
+    needs: version
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -37,35 +63,29 @@ jobs:
           key: ffmpeg-essentials-${{ hashFiles('packaging/windows/build.sh') }}
       - name: build the Windows bundle (cross-published from Linux)
         run: packaging/windows/build.sh
+        env:
+          ZAMAREC_VERSION: ${{ needs.version.outputs.version }}
       - uses: actions/upload-artifact@v4
         with:
           name: zamarec-windows-x64-${{ github.sha }}
           path: dist/windows/zamarec-windows-x64.zip
           if-no-files-found: error
+          # Only the release job needs it; keep it a few days so artifacts do not pile up.
+          retention-days: 3
 
   # Only after both jobs above passed, and never for a pull request.
   release:
     if: github.event_name == 'push'
-    needs: [build, windows-bundle]
+    needs: [version, build, windows-bundle]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
+      VERSION: ${{ needs.version.outputs.version }}
     steps:
       - uses: actions/download-artifact@v4
         with:
           name: zamarec-windows-x64-${{ github.sha }}
-      - name: develop -> the "dev" pre-release, replaced each time
-        if: github.ref == 'refs/heads/develop'
-        run: |
-          gh release delete dev --cleanup-tag --yes 2>/dev/null || true
-          gh release create dev zamarec-windows-x64.zip --prerelease --target "$GITHUB_SHA" \
-            --title "Development build" \
-            --notes "The newest build of the develop branch, replaced on every push. Built from $GITHUB_SHA on $(date -u +%Y-%m-%d\ %H:%M) UTC."
-      - name: master -> a release of its own
-        if: github.ref == 'refs/heads/master'
-        run: |
-          tag="v$(date -u +%Y.%m.%d)-$GITHUB_RUN_NUMBER"
-          gh release create "$tag" zamarec-windows-x64.zip --latest --target "$GITHUB_SHA" --title "ZamaREC $tag" --generate-notes
+      - run: gh release create "v$VERSION" zamarec-windows-x64.zip --latest --target "$GITHUB_SHA" --title "ZamaREC $VERSION" --generate-notes

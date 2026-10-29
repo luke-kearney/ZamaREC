@@ -1,3 +1,4 @@
+using System.Reflection;
 using ZamaRec.Core;
 using ZamaRec.Core.Config;
 using ZamaRec.Core.Feedback;
@@ -49,7 +50,8 @@ builder.Services.AddSingleton<ThumbService>();
 builder.Services.AddSingleton<DiscordShare>();
 builder.Services.AddSingleton<ShareJobs>();
 builder.Services.AddHostedService<GameWatcherService>();
-builder.Services.AddHostedService<ControlSocketServer>();
+builder.Services.AddSingleton<ControlSocketServer>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<ControlSocketServer>());
 builder.Services.AddSingleton<RetentionService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<RetentionService>());
 if (OperatingSystem.IsWindows()) builder.Services.AddHostedService<WindowsShell>();
@@ -76,8 +78,10 @@ app.MapWebApi();
 app.Services.GetRequiredService<ZamaRec.Core.Telemetry.EventLog>().Write("daemon", "daemon started");
 app.Services.GetRequiredService<GsiService>().EnsureConfigFile();
 var log = app.Services.GetRequiredService<ILogger<Program>>();
-log.LogInformation("zamarec daemon starting; config {path}; ui http://{bind}:{port}; profiles: {profiles}",
-    configPath, config.Daemon.Bind, config.Daemon.UiPort, string.Join(", ", config.Profiles.Select(p => $"{p.Name} ({p.Mode})")));
+// The release version CI builds with (e.g. 0.1.3, or 0.1.0-dev locally), plus the commit it came from.
+var appVersion = typeof(Program).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "unknown";
+log.LogInformation("zamarec {version} daemon starting; config {path}; ui http://{bind}:{port}; profiles: {profiles}",
+    appVersion, configPath, config.Daemon.Bind, config.Daemon.UiPort, string.Join(", ", config.Profiles.Select(p => $"{p.Name} ({p.Mode})")));
 {
     var found = ZamaRec.Core.Recording.GpuVendor.Detected;
     var use = ZamaRec.Core.Recording.HwCodec.Normalize(config.Capture.Gpu);
@@ -87,7 +91,7 @@ log.LogInformation("zamarec daemon starting; config {path}; ui http://{bind}:{po
 }
 var ffmpegVersion = Platform.IsWindows ? ZamaRec.Core.Recording.Ffmpeg.Version() : null;
 if (Platform.IsWindows && ffmpegVersion is not null)
-    log.LogInformation("zamarec {version} on {os}; {ffmpeg} ({exe})", typeof(Program).Assembly.GetName().Version, System.Runtime.InteropServices.RuntimeInformation.OSDescription, ffmpegVersion, ZamaRec.Core.Recording.Ffmpeg.Exe);
+    log.LogInformation("zamarec {version} on {os}; {ffmpeg} ({exe})", appVersion, System.Runtime.InteropServices.RuntimeInformation.OSDescription, ffmpegVersion, ZamaRec.Core.Recording.Ffmpeg.Exe);
 if (Platform.IsWindows && ffmpegVersion is null)
 {
     log.LogError("ffmpeg.exe was not found next to the daemon or on PATH: nothing can be recorded or exported until it is");

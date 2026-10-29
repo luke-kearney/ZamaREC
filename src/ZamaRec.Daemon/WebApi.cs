@@ -65,6 +65,10 @@ public static class WebApi
         api.MapPost("/mark", async (MarkRequest req, RecordingCoordinator rec, CancellationToken ct) =>
             Results.Ok(await rec.MarkAsync(req.Label, ct)));
 
+        // The CLI's request and reply as they go over the control socket (snake_case), for clients without that socket.
+        api.MapPost("/control", async (ZamaRec.Protocol.ControlRequest req, ControlSocketServer control, CancellationToken ct) =>
+            Results.Json(await control.DispatchAsync(req, ct), ZamaRec.Protocol.ProtocolJson.Default.ControlResponse));
+
         // ------------------------------------------------------------ log + stats
 
         api.MapGet("/events", (EventLog log, int? limit, string? kind) => Results.Ok(log.Tail(Math.Clamp(limit ?? 200, 1, 2000), string.IsNullOrEmpty(kind) ? null : kind)));

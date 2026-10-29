@@ -85,6 +85,11 @@ command -v kbuildsycoca6 >/dev/null && kbuildsycoca6 >/dev/null 2>&1 || true
 command -v gtk-update-icon-cache >/dev/null && gtk-update-icon-cache -q -t "$ICON_DIR" 2>/dev/null || true
 command -v update-desktop-database >/dev/null && update-desktop-database -q "$HOME/.local/share/applications" 2>/dev/null || true
 
+# Only where OpenDeck is installed; packaging/opendeck/install.sh does it on its own too.
+if [ -d "${XDG_CONFIG_HOME:-$HOME/.config}/opendeck/plugins" ] || [ -d "$HOME/.var/app/me.amankhanna.opendeck/config/opendeck/plugins" ]; then
+  packaging/opendeck/install.sh
+fi
+
 echo ">> installing systemd user unit"
 mkdir -p "$UNIT_DIR"
 cp packaging/zamarec.service "$UNIT_DIR/zamarec.service"
