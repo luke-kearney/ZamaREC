@@ -15,14 +15,16 @@ cd "$(dirname "$0")/../.."
 OUT=${1:-dist/windows}
 FFMPEG_URL=${ZAMAREC_FFMPEG_URL:-https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip}
 CACHE=${ZAMAREC_FFMPEG_ZIP:-$HOME/.cache/zamarec/ffmpeg-release-essentials.zip}
+# CI sets the release version; a local build keeps Directory.Build.props' MAJOR.MINOR.0-dev.
+VERSION_ARG=${ZAMAREC_VERSION:+-p:Version=$ZAMAREC_VERSION}
 
 rm -rf "$OUT"
 mkdir -p "$OUT/stage/zamarec"
 
 echo ">> publishing daemon (win-x64, single file)"
-dotnet publish src/ZamaRec.Daemon -c Release -r win-x64 -o "$OUT/daemon" --nologo -v q
+dotnet publish src/ZamaRec.Daemon -c Release -r win-x64 -o "$OUT/daemon" --nologo -v q $VERSION_ARG
 echo ">> publishing cli (win-x64, single file)"
-dotnet publish src/ZamaRec.Cli -c Release -r win-x64 -o "$OUT/cli" --nologo -v q
+dotnet publish src/ZamaRec.Cli -c Release -r win-x64 -o "$OUT/cli" --nologo -v q $VERSION_ARG
 cp "$OUT/daemon/zamarec-daemon.exe" "$OUT/cli/zamarec.exe" "$OUT/stage/zamarec/"
 
 echo ">> ffmpeg"

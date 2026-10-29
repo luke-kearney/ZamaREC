@@ -12,14 +12,15 @@ Both builds come from the same source; the Windows one swaps the recorder and a 
 
 ## Branches and releases
 
-- Work on a feature branch and open a pull request into `develop`. Every pull request is built and
-  tested, and its run carries the Windows bundle as an artifact, for trying the change on Windows
-  before it is merged.
-- A push to `develop` replaces the **Development build** pre-release (tag `dev`) with a new zip.
-- `develop` reaches `master` by pull request only. A push to `master` publishes a release of its
-  own, `vYYYY.MM.DD-N`, which becomes the latest release.
-- Merge with a merge commit, not a squash or rebase: both rewrite the commits, and `develop` and
-  `master` then no longer share them.
+- Work on a feature branch and open a pull request into `master`. Every pull request is built and
+  tested, and its run carries the Windows bundle as an artifact (kept 3 days), for trying the
+  change on Windows before it is merged.
+- A push to `master` publishes a release, `vMAJOR.MINOR.PATCH`, which becomes the latest release.
+  The patch goes up by itself with every merge. For a new minor or major, raise `ZamaRecVersion`
+  in `Directory.Build.props` in the pull request; the patch then starts again at 0.
+- Builds carry their version: a release says e.g. `0.1.3`, a pull request build `0.1.3-pr.12`, a
+  local build `0.1.0-dev`. The daemon logs it when it starts.
+- Merge with a merge commit, not a squash or rebase.
 
 The workflow is `.github/workflows/ci.yml`. Releases are only published once the tests and the
 Windows bundle both passed.
