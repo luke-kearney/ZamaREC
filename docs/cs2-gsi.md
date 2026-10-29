@@ -42,6 +42,12 @@ spectating stretch.
 window as a manual mark. Default `["kill:2", "mvp"]`: a round with two or more kills, and an MVP.
 Entries: `kill:N`, `mvp`, `death`, `round_win`, `round_loss`, `map_start`, `map_end`.
 
+`clips.event_clip_modes` limits those clips to some game modes, as CS2 names them in `map.mode`:
+`competitive`, `rush`, `casual`, `deathmatch`, `scrimcomp2v2` (wingman) and so on. Settings offers
+"competitive, premier and rush only"; empty means every mode. Events in other modes still become
+markers. The log's `map` line shows the mode CS2 reported, which is how to find a mode's name
+(Premier's has not been seen in a payload yet, so `premier` is a guess next to `competitive`).
+
 ## Raw capture
 
 With `gsi.capture_raw` on, every payload is appended to `gsi.jsonl` in the session folder with its

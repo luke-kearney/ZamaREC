@@ -106,6 +106,7 @@ Named encoder presets. Four ship by default: `low` (720p30, 6000 kbps), `medium`
 | `mark_clip_expire_hours` | `30` | mark clips are deleted after this unless starred. `0` = never |
 | `mark_saves` | unset | timeline mode: also write a clip on every mark. Unset = on for RAM timelines, off for disk. Buffer mode always does |
 | `event_clips` | `["kill:2", "mvp"]` | CS2 events that also write a clip: `kill:N` (N or more in the round), `mvp`, `death`, `round_win`, `round_loss`, `map_start`, `map_end` |
+| `event_clip_modes` | `[]` | CS2 modes (`map.mode`) in which `event_clips` write clips, e.g. `["competitive", "premier", "rush"]`. Empty = every mode. Markers are set in every mode |
 
 ## `[retention]` (defaults; profiles override under `retention.*`)
 

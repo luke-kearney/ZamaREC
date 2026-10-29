@@ -85,10 +85,11 @@ public sealed class GsiService
             try { await File.AppendAllTextAsync(Path.Combine(dir, "gsi.jsonl"), JsonSerializer.Serialize(new { mono_us = arrivalMono, payload = root }) + "\n", ct); }
             catch (Exception ex) { _log.LogDebug(ex, "gsi capture"); }
         }
+        var mode = Game?.Mode;
         foreach (var ev in events)
         {
-            if (ev.Type == "map_start" && snap.MapName is not null) _rec.SetMap(snap.MapName);
-            await _rec.EventMarkAsync(ev, arrivalMono, ct);
+            if (ev.Type == "map_start" && snap.MapName is not null) _rec.SetMap(snap.MapName, mode);
+            await _rec.EventMarkAsync(ev, arrivalMono, mode, ct);
         }
         return true;
     }

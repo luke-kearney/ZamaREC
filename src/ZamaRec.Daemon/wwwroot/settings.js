@@ -72,6 +72,7 @@
       ${field('mark: seconds after', inp('clips.markAfterSeconds', c.clips.markAfterSeconds, 'number', 'min="0"'))}
       ${field('mark clips expire after hours (0 = never)', inp('clips.markClipExpireHours', c.clips.markClipExpireHours, 'number', 'min="0"'))}
       ${field('game events that write a clip (comma list: kill:2, mvp, death, round_win, round_loss)', inp('clips.eventClips', (c.clips.eventClips || []).join(', ')), true)}
+      ${field('game event clips in', modesSel('clips.eventClipModes', c.clips.eventClipModes), false, 'CS2 modes whose events write a clip. Markers are set in every mode')}
       ${field('timeline: write a clip around each mark', sel('clips.markSaves', c.clips.markSaves == null ? '' : String(c.clips.markSaves), [{ v: '', l: 'auto (on for RAM timelines)' }, { v: 'true', l: 'on' }, { v: 'false', l: 'off' }]))}
       ${field('retention max GB', inp('retention.maxGb', c.retention.maxGb, 'number', 'min="0" step="1"'))}
       ${field('retention max days', inp('retention.maxDays', c.retention.maxDays, 'number', 'min="0"'))}
@@ -370,6 +371,15 @@
     });
   }
 
+  // event_clip_modes as a choice: every mode (empty list), the competitive ones, or a list set in the file, kept as it is.
+  const COMPETITIVE_MODES = 'competitive, premier, rush';
+  function modesSel(path, modes) {
+    const cur = (modes || []).join(', ');
+    const opts = [{ v: '', l: 'every mode' }, { v: COMPETITIVE_MODES, l: 'competitive, premier and rush only' }];
+    if (cur && cur !== COMPETITIVE_MODES) opts.push({ v: cur, l: cur });
+    return sel(path, cur, opts);
+  }
+
   // Reads the form back into cfg. Blank numbers become null (= use default); empty override groups become null.
   function collect() {
     const setPath = (obj, path, v) => { const ks = path.split('.'); let o = obj; for (let i = 0; i < ks.length - 1; i++) { const k = isNaN(ks[i]) ? ks[i] : +ks[i]; if (o[k] == null) o[k] = isNaN(ks[i + 1]) ? {} : []; o = o[k]; } o[ks[ks.length - 1]] = v; };
@@ -378,6 +388,7 @@
       let v = el.type === 'checkbox' ? el.checked : el.type === 'number' ? num(el.value) : (el.value === '' ? null : el.value);
       if (path.endsWith('markSaves') && v != null) v = v === 'true';
       if (path.endsWith('eventClips')) v = (v || '').split(',').map(x => x.trim()).filter(Boolean);
+      if (path.endsWith('eventClipModes')) v = (v || '').split(',').map(x => x.trim()).filter(Boolean);
       if (/^capture\.tracks\.\d+\.sources$/.test(path)) v = (v || '').split(',').map(x => x.trim()).filter(Boolean);
       if (/^capture\.tracks\.\d+\.name$/.test(path)) v = v || '';
       if (/^share\.targets\.\d+\.(name|command)$/.test(path)) v = v || '';
