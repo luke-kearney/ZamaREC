@@ -102,6 +102,14 @@
       ${field('never record these Steam app ids (comma list)', inp('autoGames.ignore', (ag.ignore || []).join(', ')), true)}
     </div></div>`;
 
+    const dk = c.desktop || (c.desktop = { windowMinutes: 30, storage: 'disk', quality: null, yieldToGames: true });
+    h += `<div class="card"><h3>Desktop recording</h3><div class="help">Record or <code>zamarec start</code> with no game running records the desktop with these settings, until you stop it; <code>zamarec start desktop</code> does so with a game running too.</div><div class="fields">
+      ${field('rolling window minutes', inp('desktop.windowMinutes', dk.windowMinutes, 'number', 'min="0"'), false, '0 keeps everything')}
+      <label class="field" ${win ? 'hidden' : ''}><span>storage</span>${sel('desktop.storage', dk.storage || 'disk', [{ v: 'disk', l: 'disk' }, { v: 'ram', l: 'RAM (drops the last game\'s RAM footage)' }])}</label>
+      ${field('quality preset', sel('desktop.quality', dk.quality ?? '', [{ v: '', l: '(capture default)' }, ...presetOpts]))}
+      ${field('a game that starts takes over', chk('desktop.yieldToGames', dk.yieldToGames))}
+    </div></div>`;
+
     const sh = c.share || (c.share = { discordWebhook: null, discordMaxMb: 10, targets: [] });
     sh.targets ||= [];
     h += `<div class="card"><h3>Sharing</h3><div class="help">A clip's Share button can post it to a Discord channel through a webhook. Nothing is sent unless you click it. A clip over the size limit is re-encoded on the GPU to fit first.</div><div class="fields">

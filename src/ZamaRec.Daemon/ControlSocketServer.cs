@@ -9,6 +9,7 @@ namespace ZamaRec.Daemon;
 public sealed class ControlSocketServer : BackgroundService
 {
     private readonly RecordingCoordinator _rec;
+    private readonly GameWatcherService _games;
     private readonly Core.Config.ZamaRecConfig _cfg;
     private readonly ConfigService _configService;
     private readonly GsiService _gsi;
@@ -17,9 +18,9 @@ public sealed class ControlSocketServer : BackgroundService
     private readonly Core.Telemetry.EventLog _events;
     private readonly ILogger<ControlSocketServer> _log;
 
-    public ControlSocketServer(RecordingCoordinator rec, Core.Config.ZamaRecConfig cfg, ConfigService configService, GsiService gsi, PauseControl pause, RetentionService retention, Core.Telemetry.EventLog events, ILogger<ControlSocketServer> log)
+    public ControlSocketServer(RecordingCoordinator rec, GameWatcherService games, Core.Config.ZamaRecConfig cfg, ConfigService configService, GsiService gsi, PauseControl pause, RetentionService retention, Core.Telemetry.EventLog events, ILogger<ControlSocketServer> log)
     {
-        _rec = rec; _cfg = cfg; _configService = configService; _gsi = gsi; _pause = pause; _retention = retention; _events = events; _log = log;
+        _rec = rec; _games = games; _cfg = cfg; _configService = configService; _gsi = gsi; _pause = pause; _retention = retention; _events = events; _log = log;
     }
 
     protected override async Task ExecuteAsync(CancellationToken ct)
@@ -87,10 +88,11 @@ public sealed class ControlSocketServer : BackgroundService
             case "stop": return await _rec.StopAsync("manual", ct);
             case "start":
             {
-                var name = req.Profile ?? _cfg.Profiles.FirstOrDefault()?.Name;
-                var profile = name is null ? null : _cfg.FindProfile(name);
-                if (profile is null) return new ControlResponse { Ok = false, Message = $"unknown profile '{name}'. Known: {string.Join(", ", _cfg.Profiles.Select(p => p.Name))}" };
-                return await _rec.StartAsync(profile, "manual", null, ct);
+                // No profile: the game that is running, else the desktop (GameWatcherService.StartByHandAsync).
+                if (string.IsNullOrWhiteSpace(req.Profile)) return await _games.StartByHandAsync(null, ct);
+                var profile = string.Equals(req.Profile, Core.Config.DesktopConfig.ProfileName, StringComparison.OrdinalIgnoreCase) ? _cfg.DesktopProfile() : _cfg.FindProfile(req.Profile);
+                if (profile is null) return new ControlResponse { Ok = false, Message = $"unknown profile '{req.Profile}'. Known: {string.Join(", ", _cfg.Profiles.Select(p => p.Name).Append(Core.Config.DesktopConfig.ProfileName).Distinct(StringComparer.OrdinalIgnoreCase))}" };
+                return await _games.StartByHandAsync(profile, ct);
             }
             case "pause":
             {

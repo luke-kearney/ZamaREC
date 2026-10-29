@@ -31,11 +31,13 @@ public sealed class WindowsShell : IHostedService
     private const int WmDestroy = 0x0002, WmClose = 0x0010, WmCommand = 0x0111, WmHotkey = 0x0312, WmApp = 0x8000, WmTray = WmApp + 1;
     private const int WmLButtonUp = 0x0202, WmLButtonDblClk = 0x0203, WmRButtonUp = 0x0205, WmContextMenu = 0x007B;
     private const int IdMark = 1, IdSave = 2, IdUi = 3;   // hotkey ids
-    private const int MenuOpen = 101, MenuMark = 102, MenuSave = 103, MenuPause = 104, MenuResume = 105, MenuFolder = 106, MenuAutostart = 107, MenuQuit = 108, MenuStatus = 109;
+    private const int MenuOpen = 101, MenuMark = 102, MenuSave = 103, MenuPause = 104, MenuResume = 105, MenuFolder = 106, MenuAutostart = 107, MenuQuit = 108, MenuStatus = 109, MenuStart = 110, MenuStop = 111, MenuDesktop = 112;
 
-    public WindowsShell(ZamaRecConfig cfg, RecordingCoordinator rec, PauseControl pause, IHostApplicationLifetime life, ILogger<WindowsShell> log)
+    private readonly GameWatcherService _games;
+
+    public WindowsShell(ZamaRecConfig cfg, RecordingCoordinator rec, GameWatcherService games, PauseControl pause, IHostApplicationLifetime life, ILogger<WindowsShell> log)
     {
-        _cfg = cfg; _rec = rec; _pause = pause; _life = life; _log = log;
+        _cfg = cfg; _rec = rec; _games = games; _pause = pause; _life = life; _log = log;
     }
 
     public Task StartAsync(CancellationToken ct)
@@ -147,6 +149,12 @@ public sealed class WindowsShell : IHostedService
         AppendMenu(menu, MfSeparator, 0, null);
         AppendMenu(menu, s.State == "idle" ? MfGrayed : 0, MenuMark, "Mark" + Suffix(_cfg.Hotkeys.Mark));
         AppendMenu(menu, s.State == "idle" ? MfGrayed : 0, MenuSave, $"Save last {s.SaveSeconds ?? _cfg.Clips.SaveSeconds} s" + Suffix(_cfg.Hotkeys.Save));
+        if (s.State == "idle")
+        {
+            AppendMenu(menu, 0, MenuStart, "Start recording");   // the running game, else the desktop
+            AppendMenu(menu, 0, MenuDesktop, "Record the desktop");
+        }
+        else AppendMenu(menu, 0, MenuStop, "Stop session");
         AppendMenu(menu, 0, paused ? MenuResume : MenuPause, paused ? "Turn recording on" : "Turn recording off");
         AppendMenu(menu, MfSeparator, 0, null);
         AppendMenu(menu, 0, MenuFolder, "Open recordings folder");
@@ -180,6 +188,9 @@ public sealed class WindowsShell : IHostedService
                 _ = Task.Run(async () => { _pause.Pause("forever", null, _rec.ActiveGamePid, _rec.Status().Profile); if (_rec.IsActive) await _rec.StopAsync("paused", CancellationToken.None); });
                 break;
             case MenuResume: _pause.Resume(); break;
+            case MenuStart: _ = Task.Run(() => _games.StartByHandAsync(null, CancellationToken.None)); break;
+            case MenuDesktop: _ = Task.Run(() => _games.StartByHandAsync(_cfg.DesktopProfile(), CancellationToken.None)); break;
+            case MenuStop: _ = Task.Run(() => _rec.StopAsync("manual", CancellationToken.None)); break;
             case MenuFolder:
                 try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", _cfg.RootDir) { UseShellExecute = true }); } catch (Exception ex) { _log.LogWarning(ex, "open folder"); }
                 break;

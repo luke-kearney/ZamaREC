@@ -72,6 +72,9 @@ async function refreshStatus() {
     } else { el.className = 'status idle'; txt.textContent = s.state; }
     if (s.pause) { el.className = 'status paused'; txt.textContent = (s.state === 'recording' ? txt.textContent + ' · ' : '') + 'auto recording off ' + s.pause.text; }
     $('powerBtn').className = 'switch ' + (s.pause ? 'off' : 'on');
+    const rec = $('recBtn'); rec.dataset.cmd = s.state === 'recording' ? 'stop' : 'start';
+    rec.textContent = s.state === 'recording' ? 'Stop' : 'Record';
+    rec.title = s.state === 'recording' ? `stop this session (a game stopped by hand is not recorded again until it exits or you press Record)` : 'start recording: the game that is running, else the desktop';
     state.shareTargets = s.shareTargets || [];
     if (s.usage) {
       const perCore = localStorage.getItem('cpuPerCore') === '1';
@@ -694,6 +697,13 @@ $('batchBtn').onclick = exportBatch;
   apply('aside-collapsed', asBtn, localStorage.getItem('asideCollapsed') === '1', 'sidebar');
 })();
 $('uCpuWrap').onclick = () => { localStorage.setItem('cpuPerCore', localStorage.getItem('cpuPerCore') === '1' ? '0' : '1'); refreshStatus(); };
+// Record / Stop: a start by hand picks the running game, else the desktop
+$('recBtn').onclick = async () => {
+  const b = $('recBtn'); b.disabled = true;
+  try { const r = await api('/control', { body: { cmd: b.dataset.cmd || 'start' } }); toast(r.message, !r.ok); refreshStatus(); refreshList(); }
+  catch (err) { toast(err.message, true); }
+  finally { b.disabled = false; }
+};
 // on/off switch: off opens a menu of durations, on resumes at once
 (() => {
   const menu = $('pauseMenu');

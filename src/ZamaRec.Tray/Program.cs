@@ -20,8 +20,8 @@ await conn.RequestNameAsync(busName, RequestNameOptions.None);
 
 string? uiUrl = null; string? uiWindow = null; string? rootDir = null;
 void Open(string target) { try { Process.Start(new ProcessStartInfo("xdg-open", target) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true })?.Dispose(); } catch { } }
-void Cmd(string cmd, string? mode = null, double? hours = null, int? seconds = null) =>
-    _ = Task.Run(() => DaemonClient.Send(new ControlRequest { Cmd = cmd, Mode = mode, Hours = hours, Seconds = seconds }));
+void Cmd(string cmd, string? mode = null, double? hours = null, int? seconds = null, string? profile = null) =>
+    _ = Task.Run(() => DaemonClient.Send(new ControlRequest { Cmd = cmd, Mode = mode, Hours = hours, Seconds = seconds, Profile = profile }));
 
 void OpenUi() { if (uiUrl is { } url) { var mode = uiWindow; _ = Task.Run(() => UiLauncher.Open(url, mode)); } }
 sni.OnActivate = OpenUi;
@@ -103,7 +103,12 @@ while (true)
             });
             items.Add(new MenuItem { Label = "Mark", Enabled = recording, Action = () => Cmd("mark") });
             items.Add(new MenuItem { Label = $"Save last {st.SaveSeconds ?? 30} s", Enabled = recording, Action = () => Cmd("save") });
-            items.Add(new MenuItem { Label = "Stop session", Enabled = recording, Action = () => Cmd("stop") });
+            if (recording) items.Add(new MenuItem { Label = "Stop session", Action = () => Cmd("stop") });
+            else
+            {
+                items.Add(new MenuItem { Label = "Start recording", Action = () => Cmd("start") });   // the running game, else the desktop
+                items.Add(new MenuItem { Label = "Record the desktop", Action = () => Cmd("start", profile: "desktop") });
+            }
             items.Add(MenuItem.Sep());
         }
         items.Add(new MenuItem { Label = "Open web UI", Enabled = uiUrl is not null, Action = OpenUi });

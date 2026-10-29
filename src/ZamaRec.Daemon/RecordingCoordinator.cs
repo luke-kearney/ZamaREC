@@ -79,6 +79,10 @@ public sealed class RecordingCoordinator : IAsyncDisposable
     public bool RecorderDied => _active is { Recorder.HasExited: true };
     /// <summary>A recorder that dies this soon after starting counts as one that did not start.</summary>
     public const double EarlyDeathSeconds = 10;
+    /// <summary>A desktop recording: the desktop profile, no game behind it.</summary>
+    public bool ActiveIsDesktop => _active is { GamePid: null } a && string.Equals(a.Profile.Profile.Name, DesktopConfig.ProfileName, StringComparison.OrdinalIgnoreCase);
+    /// <summary>Why the last session ended, and the game it was tied to.</summary>
+    public (string Reason, int? GamePid)? LastStop { get; private set; }
     /// <summary>Seconds since the active session's recorder was spawned.</summary>
     public double ActiveSeconds => _active is null ? 0 : (MonotonicClock.NowMicros() - _active.Session.Info.SpawnMonoUs) / 1e6;
     public string? RecorderError => _active?.Recorder.LastError;
@@ -163,6 +167,7 @@ public sealed class RecordingCoordinator : IAsyncDisposable
             if (_active is null) return Fail("not recording");
             var a = _active;
             _active = null;
+            LastStop = (reason, a.GamePid);
             if (failed) _events.Write("error", $"{Recorder.Name} stopped right after starting" + (a.Recorder.LastError is { } why ? ": " + why : ""), a.Profile.Name, a.Session.Info.Id, level: "error");
             var result = await StopActiveAsync(a, reason, ct);
             _sound.Play(failed ? "error" : "stop");

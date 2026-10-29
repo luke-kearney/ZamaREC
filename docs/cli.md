@@ -6,8 +6,8 @@ few milliseconds, which is what makes it usable as a hotkey target.
 ```
 zamarec mark [label...]            drop a marker on the current session
 zamarec save [--last 30s] [label]  write the last N seconds to a clip (30s, 2m, 90)
-zamarec start [profile]            start a session by hand (works even while paused)
-zamarec stop                       stop the current session
+zamarec start [profile|desktop]    start by hand (works even while paused): the running game, else the desktop
+zamarec stop                       stop the current session; a game stopped this way stays unrecorded until it exits or you start again
 zamarec status                     one line: state, profile, elapsed, window, markers, GSI age
 zamarec pause [session|2h|forever] auto recording off; stops the current session
 zamarec resume                     auto recording on; a running game is picked up at once
@@ -18,6 +18,13 @@ zamarec retention                  run the retention pass now and list what it r
 zamarec reload                     re-read config.toml after a hand edit
 zamarec config                     print the config file path
 ```
+
+`zamarec start` with no profile looks at what runs right then: a profile's game process, else a
+game Steam launched (its profile, or the `[auto_games]` defaults), else it records the desktop
+(`[desktop]` in the config). A game it finds is tied to its process like an automatic start: game
+events work and the session ends when the game exits. `zamarec start desktop` records the desktop
+even with a game running; `zamarec start cs2` names the profile (tied to its game when that runs).
+Bind `zamarec start` and `zamarec stop` to keys to have a start/stop pair that always works.
 
 Exit codes: 0 ok, 1 the daemon said no (message printed), 2 usage, 3 daemon not running.
 
