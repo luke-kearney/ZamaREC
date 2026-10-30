@@ -819,6 +819,9 @@ $('video').addEventListener('timeupdate', () => {
   $('timeline').addEventListener('click', e => { if (dragged) { dragged = false; e.stopImmediatePropagation(); e.preventDefault(); } }, true);
   $('tlSel').addEventListener('click', e => e.stopPropagation());
 })();
+// Ctrl+wheel (and a touchpad pinch, which arrives as one) never zooms the page; the timeline's own
+// Ctrl+wheel zoom has run by the time this sees it
+window.addEventListener('wheel', e => { if (e.ctrlKey) e.preventDefault(); }, { passive: false });
 document.addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
   const v = $('video');
