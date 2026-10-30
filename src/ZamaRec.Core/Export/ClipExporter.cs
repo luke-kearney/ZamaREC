@@ -225,7 +225,12 @@ public static class ClipExporter
             {
                 var args = new List<string> { "-hide_banner", "-loglevel", "error", "-y" };
                 args.AddRange(seekInput(first.T - Eps));
-                args.AddRange(["-t", F6(end - first.T - Eps * 10), "-map", "0:a", "-vn", "-c", "copy", audioFile]);
+                args.AddRange(["-t", F6(end - first.T - Eps * 10), "-map", "0:a", "-vn", "-c", "copy"]);
+                // A seek on the input of a file (a clip) lands on the video keyframe before the In point, and copied audio keeps its
+                // packets from there: up to a keyframe interval of earlier sound, so the clip's audio ran that much late and lost
+                // as much at the end. -copypriorss 0 drops them. The concat input seeks on the output, which drops them anyway.
+                if (!concat) args.AddRange(["-copypriorss", "0"]);
+                args.Add(audioFile);
                 var (code, err) = await RunAsync(Recording.Ffmpeg.Exe, args, ct);
                 if (code != 0) { log.LogWarning("frame-exact export: copying the audio failed ({err}), so the whole range is re-encoded", err.Trim()); return null; }
             }
