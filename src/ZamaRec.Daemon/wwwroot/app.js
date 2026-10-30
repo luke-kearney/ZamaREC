@@ -72,9 +72,14 @@ async function refreshStatus() {
     } else { el.className = 'status idle'; txt.textContent = s.state; }
     if (s.pause) { el.className = 'status paused'; txt.textContent = (s.state === 'recording' ? txt.textContent + ' · ' : '') + 'auto recording off ' + s.pause.text; }
     $('powerBtn').className = 'switch ' + (s.pause ? 'off' : 'on');
-    const rec = $('recBtn'); rec.dataset.cmd = s.state === 'recording' ? 'stop' : 'start';
-    rec.textContent = s.state === 'recording' ? 'Stop' : 'Record';
-    rec.title = s.state === 'recording' ? `stop this session (a game stopped by hand is not recorded again until it exits or you press Record)` : 'start recording: the game that is running, else the desktop';
+    // REC starts the running game, else the desktop; while recording the same button stops
+    const rec = $('recBtn'), recording = s.state === 'recording';
+    if (!rec.disabled) {
+      rec.dataset.cmd = recording ? 'stop' : 'start';
+      rec.classList.toggle('stop', recording);
+      rec.querySelector('.t').textContent = recording ? 'STOP' : 'REC';
+      rec.title = recording ? 'stop this session (a game stopped by hand is not recorded again until it exits or you press REC)' : 'start recording: the game that is running, else the desktop';
+    }
     state.shareTargets = s.shareTargets || [];
     if (s.usage) {
       const perCore = localStorage.getItem('cpuPerCore') === '1';
@@ -90,7 +95,7 @@ async function refreshStatus() {
       state.profilesLoaded = true;
     }
     if (state.current && state.current.kind === 'session' && state.current.data.live && s.sessionId !== state.current.id) loadSession(state.current.id);
-  } catch { $('status').className = 'status idle'; $('status').querySelector('.txt').textContent = 'daemon unreachable'; }
+  } catch { $('status').className = 'status idle'; $('status').querySelector('.txt').textContent = 'daemon unreachable'; $('status').title = ''; }
 }
 
 // ------------------------------------------------------------------ lists
@@ -697,12 +702,12 @@ $('batchBtn').onclick = exportBatch;
   apply('aside-collapsed', asBtn, localStorage.getItem('asideCollapsed') === '1', 'sidebar');
 })();
 $('uCpuWrap').onclick = () => { localStorage.setItem('cpuPerCore', localStorage.getItem('cpuPerCore') === '1' ? '0' : '1'); refreshStatus(); };
-// Record / Stop: a start by hand picks the running game, else the desktop
+// REC / STOP
 $('recBtn').onclick = async () => {
   const b = $('recBtn'); b.disabled = true;
-  try { const r = await api('/control', { body: { cmd: b.dataset.cmd || 'start' } }); toast(r.message, !r.ok); refreshStatus(); refreshList(); }
+  try { const r = await api('/control', { body: { cmd: b.dataset.cmd || 'start' } }); toast(r.message, !r.ok); }
   catch (err) { toast(err.message, true); }
-  finally { b.disabled = false; }
+  finally { b.disabled = false; refreshStatus(); refreshList(); }
 };
 // on/off switch: off opens a menu of durations, on resumes at once
 (() => {
@@ -729,7 +734,7 @@ $('recBtn').onclick = async () => {
     catch (e) { toast(e.message, true); }
   };
 })();
-$('markBtn').onclick = async () => { try { const r = await api('/mark', { body: { label: null } }); toast(r.message, !r.ok); } catch (e) { toast(e.message, true); } };
+const mark = async () => { try { const r = await api('/mark', { body: { label: null } }); toast(r.message, !r.ok); } catch (e) { toast(e.message, true); } };
 $('video').addEventListener('timeupdate', () => {
   if (!state.current) return;
   const t = fromMedia($('video').currentTime); state.cursorT = t; followPlayhead(t); placeHead(t);
@@ -835,7 +840,7 @@ document.addEventListener('keydown', e => {
     case 'I': $('goIn').click(); break;
     case 'Escape': if (!exportPop.hidden) showExportPop(false); break;
     case 'p': playRange(); break;
-    case 'm': $('markBtn').click(); break;
+    case 'm': mark(); break;
     case 'e': if (exportPop.hidden) showExportPop(true); else exportRange(); break;
   }
 });
