@@ -42,24 +42,16 @@
   <div class="switch-wrap">
     <button id="powerBtn" class="switch on" title="auto recording on/off"><i class="led"></i><span class="lbl">AUTO</span><span class="track"><span class="knob"></span></span></button>
     <div id="pauseMenu" class="menu" hidden>
-      <div class="menu-group" id="stopGroup">
-        <button id="stopBtn">Stop this session<span class="sub">auto recording stays on; this game is not recorded again until it exits</span></button>
-      </div>
-      <div class="menu-group" id="offGroup">
-        <div class="menu-title">Turn off recording</div>
-        <button data-pause="session">for the rest of this game</button>
-        <button data-pause="until" data-hours="1">for 1 hour</button>
-        <button data-pause="until" data-hours="2">for 2 hours</button>
-        <button data-pause="until" data-hours="8">for 8 hours</button>
-        <button data-pause="forever">until I turn it back on</button>
-        <div class="menu-note">A running session is stopped. Starting from the status pill (or <code>zamarec start</code>) still works.</div>
-      </div>
-      <div class="menu-group" id="onGroup">
-        <button id="resumeBtn">Turn auto recording back on</button>
-      </div>
+      <div class="menu-title">Turn off recording</div>
+      <button data-pause="session">for the rest of this game</button>
+      <button data-pause="until" data-hours="1">for 1 hour</button>
+      <button data-pause="until" data-hours="2">for 2 hours</button>
+      <button data-pause="until" data-hours="8">for 8 hours</button>
+      <button data-pause="forever">until I turn it back on</button>
+      <div class="menu-note">A running session is stopped. REC (or <code>zamarec start</code>) still works.</div>
     </div>
   </div>
-  <div id="status" class="status idle" role="button" tabindex="0"><span class="dot"></span><span class="txt">idle</span><span class="act" aria-hidden="true">record</span></div>
+  <div id="status" class="status idle"><span class="dot"></span><span class="txt">idle</span></div>
   <div class="usage" id="usage" title="ZamaREC's own CPU (per core) and memory: daemon + recorder">
     <span class="u" id="uCpuWrap" title="click to switch between share of all cores and share of one core" style="cursor:pointer"><span class="k" id="uCpuK">cpu</span><span class="v mono" id="uCpu">–</span></span>
     <span class="u"><span class="k">ram</span><span class="v mono" id="uRss">–</span></span>
@@ -83,7 +75,7 @@
   </button>
   <a class="btn ghost icon" href="https://github.com/luke-kearney/zamarec" target="_blank" rel="noopener" title="ZamaREC on GitHub">
     <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.9 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.56-1.11-4.56-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.6 9.6 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2z" fill="currentColor"/></svg></a>
-  <button id="markBtn" class="btn accent" title="M"><span class="pulse"></span>Mark</button>
+  <button id="recBtn" class="btn accent rec" title="start recording: the game that is running, else the desktop"><span class="pulse"></span><span class="t">REC</span></button>
 </header>
 
 <div class="layout">

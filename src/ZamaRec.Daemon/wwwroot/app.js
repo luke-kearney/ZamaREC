@@ -62,7 +62,6 @@ function toast(msg, err, ms) {
 }
 
 // ------------------------------------------------------------------ status
-let statusBusy = false;
 async function refreshStatus() {
   try {
     const s = await api('/status');
@@ -73,11 +72,14 @@ async function refreshStatus() {
     } else { el.className = 'status idle'; txt.textContent = s.state; }
     if (s.pause) { el.className = 'status paused'; txt.textContent = (s.state === 'recording' ? txt.textContent + ' · ' : '') + 'auto recording off ' + s.pause.text; }
     $('powerBtn').className = 'switch ' + (s.pause ? 'off' : 'on');
-    // when nothing records the pill starts a recording; stopping is in the switch's menu
-    state.recording = s.state === 'recording';
-    el.classList.toggle('can', !state.recording);
-    el.classList.toggle('busy', statusBusy);
-    el.title = state.recording ? '' : 'click to start recording: the game that is running, else the desktop';
+    // REC starts the running game, else the desktop; while recording the same button stops
+    const rec = $('recBtn'), recording = s.state === 'recording';
+    if (!rec.disabled) {
+      rec.dataset.cmd = recording ? 'stop' : 'start';
+      rec.classList.toggle('stop', recording);
+      rec.querySelector('.t').textContent = recording ? 'STOP' : 'REC';
+      rec.title = recording ? 'stop this session (a game stopped by hand is not recorded again until it exits or you press REC)' : 'start recording: the game that is running, else the desktop';
+    }
     state.shareTargets = s.shareTargets || [];
     if (s.usage) {
       const perCore = localStorage.getItem('cpuPerCore') === '1';
@@ -700,36 +702,20 @@ $('batchBtn').onclick = exportBatch;
   apply('aside-collapsed', asBtn, localStorage.getItem('asideCollapsed') === '1', 'sidebar');
 })();
 $('uCpuWrap').onclick = () => { localStorage.setItem('cpuPerCore', localStorage.getItem('cpuPerCore') === '1' ? '0' : '1'); refreshStatus(); };
-// status pill: click to start (the running game, else the desktop)
-(() => {
-  const el = $('status'), act = el.querySelector('.act');
-  const go = async () => {
-    if (statusBusy || !el.classList.contains('can')) return;
-    statusBusy = true; el.classList.add('busy'); act.textContent = 'starting…';
-    try { const r = await api('/control', { body: { cmd: 'start' } }); toast(r.message, !r.ok); }
-    catch (err) { toast(err.message, true); }
-    finally { statusBusy = false; act.textContent = 'record'; refreshStatus(); refreshList(); }
-  };
-  el.onclick = go;
-  el.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } };
-})();
-// on/off switch: its menu stops a running session and turns auto recording off for a while;
-// switched off with nothing recording, a click turns it back on at once
+// REC / STOP
+$('recBtn').onclick = async () => {
+  const b = $('recBtn'); b.disabled = true;
+  try { const r = await api('/control', { body: { cmd: b.dataset.cmd || 'start' } }); toast(r.message, !r.ok); }
+  catch (err) { toast(err.message, true); }
+  finally { b.disabled = false; refreshStatus(); refreshList(); }
+};
+// on/off switch: off opens a menu of durations, on resumes at once
 (() => {
   const menu = $('pauseMenu');
-  const resume = async () => { menu.hidden = true; try { const r = await api('/resume', { method: 'POST' }); toast(r.message); refreshStatus(); } catch (err) { toast(err.message, true); } };
   $('powerBtn').onclick = async e => {
     e.stopPropagation();
-    const off = $('powerBtn').classList.contains('off');
-    if (off && !state.recording) return resume();
-    $('stopGroup').hidden = !state.recording; $('offGroup').hidden = off; $('onGroup').hidden = !off;
+    if ($('powerBtn').classList.contains('off')) { try { const r = await api('/resume', { method: 'POST' }); toast(r.message); refreshStatus(); } catch (err) { toast(err.message, true); } return; }
     menu.hidden = !menu.hidden;
-  };
-  $('resumeBtn').onclick = e => { e.stopPropagation(); resume(); };
-  $('stopBtn').onclick = async e => {
-    e.stopPropagation(); menu.hidden = true;
-    try { const r = await api('/control', { body: { cmd: 'stop' } }); toast(r.message, !r.ok); refreshStatus(); refreshList(); }
-    catch (err) { toast(err.message, true); }
   };
   menu.querySelectorAll('[data-pause]').forEach(b => b.onclick = async e => {
     e.stopPropagation(); menu.hidden = true;
@@ -748,7 +734,7 @@ $('uCpuWrap').onclick = () => { localStorage.setItem('cpuPerCore', localStorage.
     catch (e) { toast(e.message, true); }
   };
 })();
-$('markBtn').onclick = async () => { try { const r = await api('/mark', { body: { label: null } }); toast(r.message, !r.ok); } catch (e) { toast(e.message, true); } };
+const mark = async () => { try { const r = await api('/mark', { body: { label: null } }); toast(r.message, !r.ok); } catch (e) { toast(e.message, true); } };
 $('video').addEventListener('timeupdate', () => {
   if (!state.current) return;
   const t = fromMedia($('video').currentTime); state.cursorT = t; followPlayhead(t); placeHead(t);
@@ -854,7 +840,7 @@ document.addEventListener('keydown', e => {
     case 'I': $('goIn').click(); break;
     case 'Escape': if (!exportPop.hidden) showExportPop(false); break;
     case 'p': playRange(); break;
-    case 'm': $('markBtn').click(); break;
+    case 'm': mark(); break;
     case 'e': if (exportPop.hidden) showExportPop(true); else exportRange(); break;
   }
 });

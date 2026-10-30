@@ -51,15 +51,6 @@ header > .status { flex: 0 1 auto; min-width: 92px; }
 .status .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); }
 .status.recording { background: var(--red-bg); color: var(--red-text); border-color: var(--red-line); }
 .status.recording .dot { background: var(--brand); box-shadow: 0 0 0 0 rgba(232,20,32,.6); animation: ping 1.4s infinite; }
-/* When nothing records the pill starts a recording: on hover (or while the request runs) a label covers it in place, its dot and text exactly over the pill's own, so nothing moves under the pointer. */
-.status { position: relative; }
-.status.can { cursor: pointer; }
-.status .act { display: none; position: absolute; inset: -1px; padding: 0 12px; border-radius: inherit; align-items: center; gap: 8px; border: 1px solid var(--red-line2); background: var(--red-bg); color: var(--red-text); font-weight: 600; }
-.status .act::before { content: ''; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--brand); }
-.status.can:hover .act, .status.can:focus-visible .act, .status.busy .act { display: flex; }
-.status.busy { cursor: progress; }
-.status.busy .act { opacity: .75; }
-.status:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 @keyframes ping { 70% { box-shadow: 0 0 0 7px rgba(232,20,32,0); } 100% { box-shadow: 0 0 0 0 rgba(232,20,32,0); } }
 
 .switch-wrap { position: relative; display: flex; align-items: center; height: 100%; }
@@ -82,7 +73,6 @@ header > .status { flex: 0 1 auto; min-width: 92px; }
 .menu button:hover { background: var(--panel2); }
 .menu.right { left: auto; right: 0; }
 .menu-group { display: flex; flex-direction: column; gap: 2px; }
-#stopGroup { border-bottom: 1px solid var(--line); padding-bottom: 4px; margin-bottom: 2px; }
 .banner-row { display: flex; align-items: center; gap: 10px; }
 .banner-preview { width: 138px; height: 46px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line2); background: var(--bg2); }
 .banner-preview[hidden] { display: none; }
@@ -111,6 +101,12 @@ header > .status { flex: 0 1 auto; min-width: 92px; }
 .btn.accent { background: var(--brand); border-color: var(--brand); color: #fff; font-weight: 600; }
 .btn.accent:hover { background: var(--brand-hover); }
 .btn.accent .pulse { width: 8px; height: 8px; border-radius: 50%; background: #fff; opacity: .85; }
+/* REC (filled red, a dot) turns into STOP (red outline, a square) while recording; fixed width so the header does not shift */
+.btn.rec { min-width: 82px; justify-content: center; letter-spacing: .08em; }
+.btn.rec.stop { background: var(--red-bg); border-color: var(--red-line2); color: var(--red-text); }
+.btn.rec.stop:hover { background: var(--red-bg2); }
+.btn.rec.stop .pulse { border-radius: 2px; background: var(--brand); opacity: 1; }
+.btn.rec:disabled { opacity: .6; cursor: progress; }
 .btn.small { padding: 4px 10px; font-size: 12px; }
 .btn.danger { color: var(--danger); }
 .sel { background: var(--bg2); border: 1px solid var(--line2); border-radius: 8px; padding: 6px 28px 6px 10px; font-size: 13px; appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%238592a6'%3E%3Cpath d='M5.5 7.5l4.5 5 4.5-5z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; background-size: 14px; }

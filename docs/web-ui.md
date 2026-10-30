@@ -23,18 +23,17 @@ browser. The page also has a web app manifest, so a Chromium browser offers to i
 
 ## Header
 
-- **On/off switch**: auto recording. A click opens a menu: **Stop this session** while recording
-  (auto recording stays on; a game stopped this way is not recorded again until it exits or you
-  start it), and turning auto recording off for the rest of this game, for 1/2/8 hours, or until
-  turned back on, which also stops a running session. When it is off, a click turns it back on
-  (through the menu if a session runs). Starting from the status pill and `zamarec start` still work.
+- **AUTO switch**: auto recording; its light is red while on. Off opens a menu: for the rest of
+  this game, for 1/2/8 hours, or until turned back on. A running session is stopped. REC and
+  `zamarec start` still work.
 - **Status pill**: idle, recording (profile, mode, elapsed, window), or paused with the reason.
-  When nothing records, hovering shows **record**: a click starts the game that is running, else a
-  desktop recording (`[desktop]`).
 - **cpu / ram / tmpfs**: ZamaREC's own usage, daemon plus recorder, from `/proc`. Click the CPU
   figure to switch between share of all cores and one core. **clear** drops RAM footage of finished
   sessions (asks for a second click).
-- **Games**, **Settings**, then icon buttons for Stats, Log, the theme and GitHub, then **Mark**.
+- **Games**, **Settings**, then icon buttons for Stats, Log, the theme and GitHub, then **REC**:
+  it starts the game that is running, else a desktop recording (`[desktop]`), and turns into
+  **STOP** while recording. A game stopped this way is not recorded again until it exits or you
+  press REC. **M** still drops a marker.
 - **Theme button**: the page follows the OS or browser light/dark preference and switches with it.
   The button cycles auto, light, dark; a fixed choice is remembered by the browser. The video area
   and the fullscreen controls stay dark in both.
