@@ -345,6 +345,21 @@ public static class WebApi
             return path is null ? Results.NotFound() : Results.File(path, "image/jpeg");
         });
 
+        // A screenshot of the frame on screen t seconds into the session (fractional: the exact frame).
+        api.MapPost("/sessions/{id}/screenshot", async (string id, double t, SessionCatalog cat, RecordingCoordinator rec, ScreenshotService shots, CancellationToken ct) =>
+        {
+            var dir = cat.SessionDir(id);
+            if (dir is null || t < 0) return Results.NotFound();
+            var live = dir == rec.ActiveSessionDir;
+            var store = live ? rec.ActiveSession : SessionStore.Load(dir);
+            var index = live ? rec.ActiveSegments : new SegmentIndex(dir, store?.MediaDir);
+            var seg = index?.Available(includeTail: false).FirstOrDefault(s => t >= s.Start && t < s.Start + s.Duration);
+            if (store is null || index is null || seg is null) return Results.Json(new { ok = false, error = "that moment is not on disk (yet)" });
+            var info = store.Info;
+            var r = await shots.TakeAsync(Path.Combine(index.MediaDir, seg.File), t - seg.Start, info.Profile, info.TimeAt(t), shots.SteamAppId(info.Profile, info.SteamAppId), info.Id, ct);
+            return Results.Json(new { ok = r.Ok, r.File, r.Path, steam = r.SteamFile is not null, r.Error });
+        });
+
         // Removes a finished session: its folder, markers and any RAM footage. Its clips stay unless clips=true,
         // and starred clips stay even then.
         api.MapDelete("/sessions/{id}", (string id, bool? clips, SessionCatalog cat, RecordingCoordinator rec, EventLog events) =>
@@ -431,6 +446,21 @@ public static class WebApi
             if (p is null || t < 0) return Results.NotFound();
             var path = await thumbs.FrameAsync(p, profile, (int)Math.Floor(t), ct);
             return path is null ? Results.NotFound() : Results.File(path, "image/jpeg");
+        });
+
+        // A screenshot of the frame on screen t seconds into the clip.
+        api.MapPost("/clips/{profile}/{file}/screenshot", async (string profile, string file, double t, SessionCatalog cat, ScreenshotService shots, CancellationToken ct) =>
+        {
+            var p = cat.ClipPath(profile, file);
+            if (p is null || t < 0) return Results.NotFound();
+            var info = ReadClipInfo(p, profile);
+            // the session's clock when it is still around, else back from the end of the clip (recorded_at is its last frame)
+            var session = info.SessionId is { } sid && cat.SessionDir(sid) is { } sdir ? SessionStore.Load(sdir).Info : null;
+            var at = session is not null && info.SessionOffset is double so ? session.TimeAt(so + t)
+                : info.RecordedAt is { } end && info.DurationSeconds is double d ? end.AddSeconds(t - d)
+                : info.RecordedAt ?? info.CreatedAt;
+            var r = await shots.TakeAsync(p, t, profile, at, shots.SteamAppId(profile, session?.SteamAppId), info.SessionId, ct);
+            return Results.Json(new { ok = r.Ok, r.File, r.Path, steam = r.SteamFile is not null, r.Error });
         });
 
         // One audio track of a clip on its own, for the mixer. Seekable, like the clip.
@@ -521,7 +551,32 @@ public static class WebApi
         });
         api.MapGet("/share/jobs/{id}", (string id, ShareJobs share) => share.Find(id) is { } job ? Results.Ok(ShareJobView(job)) : Results.NotFound());
         api.MapDelete("/share/jobs/{id}", (string id, ShareJobs share) => share.CancelJob(id) ? Results.Ok(new { Ok = true }) : Results.NotFound());
+
+        // Several clips to one target, one after the other; the answer is a batch to ask about.
+        api.MapPost("/share/batches", (ShareBatchBody req, SessionCatalog cat, ShareJobs share) =>
+        {
+            var clips = new List<(string, string)>();
+            foreach (var c in req.Clips ?? [])
+            {
+                if (cat.ClipPath(c.Profile, c.File) is not { } p) return Results.BadRequest(new { Error = $"no clip {c.Profile}/{c.File}" });
+                clips.Add((p, c.Profile));
+            }
+            var (batch, error) = share.StartBatch(req.Target ?? "", clips);
+            return batch is null ? Results.BadRequest(new { Error = error }) : Results.Ok(ShareBatchView(batch));
+        });
+        api.MapGet("/share/batches/{id}", (string id, ShareJobs share) => share.FindBatch(id) is { } b ? Results.Ok(ShareBatchView(b)) : Results.NotFound());
+        api.MapDelete("/share/batches/{id}", (string id, ShareJobs share) => share.CancelBatch(id) ? Results.Ok(new { Ok = true }) : Results.NotFound());
     }
+
+    public sealed record ShareBatchClip(string Profile, string File);
+    public sealed record ShareBatchBody(string? Target, List<ShareBatchClip>? Clips);
+
+    private static object ShareBatchView(ShareJobs.Batch b) => new
+    {
+        b.Id, b.Target, b.Stage, Count = b.Items.Count,
+        Current = b.Current is { } j && b.Ended is null ? ShareJobView(j) : null,
+        Items = b.Items.Select(i => new { i.File, i.Profile, i.Stage, i.Url, i.Error, i.Reencoded }),
+    };
 
     private static object ShareJobView(ShareJobs.Job j) =>
         new { j.Id, j.Target, j.Stage, j.Progress, j.Note, j.Url, j.Error, File = j.File is null ? null : Path.GetFileName(j.File), j.Bytes, j.Reencoded };

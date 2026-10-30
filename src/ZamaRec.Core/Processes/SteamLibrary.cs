@@ -50,14 +50,18 @@ public static class SteamLibrary
     }
 
     /// <summary>Every Steam library folder: the install itself plus the ones listed in libraryfolders.vdf.</summary>
-    public static List<string> Libraries(string? home = null)
+    private static string[] Roots(string? home)
     {
         home ??= Paths.Home();
-        var roots = Platform.IsWindows
+        return Platform.IsWindows
             ? (WindowsProcesses.SteamPath() is { } sp ? new[] { sp } : Array.Empty<string>())
             : new[] { Path.Combine(home, ".local/share/Steam"), Path.Combine(home, ".steam/steam"), Path.Combine(home, ".var/app/com.valvesoftware.Steam/.local/share/Steam") };
+    }
+
+    public static List<string> Libraries(string? home = null)
+    {
         var libs = new List<string>();
-        foreach (var r in roots)
+        foreach (var r in Roots(home))
         {
             if (!Directory.Exists(r)) continue;
             libs.Add(r);
@@ -88,6 +92,46 @@ public static class SteamLibrary
             catch (IOException) { }
         }
         return null;
+    }
+
+    // A Steam account id (userdata/<id>) is the low 32 bits of the SteamID64 that loginusers.vdf lists.
+    private const long SteamId64Base = 76561197960265728;
+
+    /// <summary>
+    /// Where Steam keeps the screenshots of an app for the account that last logged in: userdata/&lt;account&gt;/760/remote/&lt;app&gt;/screenshots.
+    /// A JPEG put there (with a 200 px wide copy in thumbnails/) is picked up by Steam the next time it starts, named
+    /// yyyyMMddHHmmss_N.jpg and dated by the file's write time; screenshots.vdf is Steam's to write, never ours.
+    /// Null when there is no Steam or no logged-in account. The folder need not exist yet.
+    /// </summary>
+    public static string? ScreenshotDir(long appId, string? home = null)
+    {
+        foreach (var root in Roots(home))
+        {
+            if (LastAccount(Path.Combine(root, "config", "loginusers.vdf")) is not { } account) continue;
+            var user = Path.Combine(root, "userdata", account.ToString());
+            if (Directory.Exists(user)) return Path.Combine(user, "760", "remote", appId.ToString(), "screenshots");
+        }
+        return null;
+    }
+
+    /// <summary>The account id of the user marked MostRecent in loginusers.vdf, else of the newest Timestamp.</summary>
+    public static long? LastAccount(string loginUsersVdf)
+    {
+        if (!File.Exists(loginUsersVdf)) return null;
+        long? current = null, recent = null, newest = null, newestAt = null;
+        try
+        {
+            foreach (var line in File.ReadLines(loginUsersVdf))
+            {
+                var t = line.Trim();
+                if (t.Length > 2 && t[0] == '"' && t[^1] == '"' && long.TryParse(t[1..^1], out var id) && id > SteamId64Base) { current = id; continue; }
+                if (current is null) continue;
+                if (VdfValue(line, "MostRecent") == "1") recent = current;
+                if (long.TryParse(VdfValue(line, "Timestamp"), out var at) && (newestAt is null || at > newestAt)) { newestAt = at; newest = current; }
+            }
+        }
+        catch (IOException) { return null; }
+        return (recent ?? newest) is long found ? found - SteamId64Base : null;
     }
 
     /// <summary>A name that works as a folder: no separators, control characters or trademark signs.</summary>

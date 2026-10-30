@@ -71,6 +71,9 @@ public static class DefaultConfig
         # quality = "medium"              # unset = capture.quality
         yield_to_games = true             # a game that starts meanwhile ends the desktop recording and gets its own session
 
+        [screenshots]                     # the camera button (S) in the player saves the frame as a PNG under screenshots/<game>/
+        steam = true                      # also into Steam's screenshots of the game (a Steam game), shown there after Steam's next start
+
         [share]
         # discord_webhook = "https://discord.com/api/webhooks/..."   # a clip's Share menu can post to this channel; keep it secret
         discord_max_mb = 10               # the channel's upload limit; bigger clips are re-encoded to fit first

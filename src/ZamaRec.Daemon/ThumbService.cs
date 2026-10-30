@@ -80,7 +80,7 @@ public sealed class ThumbService(ZamaRecConfig cfg, ILogger<ThumbService> log)
         catch (Exception ex) { log.LogDebug(ex, "thumbnail sweep"); }
     }
 
-    private static async Task<(int Code, string Err)> RunAsync(IEnumerable<string> args, CancellationToken ct)
+    internal static async Task<(int Code, string Err)> RunAsync(IEnumerable<string> args, CancellationToken ct)
     {
         var psi = new ProcessStartInfo(ZamaRec.Core.Recording.Ffmpeg.Exe) { UseShellExecute = false, RedirectStandardError = true, RedirectStandardOutput = true, CreateNoWindow = true };
         foreach (var a in (string[])["-hide_banner", "-loglevel", "error", "-y", .. args]) psi.ArgumentList.Add(a);

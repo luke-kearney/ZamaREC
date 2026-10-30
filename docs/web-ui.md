@@ -58,6 +58,15 @@ shift+click ticks everything up to the last one. The bar at the bottom then star
 deletes the ticked clips, or deletes the ticked sessions (their clips are kept; the one being
 recorded cannot be ticked). Delete asks for a second click.
 
+**Sharing several clips.** *Share* in that bar sends every ticked clip to Discord or a share module,
+each as its own post or module run, one after the other (a module sees nothing new: it is started
+once per clip). Each clip is re-encoded first if it is over the target's limit, and goes out with its
+name as the message. The daemon runs the batch, so closing the window does not stop it; between
+clips it waits while a game is being recorded (a desktop recording does not count), so no re-encode
+or upload starts during play. The message at the bottom follows it ("clip 2 of 5 · sending 41%"),
+and a click on it cancels the clip being sent and the rest. At the end the links are copied to the
+clipboard, one per line, and the message lists any clip that was not sent and why.
+
 ## Player and timeline
 
 ![The timeline with game markers and a selected range](screenshots/timeline.webp)
@@ -115,6 +124,13 @@ recorded cannot be ticked). Delete asks for a second click.
   - **Delete**, which asks for a second click.
 - A session that has ended has a *Delete* button too: it removes the session with its markers and
   any footage still in RAM, and keeps its clips.
+- **Screenshot** (camera, after the export button, or **S**): saves the frame on screen as a PNG
+  under `screenshots/<game>/` in the storage root, named by when that frame was recorded, with a
+  `.json` beside it. It is the exact frame, cut on the CPU from the recording, so it carries the
+  recording's compression. For a game with a Steam app id a JPEG copy also goes into Steam's own
+  screenshots of that game (`[screenshots].steam`): Steam shows it after it next starts, and it can
+  be uploaded to the profile from Steam's screenshot view. A desktop recording or a game without an
+  app id gets the PNG only.
 - The export panel's size list does the same for a range: *original size* is the usual stream
   copy; a size re-encodes the range to fit under it. It goes back to original after each export.
 - The marker pane collapses to a strip (chevron in its header). The sidebar has a pin, on by
@@ -124,7 +140,8 @@ recorded cannot be ticked). Delete asks for a second click.
   mark whose clip is not written yet reads "clip pending".
 
 Keys: space, ←/→ 5 s, shift+←/→ 30 s, J/L 10 s, `,`/`.` one frame, `[`/`]` markers, I/O set
-in/out, shift+I jump to in, P play range, E export panel / export, M mark, F fullscreen, +/−/0 zoom.
+in/out, shift+I jump to in, P play range, E export panel / export, M mark, S screenshot, F fullscreen,
++/−/0 zoom.
 
 ## Games
 
