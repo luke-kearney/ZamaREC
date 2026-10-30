@@ -17,6 +17,7 @@ public sealed class ZamaRecConfig
     public GsiConfig Gsi { get; set; } = new();
     public AutoGamesConfig AutoGames { get; set; } = new();
     public DesktopConfig Desktop { get; set; } = new();
+    public ScreenshotsConfig Screenshots { get; set; } = new();
     public ShareConfig Share { get; set; } = new();
     /// <summary>Windows only: global hotkeys the daemon registers itself (Linux binds the CLI to desktop shortcuts).</summary>
     public HotkeysConfig Hotkeys { get; set; } = new();
@@ -30,6 +31,7 @@ public sealed class ZamaRecConfig
     [JsonIgnore] public string RootDir => Paths.Expand(Storage.Root);
     [JsonIgnore] public string SessionsDir => Path.Combine(RootDir, "sessions");
     [JsonIgnore] public string ClipsDir => Path.Combine(RootDir, "clips");
+    [JsonIgnore] public string ScreenshotsDir => Path.Combine(RootDir, "screenshots");
     /// <summary>storage.footage_dir, expanded; null when it is not set.</summary>
     [JsonIgnore] public string? FootageDir => string.IsNullOrWhiteSpace(Storage.FootageDir) ? null : Paths.Expand(Storage.FootageDir.Trim());
 
@@ -40,7 +42,7 @@ public sealed class ZamaRecConfig
     public void CopyFrom(ZamaRecConfig o)
     {
         Storage = o.Storage; Capture = o.Capture; Timeline = o.Timeline; Buffer = o.Buffer; Clips = o.Clips;
-        Retention = o.Retention; Feedback = o.Feedback; Daemon = o.Daemon; Gsi = o.Gsi; AutoGames = o.AutoGames; Share = o.Share; Hotkeys = o.Hotkeys; Quality = o.Quality; Profiles = o.Profiles;
+        Retention = o.Retention; Feedback = o.Feedback; Daemon = o.Daemon; Gsi = o.Gsi; AutoGames = o.AutoGames; Desktop = o.Desktop; Screenshots = o.Screenshots; Share = o.Share; Hotkeys = o.Hotkeys; Quality = o.Quality; Profiles = o.Profiles;
         Version++;
     }
 
@@ -302,6 +304,13 @@ public sealed class DesktopConfig
     public string Storage { get; set; } = "disk";
     /// <summary>A game that starts during a desktop recording ends it and gets its own session.</summary>
     public bool YieldToGames { get; set; } = true;
+}
+
+/// <summary>Screenshots taken from a recording in the player: a PNG under screenshots/&lt;profile&gt;/.</summary>
+public sealed class ScreenshotsConfig
+{
+    /// <summary>Also put a copy in Steam's screenshots of the game (when it has a Steam app id), where Steam finds it on its next start.</summary>
+    public bool Steam { get; set; } = true;
 }
 
 /// <summary>Steam games without a profile ("unconfirmed"): recorded to RAM with these defaults, never to disk unless you mark.</summary>

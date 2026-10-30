@@ -345,6 +345,21 @@ public static class WebApi
             return path is null ? Results.NotFound() : Results.File(path, "image/jpeg");
         });
 
+        // A screenshot of the frame on screen t seconds into the session (fractional: the exact frame).
+        api.MapPost("/sessions/{id}/screenshot", async (string id, double t, SessionCatalog cat, RecordingCoordinator rec, ScreenshotService shots, CancellationToken ct) =>
+        {
+            var dir = cat.SessionDir(id);
+            if (dir is null || t < 0) return Results.NotFound();
+            var live = dir == rec.ActiveSessionDir;
+            var store = live ? rec.ActiveSession : SessionStore.Load(dir);
+            var index = live ? rec.ActiveSegments : new SegmentIndex(dir, store?.MediaDir);
+            var seg = index?.Available(includeTail: false).FirstOrDefault(s => t >= s.Start && t < s.Start + s.Duration);
+            if (store is null || index is null || seg is null) return Results.Json(new { ok = false, error = "that moment is not on disk (yet)" });
+            var info = store.Info;
+            var r = await shots.TakeAsync(Path.Combine(index.MediaDir, seg.File), t - seg.Start, info.Profile, info.TimeAt(t), shots.SteamAppId(info.Profile, info.SteamAppId), info.Id, ct);
+            return Results.Json(new { ok = r.Ok, r.File, r.Path, steam = r.SteamFile is not null, r.Error });
+        });
+
         // Removes a finished session: its folder, markers and any RAM footage. Its clips stay unless clips=true,
         // and starred clips stay even then.
         api.MapDelete("/sessions/{id}", (string id, bool? clips, SessionCatalog cat, RecordingCoordinator rec, EventLog events) =>
@@ -431,6 +446,21 @@ public static class WebApi
             if (p is null || t < 0) return Results.NotFound();
             var path = await thumbs.FrameAsync(p, profile, (int)Math.Floor(t), ct);
             return path is null ? Results.NotFound() : Results.File(path, "image/jpeg");
+        });
+
+        // A screenshot of the frame on screen t seconds into the clip.
+        api.MapPost("/clips/{profile}/{file}/screenshot", async (string profile, string file, double t, SessionCatalog cat, ScreenshotService shots, CancellationToken ct) =>
+        {
+            var p = cat.ClipPath(profile, file);
+            if (p is null || t < 0) return Results.NotFound();
+            var info = ReadClipInfo(p, profile);
+            // the session's clock when it is still around, else back from the end of the clip (recorded_at is its last frame)
+            var session = info.SessionId is { } sid && cat.SessionDir(sid) is { } sdir ? SessionStore.Load(sdir).Info : null;
+            var at = session is not null && info.SessionOffset is double so ? session.TimeAt(so + t)
+                : info.RecordedAt is { } end && info.DurationSeconds is double d ? end.AddSeconds(t - d)
+                : info.RecordedAt ?? info.CreatedAt;
+            var r = await shots.TakeAsync(p, t, profile, at, shots.SteamAppId(profile, session?.SteamAppId), info.SessionId, ct);
+            return Results.Json(new { ok = r.Ok, r.File, r.Path, steam = r.SteamFile is not null, r.Error });
         });
 
         // One audio track of a clip on its own, for the mixer. Seekable, like the clip.

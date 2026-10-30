@@ -401,6 +401,26 @@ function thumbUrl(t) {
   if (cur.data.mode !== 'timeline') return null;
   return cur.data.segments.some(s => s.available && t >= s.start && t < s.start + s.duration) ? `/api/sessions/${enc(cur.id)}/thumb?t=${Math.floor(t)}` : null;
 }
+// A screenshot of the frame on screen: the same file and offset as the thumbnail, but the exact moment.
+function shotUrl(t) {
+  const cur = state.current; if (!cur || t < 0 || t > state.total) return null;
+  const enc = encodeURIComponent;
+  if (cur.kind === 'clip') return `/clips/${enc(cur.data.profile)}/${enc(cur.data.file)}/screenshot?t=${t}`;
+  if (clipPlayback(cur)) { const c = coverageAt(t); return c ? `/clips/${enc(cur.data.profile)}/${enc(c.file)}/screenshot?t=${Math.max(0, t - c.start)}` : null; }
+  if (cur.data.mode !== 'timeline') return null;
+  return `/sessions/${enc(cur.id)}/screenshot?t=${t}`;
+}
+async function takeShot() {
+  const url = shotUrl(currentT()), b = $('shotBtn');
+  if (!url) return toast('no footage to take a screenshot from here', true);
+  if (b.disabled) return;
+  b.disabled = true;
+  try {
+    const r = await api(url, { method: 'POST' });
+    toast(r.ok ? `screenshot saved: ${r.file}` + (r.steam ? ' · in Steam\'s screenshots after Steam\'s next start' : '') : r.error, !r.ok, r.steam ? 6000 : 0);
+  } catch (err) { toast(err.message, true); }
+  finally { b.disabled = false; }
+}
 // Shows what is known for the spot under the cursor: its picture if fetched, else the last picture while the cursor moves.
 function drawThumb() {
   const box = $('tlThumb'), img = box.querySelector('img'), url = thumbs.want;
@@ -734,6 +754,7 @@ $('recBtn').onclick = async () => {
     catch (e) { toast(e.message, true); }
   };
 })();
+$('shotBtn').onclick = takeShot;
 const mark = async () => { try { const r = await api('/mark', { body: { label: null } }); toast(r.message, !r.ok); } catch (e) { toast(e.message, true); } };
 $('video').addEventListener('timeupdate', () => {
   if (!state.current) return;
@@ -844,6 +865,7 @@ document.addEventListener('keydown', e => {
     case 'Escape': if (!exportPop.hidden) showExportPop(false); break;
     case 'p': playRange(); break;
     case 'm': mark(); break;
+    case 's': takeShot(); break;
     case 'e': if (exportPop.hidden) showExportPop(true); else exportRange(); break;
   }
 });

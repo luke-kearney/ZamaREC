@@ -115,6 +115,13 @@ recorded cannot be ticked). Delete asks for a second click.
   - **Delete**, which asks for a second click.
 - A session that has ended has a *Delete* button too: it removes the session with its markers and
   any footage still in RAM, and keeps its clips.
+- **Screenshot** (camera, after the export button, or **S**): saves the frame on screen as a PNG
+  under `screenshots/<game>/` in the storage root, named by when that frame was recorded, with a
+  `.json` beside it. It is the exact frame, cut on the CPU from the recording, so it carries the
+  recording's compression. For a game with a Steam app id a JPEG copy also goes into Steam's own
+  screenshots of that game (`[screenshots].steam`): Steam shows it after it next starts, and it can
+  be uploaded to the profile from Steam's screenshot view. A desktop recording or a game without an
+  app id gets the PNG only.
 - The export panel's size list does the same for a range: *original size* is the usual stream
   copy; a size re-encodes the range to fit under it. It goes back to original after each export.
 - The marker pane collapses to a strip (chevron in its header). The sidebar has a pin, on by
@@ -124,7 +131,8 @@ recorded cannot be ticked). Delete asks for a second click.
   mark whose clip is not written yet reads "clip pending".
 
 Keys: space, ←/→ 5 s, shift+←/→ 30 s, J/L 10 s, `,`/`.` one frame, `[`/`]` markers, I/O set
-in/out, shift+I jump to in, P play range, E export panel / export, M mark, F fullscreen, +/−/0 zoom.
+in/out, shift+I jump to in, P play range, E export panel / export, M mark, S screenshot, F fullscreen,
++/−/0 zoom.
 
 ## Games
 

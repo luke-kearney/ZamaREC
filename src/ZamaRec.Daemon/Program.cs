@@ -47,6 +47,7 @@ builder.Services.AddSingleton<SeenGames>();
 builder.Services.AddSingleton<BannerService>();
 builder.Services.AddSingleton<StemService>();
 builder.Services.AddSingleton<ThumbService>();
+builder.Services.AddSingleton<ScreenshotService>();
 builder.Services.AddSingleton<DiscordShare>();
 builder.Services.AddSingleton<ShareJobs>();
 builder.Services.AddSingleton<GameWatcherService>();

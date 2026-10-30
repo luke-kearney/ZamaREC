@@ -220,6 +220,15 @@ timeline of `capture.monitor` with the `capture` audio, and it runs until you st
 
 A profile of your own named `desktop` replaces these settings.
 
+## `[screenshots]`
+
+The camera button in the player (or **S**) saves the frame on screen as a PNG under
+`screenshots/<game>/` in the storage root.
+
+| key | default | meaning |
+|---|---|---|
+| `steam` | `true` | also put a JPEG copy into Steam's screenshots of the game, when it has a Steam app id (its session's, its profile's or its game preset's). It goes to `userdata/<account>/760/remote/<app id>/screenshots/` of the account that last logged in, named and dated by the moment of the frame. Steam picks it up the next time it starts (with its own "Screenshot taken" notice) and lists it like one of its own, ready to upload to the profile. ZamaREC only adds files there; Steam's `screenshots.vdf` is left to Steam |
+
 ## `[[profiles]]`
 
 | key | default | meaning |

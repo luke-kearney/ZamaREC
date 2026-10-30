@@ -103,11 +103,16 @@
     </div></div>`;
 
     const dk = c.desktop || (c.desktop = { windowMinutes: 30, storage: 'disk', quality: null, yieldToGames: true });
-    h += `<div class="card"><h3>Desktop recording</h3><div class="help">Record or <code>zamarec start</code> with no game running records the desktop with these settings, until you stop it; <code>zamarec start desktop</code> does so with a game running too.</div><div class="fields">
+    h += `<div class="card"><h3>Desktop recording</h3><div class="help">REC or <code>zamarec start</code> with no game running records the desktop with these settings, until you stop it; <code>zamarec start desktop</code> does so with a game running too.</div><div class="fields">
       ${field('rolling window minutes', inp('desktop.windowMinutes', dk.windowMinutes, 'number', 'min="0"'), false, '0 keeps everything')}
       <label class="field" ${win ? 'hidden' : ''}><span>storage</span>${sel('desktop.storage', dk.storage || 'disk', [{ v: 'disk', l: 'disk' }, { v: 'ram', l: 'RAM (drops the last game\'s RAM footage)' }])}</label>
       ${field('quality preset', sel('desktop.quality', dk.quality ?? '', [{ v: '', l: '(capture default)' }, ...presetOpts]))}
       ${field('a game that starts takes over', chk('desktop.yieldToGames', dk.yieldToGames))}
+    </div></div>`;
+
+    const ss = c.screenshots || (c.screenshots = { steam: true });
+    h += `<div class="card"><h3>Screenshots</h3><div class="help">The camera button (or <kbd>S</kbd>) in the player saves the frame on screen as a PNG under <code>screenshots/</code>. For a Steam game a copy can also go into Steam's own screenshots of that game: Steam shows it after it next starts, and you can upload it to your profile from there.</div><div class="fields">
+      ${field('also put them in Steam', chk('screenshots.steam', ss.steam))}
     </div></div>`;
 
     const sh = c.share || (c.share = { discordWebhook: null, discordMaxMb: 10, targets: [] });
