@@ -650,8 +650,8 @@ function selectBar() {
   const clips = state.tab === 'clips', n = select.keys.size;
   $('selectBar').hidden = !select.on; $('selectBtn').classList.toggle('on', select.on);
   $('selectCount').textContent = n ? `${n} selected` : 'pick some';
-  $('selStar').hidden = $('selUnstar').hidden = !clips;
-  for (const id of ['selStar', 'selUnstar', 'selDelete']) $(id).disabled = !n;
+  $('selStar').hidden = $('selUnstar').hidden = $('selShare').hidden = !clips;
+  for (const id of ['selStar', 'selUnstar', 'selShare', 'selDelete']) $(id).disabled = !n;
   clearTimeout(selDeleteTimer); $('selDelete').classList.remove('arm'); $('selDelete').querySelector('span').textContent = 'Delete';
 }
 function selectMode(on) { select.on = on; select.keys.clear(); select.last = null; renderList(); selectBar(); }
@@ -669,6 +669,51 @@ async function forSelected(what, call) {
 const clipKeyPath = k => { const i = k.indexOf('/'); return `/clips/${encodeURIComponent(k.slice(0, i))}/${encodeURIComponent(k.slice(i + 1))}`; };
 $('selStar').onclick = async () => { await forSelected('starred', k => api(clipKeyPath(k) + '/star?on=true', { method: 'POST' })); select.keys.clear(); await refreshList(); selectBar(); };
 $('selUnstar').onclick = async () => { await forSelected('unstarred', k => api(clipKeyPath(k) + '/star?on=false', { method: 'POST' })); select.keys.clear(); await refreshList(); selectBar(); };
+// Share the selection: the daemon sends one clip after another (each its own post or module run), waiting while
+// a game is being recorded; the toast follows the batch, a click on it cancels the rest.
+$('selShare').onclick = e => {
+  e.stopPropagation();
+  const menu = $('selShareMenu'); menu.hidden = !menu.hidden;
+  const box = $('selShareTargets'); box.textContent = '';
+  for (const t of state.shareTargets || []) {
+    const b = document.createElement('button'), sub = document.createElement('span');
+    b.textContent = t.name; b.disabled = !t.ready;
+    sub.className = 'sub'; sub.textContent = !t.ready ? t.problem : t.maxMb > 0 ? `each re-encoded first if over ${t.maxMb} MB` : 'sent as they are';
+    b.append(sub); b.onclick = () => shareSelected(t); box.append(b);
+  }
+};
+$('selShareMenu').onclick = e => e.stopPropagation();
+document.addEventListener('click', () => { $('selShareMenu').hidden = true; });
+async function shareSelected(target) {
+  $('selShareMenu').hidden = true;
+  if (shareJob) return toast('still sending; click the message to cancel it', true);
+  const clips = [...select.keys].map(k => { const i = k.indexOf('/'); return { profile: k.slice(0, i), file: k.slice(i + 1) }; });
+  const t = $('toast');
+  try {
+    let b = shareJob = await api('/share/batches', { body: { target: target.id, clips } });
+    selectMode(false);
+    t.onclick = () => api('/share/batches/' + b.id, { method: 'DELETE' }).catch(() => {});
+    t.classList.add('clickable');
+    while (b.stage === 'running' || b.stage === 'waiting') {
+      const n = b.items.filter(i => i.stage).length, j = b.current;
+      const now = b.stage === 'waiting' ? 'waiting until the game being recorded ends'
+        : !j ? 'starting…' : j.stage === 'encoding' ? `re-encoding to fit under ${target.maxMb} MB…`
+        : `sending${j.progress != null ? ` ${Math.round(j.progress * 100)}%` : '…'}` + (j.note ? ' · ' + j.note : '');
+      toast(`${target.name}: clip ${Math.min(n + 1, b.count)} of ${b.count} · ${now} (click to cancel)`, false, 300000);
+      await new Promise(r => setTimeout(r, 700));
+      b = await api('/share/batches/' + b.id);
+    }
+    const sent = b.items.filter(i => i.stage === 'done'), failed = b.items.filter(i => i.stage === 'failed');
+    const links = sent.map(i => i.url).filter(Boolean);
+    let copied = false;
+    if (links.length) try { await navigator.clipboard.writeText(links.join('\n')); copied = true; } catch { }
+    const left = b.count - sent.length - failed.length;
+    toast(`${target.name}: ${sent.length} of ${b.count} sent` + (copied ? ` · ${links.length === 1 ? 'link' : links.length + ' links'} copied` : links.length ? ' · ' + links.join(' ') : '')
+      + (failed.length ? ` · not sent: ${failed.map(i => `${i.file} (${i.error})`).join('; ')}` : '') + (left ? ` · ${left} cancelled` : ''), failed.length > 0, failed.length || (links.length && !copied) ? 15000 : 0);
+    if (b.items.some(i => i.reencoded) && state.tab === 'clips') refreshList();
+  } catch (e) { toast('not sent: ' + e.message, true); }
+  finally { shareJob = null; t.onclick = null; t.classList.remove('clickable'); }
+}
 $('selDelete').onclick = async () => {
   const b = $('selDelete'), clips = state.tab === 'clips', n = select.keys.size;
   if (!b.classList.contains('arm')) { b.classList.add('arm'); b.querySelector('span').textContent = `Delete ${n}? Click again`; selDeleteTimer = setTimeout(selectBar, 4000); return; }

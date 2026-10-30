@@ -213,6 +213,9 @@ kbd { display: inline-block; min-width: 20px; padding: 1px 6px; border-radius: 5
 .select-bar .btn.small { padding: 4px 8px; }
 .select-bar #selectCount { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .select-bar .btn:disabled { opacity: .45; cursor: default; }
+/* the share menu opens upward from the select bar, lined up with its left edge so it stays inside the sidebar */
+.select-bar { position: relative; }
+.menu.up { top: auto; bottom: calc(100% + 4px); left: 8px; right: 8px; min-width: 0; }
 .select-bar .btn.danger.arm { background: var(--red-bg2); border-color: var(--red-line2); color: var(--red-text); }
 .btn.danger.arm { background: var(--red-bg2); border-color: var(--red-line2); color: var(--red-text); }
 /* the stage grows with the video and shrinks so the timeline below always stays in view */

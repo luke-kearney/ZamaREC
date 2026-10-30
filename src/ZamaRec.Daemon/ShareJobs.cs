@@ -32,11 +32,42 @@ public sealed class ShareJobs(ZamaRecConfig cfg, SessionCatalog cat, RecordingCo
         public bool Reencoded { get; set; }
         internal CancellationTokenSource Cancel { get; } = new();
         internal DateTimeOffset? Ended { get; set; }
+        internal Task Done { get; set; } = Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Several clips to one target, sent one at a time: each is an ordinary job, so a module sees nothing new.
+    /// Between clips it waits while a game is being recorded, so a re-encode or upload never starts during play.
+    /// </summary>
+    public sealed class Batch
+    {
+        public string Id { get; } = Guid.NewGuid().ToString("N")[..12];
+        public required string Target { get; init; }
+        public required List<BatchItem> Items { get; init; }
+        /// <summary>running | waiting (a game is being recorded) | done | cancelled</summary>
+        public string Stage { get; set; } = "running";
+        /// <summary>The job of the clip being sent now.</summary>
+        public Job? Current { get; set; }
+        internal CancellationTokenSource Cancel { get; } = new();
+        internal DateTimeOffset? Ended { get; set; }
+    }
+
+    public sealed class BatchItem
+    {
+        public required string File { get; init; }
+        public required string Profile { get; init; }
+        public required string Path { get; init; }
+        /// <summary>null until its turn, then done | failed | cancelled</summary>
+        public string? Stage { get; set; }
+        public string? Url { get; set; }
+        public string? Error { get; set; }
+        public bool Reencoded { get; set; }
     }
 
     public sealed record Target(string Id, string Name, double MaxMb, bool Ready, string? Problem);
 
     private readonly ConcurrentDictionary<string, Job> _jobs = new();
+    private readonly ConcurrentDictionary<string, Batch> _batches = new();
 
     /// <summary>What the Share menu offers: Discord first, then the modules in config order.</summary>
     public IEnumerable<Target> Targets()
@@ -75,8 +106,67 @@ public sealed class ShareJobs(ZamaRecConfig cfg, SessionCatalog cat, RecordingCo
         var maxMb = isDiscord ? cfg.Share.DiscordMaxMb : module!.MaxMb;
         var job = new Job { Target = name };
         _jobs[job.Id] = job;
-        _ = Task.Run(() => RunAsync(job, name, maxMb, clipPath, profile, message, ct => isDiscord ? SendToDiscordAsync(webhook!, job, message, ct) : SendToModuleAsync(module!, job, clipPath, profile, message, ct)));
+        job.Done = Task.Run(() => RunAsync(job, name, maxMb, clipPath, profile, message, ct => isDiscord ? SendToDiscordAsync(webhook!, job, message, ct) : SendToModuleAsync(module!, job, clipPath, profile, message, ct)));
         return (job, null);
+    }
+
+    public Batch? FindBatch(string id) => _batches.GetValueOrDefault(id);
+
+    /// <summary>Cancels the clip being sent and every one still waiting; those already sent stay sent.</summary>
+    public bool CancelBatch(string id)
+    {
+        if (FindBatch(id) is not { Ended: null } batch) return false;
+        batch.Cancel.Cancel();
+        if (batch.Current is { } job) CancelJob(job.Id);
+        return true;
+    }
+
+    /// <summary>Starts sending several clips (path, profile) to one target, in turn; null with the reason when the target cannot take them.</summary>
+    public (Batch? Batch, string? Error) StartBatch(string targetId, IReadOnlyList<(string Path, string Profile)> clips)
+    {
+        foreach (var old in _batches.Values.Where(b => b.Ended is { } at && at < DateTimeOffset.Now.AddMinutes(-30))) _batches.TryRemove(old.Id, out _);
+        if (clips.Count == 0) return (null, "no clips to send");
+        if (Targets().FirstOrDefault(t => string.Equals(t.Id, targetId, StringComparison.OrdinalIgnoreCase)) is not { } target) return (null, $"no share target is called '{targetId}'");
+        if (!target.Ready) return (null, target.Problem);
+        var batch = new Batch
+        {
+            Target = target.Name,
+            Items = clips.Select(c => new BatchItem { File = System.IO.Path.GetFileName(c.Path), Profile = c.Profile, Path = c.Path }).ToList(),
+        };
+        _batches[batch.Id] = batch;
+        _ = Task.Run(() => RunBatchAsync(batch, target.Id));
+        return (batch, null);
+    }
+
+    private async Task RunBatchAsync(Batch batch, string targetId)
+    {
+        var ct = batch.Cancel.Token;
+        try
+        {
+            foreach (var item in batch.Items)
+            {
+                // a game being recorded comes first: the next re-encode or upload waits until it ends (a desktop recording does not count)
+                while (rec.ActiveSession?.Info.Profile is { } playing && !string.Equals(playing, DesktopConfig.ProfileName, StringComparison.OrdinalIgnoreCase))
+                {
+                    batch.Stage = "waiting";
+                    await Task.Delay(2000, ct);
+                }
+                batch.Stage = "running";
+                ct.ThrowIfCancellationRequested();
+                var (job, error) = Start(targetId, item.Path, item.Profile, WebApi.ReadClipInfo(item.Path, item.Profile).Label);
+                if (job is null) { item.Stage = "failed"; item.Error = error; continue; }
+                batch.Current = job;
+                await job.Done;
+                item.Stage = job.Stage; item.Url = job.Url; item.Error = job.Error; item.Reencoded = job.Reencoded;
+                ct.ThrowIfCancellationRequested();
+            }
+            batch.Stage = "done";
+        }
+        catch (OperationCanceledException) { batch.Stage = "cancelled"; }
+        catch (Exception ex) { log.LogWarning(ex, "sending several clips to {target} failed", batch.Target); batch.Stage = "done"; }
+        foreach (var item in batch.Items.Where(i => i.Stage is null)) item.Stage = "cancelled";
+        batch.Current = null;
+        batch.Ended = DateTimeOffset.Now;
     }
 
     private async Task RunAsync(Job job, string name, double maxMb, string clipPath, string profile, string? message, Func<CancellationToken, Task<ShareResult>> send)

@@ -89,7 +89,7 @@
         <button class="tab" data-tab="clips">Clips</button>
       </div>
       <select id="profileFilter" class="sel" title="show one game's sessions and clips"><option value="">all games</option></select>
-      <button class="tbtn pin" id="selectBtn" title="select several, to star or delete them together">
+      <button class="tbtn pin" id="selectBtn" title="select several, to star, share or delete them together">
         <svg viewBox="0 0 24 24"><path d="M9 11l3 3 8-8M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9"/></svg>
       </button>
     </div>
@@ -100,6 +100,8 @@
       <button class="btn small" id="selAll">All</button>
       <button class="btn small" id="selStar" title="star the selected clips">Star</button>
       <button class="btn small" id="selUnstar" title="unstar the selected clips">Unstar</button>
+      <span class="sel-share"><button class="btn small" id="selShare" title="send the selected clips, one post each">Share</button>
+        <div id="selShareMenu" class="menu up" hidden><div class="menu-title">Send each clip to</div><div id="selShareTargets" class="menu-group"></div></div></span>
       <button class="btn small danger" id="selDelete"><span>Delete</span></button>
       <button class="tiny" id="selDone" title="leave select mode"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
     </div>

@@ -58,6 +58,15 @@ shift+click ticks everything up to the last one. The bar at the bottom then star
 deletes the ticked clips, or deletes the ticked sessions (their clips are kept; the one being
 recorded cannot be ticked). Delete asks for a second click.
 
+**Sharing several clips.** *Share* in that bar sends every ticked clip to Discord or a share module,
+each as its own post or module run, one after the other (a module sees nothing new: it is started
+once per clip). Each clip is re-encoded first if it is over the target's limit, and goes out with its
+name as the message. The daemon runs the batch, so closing the window does not stop it; between
+clips it waits while a game is being recorded (a desktop recording does not count), so no re-encode
+or upload starts during play. The message at the bottom follows it ("clip 2 of 5 · sending 41%"),
+and a click on it cancels the clip being sent and the rest. At the end the links are copied to the
+clipboard, one per line, and the message lists any clip that was not sent and why.
+
 ## Player and timeline
 
 ![The timeline with game markers and a selected range](screenshots/timeline.webp)

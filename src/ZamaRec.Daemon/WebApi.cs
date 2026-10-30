@@ -551,7 +551,32 @@ public static class WebApi
         });
         api.MapGet("/share/jobs/{id}", (string id, ShareJobs share) => share.Find(id) is { } job ? Results.Ok(ShareJobView(job)) : Results.NotFound());
         api.MapDelete("/share/jobs/{id}", (string id, ShareJobs share) => share.CancelJob(id) ? Results.Ok(new { Ok = true }) : Results.NotFound());
+
+        // Several clips to one target, one after the other; the answer is a batch to ask about.
+        api.MapPost("/share/batches", (ShareBatchBody req, SessionCatalog cat, ShareJobs share) =>
+        {
+            var clips = new List<(string, string)>();
+            foreach (var c in req.Clips ?? [])
+            {
+                if (cat.ClipPath(c.Profile, c.File) is not { } p) return Results.BadRequest(new { Error = $"no clip {c.Profile}/{c.File}" });
+                clips.Add((p, c.Profile));
+            }
+            var (batch, error) = share.StartBatch(req.Target ?? "", clips);
+            return batch is null ? Results.BadRequest(new { Error = error }) : Results.Ok(ShareBatchView(batch));
+        });
+        api.MapGet("/share/batches/{id}", (string id, ShareJobs share) => share.FindBatch(id) is { } b ? Results.Ok(ShareBatchView(b)) : Results.NotFound());
+        api.MapDelete("/share/batches/{id}", (string id, ShareJobs share) => share.CancelBatch(id) ? Results.Ok(new { Ok = true }) : Results.NotFound());
     }
+
+    public sealed record ShareBatchClip(string Profile, string File);
+    public sealed record ShareBatchBody(string? Target, List<ShareBatchClip>? Clips);
+
+    private static object ShareBatchView(ShareJobs.Batch b) => new
+    {
+        b.Id, b.Target, b.Stage, Count = b.Items.Count,
+        Current = b.Current is { } j && b.Ended is null ? ShareJobView(j) : null,
+        Items = b.Items.Select(i => new { i.File, i.Profile, i.Stage, i.Url, i.Error, i.Reencoded }),
+    };
 
     private static object ShareJobView(ShareJobs.Job j) =>
         new { j.Id, j.Target, j.Stage, j.Progress, j.Note, j.Url, j.Error, File = j.File is null ? null : Path.GetFileName(j.File), j.Bytes, j.Reencoded };
