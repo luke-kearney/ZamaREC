@@ -207,9 +207,9 @@ not recorded this way.
 
 ## `[desktop]`
 
-A recording with no game behind it, started by hand: `zamarec start` (or Record in the web UI, or
-Start recording in the tray) when no game runs, or `zamarec start desktop` at any time. It is a
-timeline of `capture.monitor` with the `capture` audio, and it runs until you stop it.
+A recording with no game behind it, started by hand: `zamarec start` (or a click on the status
+pill in the web UI, or Start recording in the tray) when no game runs, or `zamarec start desktop`
+at any time. It is a timeline of `capture.monitor` with the `capture` audio, and it runs until you stop it.
 
 | key | default | meaning |
 |---|---|---|

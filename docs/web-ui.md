@@ -23,12 +23,14 @@ browser. The page also has a web app manifest, so a Chromium browser offers to i
 
 ## Header
 
-- **On/off switch**: auto recording. Off opens a menu: for the rest of this game, for 1/2/8 hours,
-  or until turned back on. A running session is stopped. Record and `zamarec start` still work.
+- **On/off switch**: auto recording. A click opens a menu: **Stop this session** while recording
+  (auto recording stays on; a game stopped this way is not recorded again until it exits or you
+  start it), and turning auto recording off for the rest of this game, for 1/2/8 hours, or until
+  turned back on, which also stops a running session. When it is off, a click turns it back on
+  (through the menu if a session runs). Starting from the status pill and `zamarec start` still work.
 - **Status pill**: idle, recording (profile, mode, elapsed, window), or paused with the reason.
-- **Record / Stop**: Record starts the game that is running, else a desktop recording (`[desktop]`);
-  Stop ends the session. A game stopped this way is not recorded again until it exits or you press
-  Record.
+  When nothing records, hovering shows **record**: a click starts the game that is running, else a
+  desktop recording (`[desktop]`).
 - **cpu / ram / tmpfs**: ZamaREC's own usage, daemon plus recorder, from `/proc`. Click the CPU
   figure to switch between share of all cores and one core. **clear** drops RAM footage of finished
   sessions (asks for a second click).

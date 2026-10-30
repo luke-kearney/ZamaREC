@@ -42,17 +42,24 @@
   <div class="switch-wrap">
     <button id="powerBtn" class="switch on" title="auto recording on/off"><span class="knob"></span></button>
     <div id="pauseMenu" class="menu" hidden>
-      <div class="menu-title">Turn off recording</div>
-      <button data-pause="session">for the rest of this game</button>
-      <button data-pause="until" data-hours="1">for 1 hour</button>
-      <button data-pause="until" data-hours="2">for 2 hours</button>
-      <button data-pause="until" data-hours="8">for 8 hours</button>
-      <button data-pause="forever">until I turn it back on</button>
-      <div class="menu-note">A running session is stopped. Record (or <code>zamarec start</code>) still works.</div>
+      <div class="menu-group" id="stopGroup">
+        <button id="stopBtn">Stop this session<span class="sub">auto recording stays on; this game is not recorded again until it exits</span></button>
+      </div>
+      <div class="menu-group" id="offGroup">
+        <div class="menu-title">Turn off recording</div>
+        <button data-pause="session">for the rest of this game</button>
+        <button data-pause="until" data-hours="1">for 1 hour</button>
+        <button data-pause="until" data-hours="2">for 2 hours</button>
+        <button data-pause="until" data-hours="8">for 8 hours</button>
+        <button data-pause="forever">until I turn it back on</button>
+        <div class="menu-note">A running session is stopped. Starting from the status pill (or <code>zamarec start</code>) still works.</div>
+      </div>
+      <div class="menu-group" id="onGroup">
+        <button id="resumeBtn">Turn auto recording back on</button>
+      </div>
     </div>
   </div>
-  <div id="status" class="status idle"><span class="dot"></span><span class="txt">idle</span></div>
-  <button id="recBtn" class="btn small" type="button" title="start recording: the game that is running, else the desktop">Record</button>
+  <div id="status" class="status idle" role="button" tabindex="0"><span class="dot"></span><span class="txt">idle</span><span class="act" aria-hidden="true">record</span></div>
   <div class="usage" id="usage" title="ZamaREC's own CPU (per core) and memory: daemon + recorder">
     <span class="u" id="uCpuWrap" title="click to switch between share of all cores and share of one core" style="cursor:pointer"><span class="k" id="uCpuK">cpu</span><span class="v mono" id="uCpu">–</span></span>
     <span class="u"><span class="k">ram</span><span class="v mono" id="uRss">–</span></span>
